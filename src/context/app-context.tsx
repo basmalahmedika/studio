@@ -14,8 +14,10 @@ import {
   query,
   orderBy,
   runTransaction,
+  getDocs,
+  where,
 } from 'firebase/firestore';
-import type { InventoryItem, Transaction, TransactionItem } from '@/lib/types';
+import type { InventoryItem, Transaction } from '@/lib/types';
 
 interface AppContextType {
   inventory: InventoryItem[];
@@ -79,13 +81,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const bulkAddInventoryItems = async (items: Omit<InventoryItem, 'id'>[]) => {
-    const batch = writeBatch(db);
-    const inventoryCollection = collection(db, 'inventory');
-    items.forEach(item => {
-      const newDocRef = doc(inventoryCollection);
-      batch.set(newDocRef, item);
-    });
-    await batch.commit();
+      const batch = writeBatch(db);
+      const inventoryCollection = collection(db, 'inventory');
+      
+      for (const item of items) {
+          // Check for existing item with the same name and batch number
+          const q = query(inventoryCollection, where("itemName", "==", item.itemName), where("batchNumber", "==", item.batchNumber));
+          const querySnapshot = await getDocs(q);
+          
+          if (!querySnapshot.empty) {
+              // Item exists, update it
+              const existingDoc = querySnapshot.docs[0];
+              const docRef = doc(db, 'inventory', existingDoc.id);
+              const newQuantity = (existingDoc.data().quantity || 0) + item.quantity;
+              batch.update(docRef, { ...item, quantity: newQuantity });
+          } else {
+              // Item doesn't exist, create it
+              const newDocRef = doc(inventoryCollection);
+              batch.set(newDocRef, item);
+          }
+      }
+      
+      await batch.commit();
   };
 
   // TRANSACTION MANAGEMENT & STOCK SYNCHRONIZATION

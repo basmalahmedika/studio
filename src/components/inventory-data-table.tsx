@@ -114,35 +114,55 @@ const excelSerialDateToJSDate = (serial: number): Date => {
   const utc_days = Math.floor(serial - 25569);
   const utc_value = utc_days * 86400;
   const date_info = new Date(utc_value * 1000);
-  return new Date(date_info.getFullYear(), date_info.getMonth(), date_info.getDate());
+  const offset = date_info.getTimezoneOffset();
+  date_info.setMinutes(date_info.getMinutes() + offset);
+  return date_info;
 };
 
 const parseDateFromExcel = (dateValue: any): Date | null => {
   if (dateValue === null || typeof dateValue === 'undefined' || dateValue === '') return null;
 
+  // Handle JS Date objects
   if (dateValue instanceof Date && !isNaN(dateValue.getTime())) {
     return dateValue;
   }
   
+  // Handle Excel serial numbers
   if (typeof dateValue === 'number') {
     return excelSerialDateToJSDate(dateValue);
   }
   
+  // Handle string dates (e.g., "dd/mm/yyyy", "mm/dd/yyyy", "yyyy-mm-dd")
   if (typeof dateValue === 'string') {
-    const parts = dateValue.match(/(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
-    if (parts) {
-      const day = parseInt(parts[1], 10);
-      const month = parseInt(parts[2], 10) - 1;
-      const year = parseInt(parts[3], 10);
-      if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
-        const date = new Date(year, month, day);
-        if (date.getFullYear() === year && date.getMonth() === month && date.getDate() === day) {
-          return date;
+    // Attempt to parse various formats
+    const formats = [
+      /(\d{1,2})[/-](\d{1,2})[/-](\d{4})/, // dd/mm/yyyy or mm/dd/yyyy
+      /(\d{4})[/-](\d{1,2})[/-](\d{1,2})/, // yyyy/mm/dd
+    ];
+    for (const regex of formats) {
+        const parts = dateValue.match(regex);
+        if (parts) {
+            let year, month, day;
+            if(regex.source.startsWith('(\\d{4})')) { // yyyy-mm-dd
+                year = parseInt(parts[1], 10);
+                month = parseInt(parts[2], 10) - 1;
+                day = parseInt(parts[3], 10);
+            } else { // dd-mm-yyyy or mm-dd-yyyy (assume dd/mm for robustness)
+                day = parseInt(parts[1], 10);
+                month = parseInt(parts[2], 10) - 1;
+                year = parseInt(parts[3], 10);
+            }
+            if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+                const date = new Date(Date.UTC(year, month, day));
+                 if (date.getUTCFullYear() === year && date.getUTCMonth() === month && date.getUTCDate() === day) {
+                    return date;
+                }
+            }
         }
-      }
     }
   }
 
+  // Fallback to direct parsing
   const parsedDate = new Date(dateValue);
   if (!isNaN(parsedDate.getTime())) {
     return parsedDate;
@@ -246,15 +266,27 @@ export function InventoryDataTable() {
           const workbook = XLSX.read(data, { type: 'array', cellDates: true });
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
-          const json = XLSX.utils.sheet_to_json(worksheet, { defval: null });
+          const json = XLSX.utils.sheet_to_json(worksheet, { defval: null, header: 1 });
+          
+          if(json.length < 2) {
+             throw new Error("The Excel file is empty or contains only a header.");
+          }
+
+          const headers = json[0] as string[];
+          const rows = json.slice(1);
 
           const newItems = [];
-
-          for (let i = 0; i < json.length; i++) {
-            const row = json[i] as any;
+          for (let i = 0; i < rows.length; i++) {
+            const rowData = rows[i] as any[];
             const rowIndex = i + 2; // Excel rows are 1-based, plus header
 
-            const validationResult = excelRowSchema.safeParse(row);
+            const rowObject = headers.reduce((obj, header, index) => {
+                obj[header] = rowData[index];
+                return obj;
+            }, {} as {[key: string]: any});
+
+
+            const validationResult = excelRowSchema.safeParse(rowObject);
 
             if (!validationResult.success) {
               const firstError = validationResult.error.issues[0];

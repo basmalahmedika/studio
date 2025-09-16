@@ -27,10 +27,10 @@ export default function DashboardPage() {
       const transactionDate = new Date(t.date);
       transactionDate.setHours(0, 0, 0, 0);
 
-      const fromDate = date?.from;
+      const fromDate = date?.from ? new Date(date.from) : null;
       if (fromDate) fromDate.setHours(0, 0, 0, 0);
       
-      const toDate = date?.to;
+      const toDate = date?.to ? new Date(date.to) : null;
       if (toDate) toDate.setHours(0, 0, 0, 0);
 
       return fromDate && toDate 
