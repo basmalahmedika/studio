@@ -2,7 +2,7 @@
 'use client';
 
 import * as React from 'react';
-import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 import { FileDown } from 'lucide-react';
 import {
   Table,
@@ -111,22 +111,26 @@ export function AbcAnalysis({ transactions }: AbcAnalysisProps) {
   const handleExportData = () => {
     const dataToExport = analyzedItems.map(item => ({
       'Item Name': item.name,
-      'Total Sales': `Rp ${item.totalSales.toLocaleString('id-ID')}`,
-      'Contribution (%)': `${item.contributionPercent.toFixed(2)}%`,
-      'Cumulative (%)': `${item.cumulativePercent.toFixed(2)}%`,
+      'Total Sales': item.totalSales,
+      'Contribution (%)': item.contributionPercent,
+      'Cumulative (%)': item.cumulativePercent,
       'Category': getCategoryLabel(item.category),
     }));
     
-    const csv = Papa.unparse(dataToExport);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'abc_analysis_report.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'ABC Analysis');
+    
+    // Set column widths
+    ws['!cols'] = [
+        { wch: 30 }, // Item Name
+        { wch: 15 }, // Total Sales
+        { wch: 15 }, // Contribution
+        { wch: 15 }, // Cumulative
+        { wch: 15 }, // Category
+    ];
+
+    XLSX.writeFile(wb, 'abc_analysis_report.xlsx');
   };
 
   return (
@@ -141,7 +145,7 @@ export function AbcAnalysis({ transactions }: AbcAnalysisProps) {
             </div>
             <Button variant="outline" size="sm" onClick={handleExportData}>
                 <FileDown className="mr-2 h-4 w-4" />
-                Export CSV
+                Export Excel
             </Button>
         </div>
       </CardHeader>

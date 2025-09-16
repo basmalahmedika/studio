@@ -7,7 +7,7 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { PlusCircle, MoreHorizontal, Pen, Trash2, CalendarIcon, X, FileDown } from 'lucide-react';
 import { format } from "date-fns";
-import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 import {
   Table,
   TableBody,
@@ -237,16 +237,16 @@ export function TransactionsDataTable() {
   }
   
   const handleExportData = () => {
-    const csv = Papa.unparse(transactions);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'transactions_export.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // We remove the nested 'items' array for a cleaner export
+    const dataToExport = filteredData.map(t => {
+      const { items, ...rest } = t;
+      return rest;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Transactions');
+    XLSX.writeFile(wb, 'transactions_export.xlsx');
   };
 
 
@@ -292,7 +292,7 @@ export function TransactionsDataTable() {
           <div className="flex flex-wrap gap-2">
              <Button variant="outline" onClick={handleExportData}>
               <FileDown className="mr-2 h-4 w-4" />
-              Export CSV
+              Export Excel
             </Button>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>

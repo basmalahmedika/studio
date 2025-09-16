@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 import {
   Table,
   TableBody,
@@ -32,16 +32,17 @@ export function LowStockReport() {
       'Nama Item': item.itemName,
       'Sisa Kuantitas': item.quantity,
     }));
-    const csv = Papa.unparse(dataToExport);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'low_stock_report.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Low Stock');
+
+    ws['!cols'] = [
+        { wch: 30 }, 
+        { wch: 15 },
+    ];
+
+    XLSX.writeFile(wb, 'low_stock_report.xlsx');
   };
 
   return (
@@ -59,7 +60,7 @@ export function LowStockReport() {
           </div>
            <Button variant="outline" size="sm" onClick={handleExportData}>
               <FileDown className="mr-2 h-4 w-4" />
-              Export CSV
+              Export Excel
           </Button>
         </div>
       </CardHeader>

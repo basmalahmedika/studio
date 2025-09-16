@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { differenceInMonths, parseISO, formatDistanceToNowStrict } from 'date-fns';
 import { id } from 'date-fns/locale';
-import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 import {
   Table,
   TableBody,
@@ -70,23 +70,26 @@ export function ExpiringStockReport() {
   
   const handleExportData = () => {
     const dataToExport = expiringItems.map((item, index) => ({
-      No: index + 1,
+      'No.': index + 1,
       'Nama Item': item.itemName,
       'Tanggal Kadaluarsa': item.expiredDate,
       'Sisa Waktu': item.timeLeft,
-      Status: item.zone,
+      'Status': item.zone,
     }));
     
-    const csv = Papa.unparse(dataToExport);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'expiring_stock_report.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Expiring Stock');
+    
+    ws['!cols'] = [
+        { wch: 5 }, 
+        { wch: 30 },
+        { wch: 15 },
+        { wch: 20 },
+        { wch: 10 },
+    ];
+
+    XLSX.writeFile(wb, 'expiring_stock_report.xlsx');
   };
 
   return (
@@ -104,7 +107,7 @@ export function ExpiringStockReport() {
           </div>
           <Button variant="outline" size="sm" onClick={handleExportData}>
               <FileDown className="mr-2 h-4 w-4" />
-              Export CSV
+              Export Excel
           </Button>
         </div>
       </CardHeader>

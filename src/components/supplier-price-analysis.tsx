@@ -2,7 +2,7 @@
 'use client';
 
 import * as React from 'react';
-import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 import { DollarSign, FileDown } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -54,21 +54,23 @@ export function SupplierPriceAnalysis({ inventory }: { inventory: InventoryItem[
       item.suppliers.map(supplierInfo => ({
         'Item Name': item.itemName,
         'Supplier': supplierInfo.supplier,
-        'Purchase Price': `Rp ${supplierInfo.price.toLocaleString('id-ID')}`,
+        'Purchase Price': supplierInfo.price,
         'Is Lowest Price': supplierInfo.isLowest ? 'Yes' : 'No',
       }))
     );
     
-    const csv = Papa.unparse(dataToExport);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `supplier_price_analysis_${activeTab.toLowerCase()}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, `Price Analysis ${activeTab}`);
+
+    ws['!cols'] = [
+        { wch: 30 },
+        { wch: 20 },
+        { wch: 15 },
+        { wch: 15 },
+    ];
+    
+    XLSX.writeFile(wb, `supplier_price_analysis_${activeTab.toLowerCase()}.xlsx`);
   };
 
 
@@ -87,7 +89,7 @@ export function SupplierPriceAnalysis({ inventory }: { inventory: InventoryItem[
             </div>
             <Button variant="outline" size="sm" onClick={handleExportData}>
                 <FileDown className="mr-2 h-4 w-4" />
-                Export CSV
+                Export Excel
             </Button>
         </div>
       </CardHeader>

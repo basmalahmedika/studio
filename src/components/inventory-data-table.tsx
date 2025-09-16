@@ -8,7 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { PlusCircle, MoreHorizontal, Pen, Trash2, Upload, Download, FileDown } from 'lucide-react';
 import { format } from "date-fns"
 import { Calendar as CalendarIcon } from "lucide-react"
-import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 
 import {
   Table,
@@ -92,6 +92,21 @@ const inventorySchema = z.object({
 });
 
 type InventoryFormValues = z.infer<typeof inventorySchema>;
+
+// Function to convert Excel serial date to JS Date
+const excelSerialDateToJSDate = (serial: number) => {
+  const utc_days = Math.floor(serial - 25569);
+  const utc_value = utc_days * 86400;
+  const date_info = new Date(utc_value * 1000);
+  const fractional_day = serial - Math.floor(serial) + 0.0000001;
+  let total_seconds = Math.floor(86400 * fractional_day);
+  const seconds = total_seconds % 60;
+  total_seconds -= seconds;
+  const hours = Math.floor(total_seconds / (60 * 60));
+  const minutes = Math.floor(total_seconds / 60) % 60;
+  return new Date(date_info.getFullYear(), date_info.getMonth(), date_info.getDate(), hours, minutes, seconds);
+};
+
 
 export function InventoryDataTable() {
   const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem, bulkAddInventoryItems } = useAppContext();
@@ -182,43 +197,44 @@ export function InventoryDataTable() {
  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        complete: async (results) => {
-          try {
-            const parsedData = z.array(inventorySchema.omit({id: true})).parse(results.data.map((d: any) => ({
-                ...d,
-                inputDate: new Date(d.inputDate as string),
-                expiredDate: new Date(d.expiredDate as string),
-                quantity: Number(d.quantity),
-                purchasePrice: Number(d.purchasePrice),
-                sellingPriceRJ: Number(d.sellingPriceRJ),
-                sellingPriceRI: Number(d.sellingPriceRI),
-            })));
-            
-            const newItems = parsedData.map(item => ({
-              ...item,
-              inputDate: format(item.inputDate, "yyyy-MM-dd"),
-              expiredDate: format(item.expiredDate, "yyyy-MM-dd"),
-            }));
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const json = XLSX.utils.sheet_to_json(worksheet);
 
-            await bulkAddInventoryItems(newItems);
-            toast({ title: "Upload Successful", description: `${newItems.length} new items have been added.` });
-          } catch (error) {
-             if (error instanceof z.ZodError) {
-                console.error("CSV validation error:", error.issues);
-                toast({ variant: "destructive", title: "Upload Failed", description: "CSV data is invalid. Please check the file and try again." });
-            } else {
-                console.error("An unexpected error occurred:", error);
-                toast({ variant: "destructive", title: "Upload Failed", description: "An unexpected error occurred during file processing." });
-            }
+          const parsedData = z.array(inventorySchema.omit({id: true})).parse(json.map((d: any) => ({
+              ...d,
+              inputDate: typeof d.inputDate === 'number' ? excelSerialDateToJSDate(d.inputDate) : new Date(d.inputDate),
+              expiredDate: typeof d.expiredDate === 'number' ? excelSerialDateToJSDate(d.expiredDate) : new Date(d.expiredDate),
+              quantity: Number(d.quantity),
+              purchasePrice: Number(d.purchasePrice),
+              sellingPriceRJ: Number(d.sellingPriceRJ),
+              sellingPriceRI: Number(d.sellingPriceRI),
+          })));
+          
+          const newItems = parsedData.map(item => ({
+            ...item,
+            inputDate: format(item.inputDate, "yyyy-MM-dd"),
+            expiredDate: format(item.expiredDate, "yyyy-MM-dd"),
+          }));
+
+          await bulkAddInventoryItems(newItems);
+          toast({ title: "Upload Successful", description: `${newItems.length} new items have been added.` });
+        } catch (error) {
+           if (error instanceof z.ZodError) {
+              console.error("XLSX validation error:", error.issues);
+              toast({ variant: "destructive", title: "Upload Failed", description: "Data Excel tidak valid. Silakan periksa file dan coba lagi." });
+          } else {
+              console.error("An unexpected error occurred:", error);
+              toast({ variant: "destructive", title: "Upload Failed", description: "Terjadi kesalahan tak terduga saat memproses file." });
           }
-        },
-        error: (error) => {
-           toast({ variant: "destructive", title: "Upload Failed", description: error.message });
         }
-      });
+      };
+      reader.readAsArrayBuffer(file);
     }
     if (event.target) event.target.value = '';
   };
@@ -228,29 +244,17 @@ export function InventoryDataTable() {
       'inputDate', 'itemName', 'batchNumber', 'itemType', 'category', 'unit', 
       'quantity', 'purchasePrice', 'sellingPriceRJ', 'sellingPriceRI', 'expiredDate', 'supplier'
     ];
-    const csv = Papa.unparse([headers]);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'inventory_template.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const ws = XLSX.utils.aoa_to_sheet([headers]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Template');
+    XLSX.writeFile(wb, 'inventory_template.xlsx');
   };
 
   const handleExportData = () => {
-    const csv = Papa.unparse(inventory);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'inventory_export.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const ws = XLSX.utils.json_to_sheet(inventory);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Inventory');
+    XLSX.writeFile(wb, 'inventory_export.xlsx');
   };
 
   return (
@@ -264,7 +268,7 @@ export function InventoryDataTable() {
               ref={fileInputRef}
               onChange={handleFileUpload}
               className="hidden"
-              accept=".csv"
+              accept=".xlsx, .xls"
             />
              <Button variant="outline" onClick={handleDownloadTemplate}>
               <Download className="mr-2 h-4 w-4" />
@@ -272,11 +276,11 @@ export function InventoryDataTable() {
             </Button>
             <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
               <Upload className="mr-2 h-4 w-4" />
-              Upload CSV
+              Upload Excel
             </Button>
              <Button variant="outline" onClick={handleExportData}>
               <FileDown className="mr-2 h-4 w-4" />
-              Export CSV
+              Export Excel
             </Button>
             <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
               <DialogTrigger asChild>
