@@ -223,28 +223,32 @@ export function InventoryDataTable() {
           const worksheet = workbook.Sheets[sheetName];
           const json = XLSX.utils.sheet_to_json(worksheet);
 
-          // 1. Validate the structure and types first
           const validatedData = excelImportSchema.parse(json);
 
-          // 2. Convert and format the data for Firestore
-          const newItems = validatedData.map(item => {
-            const parseDate = (dateValue: any): Date => {
-              if (typeof dateValue === 'number') {
-                return excelSerialDateToJSDate(dateValue);
-              }
-              // Attempt to parse string dates, assuming common formats
+          const parseDate = (dateValue: any): Date => {
+            if (typeof dateValue === 'number') {
+              return excelSerialDateToJSDate(dateValue);
+            }
+            if (typeof dateValue === 'string') {
               const parsed = new Date(dateValue);
               if (!isNaN(parsed.getTime())) {
-                  return parsed;
+                return parsed;
               }
-              throw new Error(`Invalid date format: ${dateValue}`);
-            };
+            }
+            throw new Error(`Invalid date format: ${dateValue}`);
+          };
 
-            return {
-              ...item,
-              inputDate: format(parseDate(item.inputDate), "yyyy-MM-dd"),
-              expiredDate: format(parseDate(item.expiredDate), "yyyy-MM-dd"),
-            };
+          const newItems = validatedData.map(item => {
+            try {
+              return {
+                ...item,
+                inputDate: format(parseDate(item.inputDate), "yyyy-MM-dd"),
+                expiredDate: format(parseDate(item.expiredDate), "yyyy-MM-dd"),
+              };
+            } catch(e) {
+              console.error("Error parsing date for item:", item, e);
+              throw new Error("One of the dates in the Excel file is in an unrecognized format.");
+            }
           });
 
           await bulkAddInventoryItems(newItems);
@@ -255,7 +259,7 @@ export function InventoryDataTable() {
               toast({ variant: "destructive", title: "Upload Failed", description: "Data Excel tidak valid. Silakan periksa file dan coba lagi." });
           } else {
               console.error("An unexpected error occurred:", error);
-              toast({ variant: "destructive", title: "Upload Failed", description: "Terjadi kesalahan tak terduga saat memproses file." });
+              toast({ variant: "destructive", title: "Upload Failed", description: (error as Error).message || "Terjadi kesalahan tak terduga saat memproses file." });
           }
         }
       };
