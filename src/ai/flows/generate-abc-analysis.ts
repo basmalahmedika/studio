@@ -39,7 +39,10 @@ Medication Data: {{{medicationData}}}
 
 Additional Context: {{{additionalContext}}}
 
-Consider the sales, cost, and volume of each medication to categorize them into A (fast-moving), B (medium-moving), and C (slow-moving) categories.
+Categorize medications into three groups based on their sales contribution:
+1.  **Fast Moving (Category A):** These are the top items that contribute to approximately 70-80% of total sales value. This group usually consists of about 20-30% of your total items.
+2.  **Medium Moving (Category B):** These items account for the next 15-20% of total sales value.
+3.  **Slow Moving (Category C):** These items contribute the final 5-10% of total sales value. They are the most numerous but have the lowest sales volume.
 
 Provide a summary of your analysis.
 
