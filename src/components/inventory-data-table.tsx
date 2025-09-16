@@ -112,8 +112,6 @@ export function InventoryDataTable() {
       itemType: 'Obat',
       category: 'Oral',
       unit: 'Tablet',
-      inputDate: new Date(),
-      expiredDate: new Date(),
     }
   });
 
@@ -124,14 +122,14 @@ export function InventoryDataTable() {
           inputDate: format(values.inputDate, "yyyy-MM-dd"),
           expiredDate: format(values.expiredDate, "yyyy-MM-dd"),
         };
-        
-        delete formattedValues.id;
     
         if (values.id) {
-          await updateInventoryItem(values.id, formattedValues);
+          const { id, ...updateData } = formattedValues;
+          await updateInventoryItem(id!, updateData);
           toast({ title: "Success", description: "Item has been updated." });
         } else {
-          await addInventoryItem(formattedValues);
+          const { id, ...createData } = formattedValues;
+          await addInventoryItem(createData);
           toast({ title: "Success", description: "New item has been added." });
         }
         form.reset();
@@ -632,5 +630,7 @@ export function InventoryDataTable() {
     </Card>
   );
 }
+
+    
 
     
