@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Papa from 'papaparse';
 import {
   Table,
   TableBody,
@@ -10,9 +11,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { inventory } from '@/lib/data';
 import type { InventoryItem } from '@/lib/types';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, FileDown } from 'lucide-react';
 
 const LOW_STOCK_THRESHOLD = 50;
 
@@ -24,16 +26,41 @@ export function LowStockReport() {
     setLowStockItems(filteredItems);
   }, []);
 
+  const handleExportData = () => {
+    const dataToExport = lowStockItems.map((item) => ({
+      'Nama Item': item.itemName,
+      'Sisa Kuantitas': item.quantity,
+    }));
+    const csv = Papa.unparse(dataToExport);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'low_stock_report.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <AlertTriangle className="h-5 w-5 text-destructive" />
-          Low Stock Report
-        </CardTitle>
-        <CardDescription>
-          Items with quantity below {LOW_STOCK_THRESHOLD} units.
-        </CardDescription>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="space-y-1.5">
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Low Stock Report
+            </CardTitle>
+            <CardDescription>
+              Items with quantity below {LOW_STOCK_THRESHOLD} units.
+            </CardDescription>
+          </div>
+           <Button variant="outline" size="sm" onClick={handleExportData}>
+              <FileDown className="mr-2 h-4 w-4" />
+              Export CSV
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
          <div className="overflow-x-auto max-h-96">
