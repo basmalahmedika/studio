@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { LayoutDashboard, ReceiptText, BarChart2, Boxes } from 'lucide-react';
+import { LayoutDashboard, ReceiptText, BarChart2, Boxes, Warehouse } from 'lucide-react';
 import {
   SidebarHeader,
   SidebarContent,
@@ -14,6 +14,7 @@ import {
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/transactions', label: 'Transactions', icon: ReceiptText },
+  { href: '/dashboard/inventory', label: 'Inventory', icon: Warehouse },
   { href: '/dashboard/analysis', label: 'Analysis', icon: BarChart2 },
 ];
 

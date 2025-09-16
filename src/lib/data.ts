@@ -1,4 +1,4 @@
-import type { Medication, Transaction } from '@/lib/types';
+import type { Medication, Transaction, InventoryItem } from '@/lib/types';
 
 export const medications: Medication[] = [
   { id: 'med001', name: 'Paracetamol 500mg', stock: 250, price: 5000 },
@@ -44,3 +44,59 @@ const generateTransactions = (): Transaction[] => {
 };
 
 export const transactions: Transaction[] = generateTransactions();
+
+
+export const inventory: InventoryItem[] = [
+  {
+    id: 'inv001',
+    inputDate: '2024-05-01',
+    itemName: 'Paracetamol 500mg',
+    itemType: 'Obat',
+    category: 'Oral',
+    unit: 'Tablet',
+    quantity: 1000,
+    purchasePrice: 4000,
+    sellingPrice: 5000,
+    expiredDate: '2026-05-01',
+    supplier: 'Supplier A',
+  },
+  {
+    id: 'inv002',
+    inputDate: '2024-05-02',
+    itemName: 'Amoxicillin 250mg',
+    itemType: 'Obat',
+    category: 'Oral',
+    unit: 'Kapsul',
+    quantity: 500,
+    purchasePrice: 10000,
+    sellingPrice: 12000,
+    expiredDate: '2025-11-01',
+    supplier: 'Supplier B',
+  },
+  {
+    id: 'inv003',
+    inputDate: '2024-05-03',
+    itemName: 'Perban Steril 10cm',
+    itemType: 'Alkes',
+    category: 'Lainnya',
+    unit: 'Pcs',
+    quantity: 200,
+    purchasePrice: 2000,
+    sellingPrice: 3000,
+    expiredDate: '2027-01-01',
+    supplier: 'Supplier C',
+  },
+  {
+    id: 'inv004',
+    inputDate: '2024-05-04',
+    itemName: 'Insulin Pen',
+    itemType: 'Obat',
+    category: 'Injeksi',
+    unit: 'Pcs',
+    quantity: 50,
+    purchasePrice: 150000,
+    sellingPrice: 175000,
+    expiredDate: '2025-08-01',
+    supplier: 'Supplier A',
+  },
+];
