@@ -6,6 +6,14 @@ import { DayPicker } from "react-day-picker"
 
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>
 
@@ -23,7 +31,8 @@ function Calendar({
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4",
         caption: "flex justify-center pt-1 relative items-center",
-        caption_label: "text-sm font-medium",
+        caption_label: "text-sm font-medium hidden",
+        caption_dropdowns: "flex gap-2",
         nav: "space-x-1 flex items-center",
         nav_button: cn(
           buttonVariants({ variant: "outline" }),
@@ -54,12 +63,44 @@ function Calendar({
         ...classNames,
       }}
       components={{
-        IconLeft: ({ className, ...props }) => (
-          <ChevronLeft className={cn("h-4 w-4", className)} {...props} />
-        ),
-        IconRight: ({ className, ...props }) => (
-          <ChevronRight className={cn("h-4 w-4", className)} {...props} />
-        ),
+        IconLeft: () => <ChevronLeft className="h-4 w-4" />,
+        IconRight: () => <ChevronRight className="h-4 w-4" />,
+        Dropdown: ({ value, onChange, children, ...props }) => {
+          const options = React.Children.toArray(
+            children
+          ) as React.ReactElement<React.HTMLProps<HTMLOptionElement>>[]
+          const selected = options.find((child) => child.props.value === value)
+          const handleChange = (value: string) => {
+            const changeEvent = {
+              target: { value },
+            } as React.ChangeEvent<HTMLSelectElement>
+            onChange?.(changeEvent)
+          }
+          return (
+            <Select
+              value={value?.toString()}
+              onValueChange={(value) => {
+                handleChange(value)
+              }}
+            >
+              <SelectTrigger className="h-8 w-auto pr-1.5 focus:ring-0">
+                <SelectValue>{selected?.props?.children}</SelectValue>
+              </SelectTrigger>
+              <SelectContent position="popper">
+                <div className="max-h-60 overflow-y-auto">
+                    {options.map((option, id: number) => (
+                    <SelectItem
+                        key={`${option.props.value}-${id}`}
+                        value={option.props.value?.toString() ?? ""}
+                    >
+                        {option.props.children}
+                    </SelectItem>
+                    ))}
+                </div>
+              </SelectContent>
+            </Select>
+          )
+        },
       }}
       {...props}
     />

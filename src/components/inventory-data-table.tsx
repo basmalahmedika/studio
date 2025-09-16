@@ -96,8 +96,8 @@ type InventoryFormValues = z.infer<typeof inventorySchema>;
 // Schema for Excel import validation
 const excelImportSchema = z.array(z.object({
   inputDate: z.any(),
-  itemName: z.string().min(1),
-  batchNumber: z.string().min(1),
+  itemName: z.string().min(1, "itemName is required"),
+  batchNumber: z.string().min(1, "batchNumber is required"),
   itemType: z.enum(['Alkes', 'Obat']),
   category: z.enum(['Oral', 'Topikal', 'Injeksi', 'Suppositoria', 'Inhalasi/Nasal', 'Vaksin', 'Lainnya']),
   unit: z.enum(['Tablet', 'Kapsul', 'Vial', 'Amp', 'Pcs', 'Cm', 'Btl']),
@@ -106,7 +106,7 @@ const excelImportSchema = z.array(z.object({
   sellingPriceRJ: z.coerce.number(),
   sellingPriceRI: z.coerce.number(),
   expiredDate: z.any(),
-  supplier: z.string().min(1),
+  supplier: z.string().min(1, "supplier is required"),
 }));
 
 
@@ -122,6 +122,30 @@ const excelSerialDateToJSDate = (serial: number) => {
   const hours = Math.floor(total_seconds / (60 * 60));
   const minutes = Math.floor(total_seconds / 60) % 60;
   return new Date(date_info.getFullYear(), date_info.getMonth(), date_info.getDate(), hours, minutes, seconds);
+};
+
+const parseDateFromExcel = (dateValue: any): Date | null => {
+    if (!dateValue) return null;
+    if (dateValue instanceof Date && !isNaN(dateValue.getTime())) {
+        return dateValue;
+    }
+    // Handle Excel's numeric date format
+    if (typeof dateValue === 'number') {
+        return excelSerialDateToJSDate(dateValue);
+    }
+    // Handle dd/mm/yyyy string format
+    if (typeof dateValue === 'string') {
+        const parts = dateValue.split('/');
+        if (parts.length === 3) {
+            const day = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10) - 1; // JS months are 0-indexed
+            const year = parseInt(parts[2], 10);
+            if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+                return new Date(year, month, day);
+            }
+        }
+    }
+    return null; // Return null if format is unrecognized
 };
 
 
@@ -211,44 +235,38 @@ export function InventoryDataTable() {
     setIsEditDialogOpen(true);
   }
   
- const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = async (e) => {
         try {
           const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+          const workbook = XLSX.read(data, { type: 'array' });
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
-          const json = XLSX.utils.sheet_to_json(worksheet);
+          // Use { raw: false } to get formatted text for dates if available
+          const json = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+          
+          const validationResult = excelImportSchema.safeParse(json);
 
-          const validatedData = excelImportSchema.parse(json);
+          if (!validationResult.success) {
+            console.error("XLSX validation error:", validationResult.error.issues);
+            const firstError = validationResult.error.issues[0];
+            const errorMessage = `Validation failed on row ${firstError.path[0]}: ${firstError.message}`;
+            toast({ variant: "destructive", title: "Upload Failed", description: errorMessage });
+            return;
+          }
 
-          const newItems = validatedData.map(item => {
-            // Robust date parsing for both inputDate and expiredDate
-            const parseDate = (dateValue: any): Date | null => {
-              if (!dateValue) return null;
-              if (dateValue instanceof Date && !isNaN(dateValue.getTime())) {
-                return dateValue;
-              }
-              if (typeof dateValue === 'number') {
-                return excelSerialDateToJSDate(dateValue);
-              }
-              if (typeof dateValue === 'string') {
-                const parsed = new Date(dateValue);
-                if (!isNaN(parsed.getTime())) {
-                  return parsed;
-                }
-              }
-              return null; // Return null if parsing fails
-            };
+          const newItems = validationResult.data.map((item, index) => {
+            const inputDate = parseDateFromExcel(item.inputDate);
+            const expiredDate = parseDateFromExcel(item.expiredDate);
             
-            const inputDate = parseDate(item.inputDate);
-            const expiredDate = parseDate(item.expiredDate);
-
-            if (!inputDate || !expiredDate) {
-              throw new Error(`Invalid date format for item "${item.itemName}". Please check the date columns.`);
+            if (!inputDate) {
+              throw new Error(`Invalid or missing inputDate on row ${index + 2}. Please use dd/mm/yyyy format.`);
+            }
+             if (!expiredDate) {
+              throw new Error(`Invalid or missing expiredDate on row ${index + 2}. Please use dd/mm/yyyy format.`);
             }
 
             return {
@@ -260,19 +278,18 @@ export function InventoryDataTable() {
 
           await bulkAddInventoryItems(newItems);
           toast({ title: "Upload Successful", description: `${newItems.length} new items have been added.` });
+
         } catch (error) {
-           if (error instanceof z.ZodError) {
-              console.error("XLSX validation error:", error.issues);
-              toast({ variant: "destructive", title: "Upload Failed", description: "Data Excel tidak valid. Silakan periksa file dan coba lagi." });
-          } else {
-              console.error("An unexpected error occurred:", error);
-              toast({ variant: "destructive", title: "Upload Failed", description: (error as Error).message || "Terjadi kesalahan tak terduga saat memproses file." });
-          }
+           console.error("File processing error:", error);
+           toast({ variant: "destructive", title: "Upload Failed", description: (error as Error).message || "An unexpected error occurred while processing the file." });
         }
       };
       reader.readAsArrayBuffer(file);
     }
-    if (event.target) event.target.value = '';
+     // Reset file input to allow re-uploading the same file
+    if (event.target) {
+        event.target.value = '';
+    }
   };
   
   const handleDownloadTemplate = () => {
@@ -280,7 +297,17 @@ export function InventoryDataTable() {
       'inputDate', 'itemName', 'batchNumber', 'itemType', 'category', 'unit', 
       'quantity', 'purchasePrice', 'sellingPriceRJ', 'sellingPriceRI', 'expiredDate', 'supplier'
     ];
-    const ws = XLSX.utils.aoa_to_sheet([headers]);
+    // Add a sample row with the correct date format
+    const sampleRow = [
+      '01/08/2024', 'Sample Medicine', 'B123', 'Obat', 'Oral', 'Tablet',
+      100, 5000, 6000, 7000, '31/12/2025', 'Supplier ABC'
+    ]
+    const ws = XLSX.utils.aoa_to_sheet([headers, sampleRow]);
+    // Set column widths for better readability
+     ws['!cols'] = [
+        { wch: 12 }, { wch: 25 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 10 }, 
+        { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 20 }
+    ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Template');
     XLSX.writeFile(wb, 'inventory_template.xlsx');

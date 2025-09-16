@@ -56,6 +56,9 @@ export function DateRangePicker({ className, date, onDateChange, align = "start"
             selected={date}
             onSelect={onDateChange}
             numberOfMonths={2}
+            captionLayout="dropdown-buttons"
+            fromYear={1900}
+            toYear={new Date().getFullYear() + 5}
           />
         </PopoverContent>
       </Popover>
