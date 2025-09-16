@@ -93,7 +93,7 @@ const inventorySchema = z.object({
 
 type InventoryFormValues = z.infer<typeof inventorySchema>;
 
-// Schema for Excel import validation
+// A more robust schema for Excel import that coerces types
 const excelRowSchema = z.object({
   inputDate: z.any().refine(val => val, { message: "inputDate is required" }),
   itemName: z.string({ required_error: "itemName is required" }).min(1, "itemName is required"),
@@ -114,41 +114,28 @@ const excelSerialDateToJSDate = (serial: number): Date => {
   const utc_days = Math.floor(serial - 25569);
   const utc_value = utc_days * 86400;
   const date_info = new Date(utc_value * 1000);
-
-  const fractional_day = serial - Math.floor(serial) + 0.0000001;
-
-  let total_seconds = Math.floor(86400 * fractional_day);
-  const seconds = total_seconds % 60;
-  total_seconds -= seconds;
-  const hours = Math.floor(total_seconds / (60 * 60));
-  const minutes = Math.floor(total_seconds / 60) % 60;
-
-  return new Date(date_info.getFullYear(), date_info.getMonth(), date_info.getDate(), hours, minutes, seconds);
+  return new Date(date_info.getFullYear(), date_info.getMonth(), date_info.getDate());
 };
 
 const parseDateFromExcel = (dateValue: any): Date | null => {
-  if (dateValue === null || typeof dateValue === 'undefined') return null;
+  if (dateValue === null || typeof dateValue === 'undefined' || dateValue === '') return null;
 
-  // Handle JS Date object
   if (dateValue instanceof Date && !isNaN(dateValue.getTime())) {
     return dateValue;
   }
   
-  // Handle Excel serial number
   if (typeof dateValue === 'number') {
     return excelSerialDateToJSDate(dateValue);
   }
   
-  // Handle string 'dd/mm/yyyy'
   if (typeof dateValue === 'string') {
-    const parts = dateValue.split('/');
-    if (parts.length === 3) {
-      const day = parseInt(parts[0], 10);
-      const month = parseInt(parts[1], 10) - 1; // JS months are 0-indexed
-      const year = parseInt(parts[2], 10);
+    const parts = dateValue.match(/(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
+    if (parts) {
+      const day = parseInt(parts[1], 10);
+      const month = parseInt(parts[2], 10) - 1;
+      const year = parseInt(parts[3], 10);
       if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
         const date = new Date(year, month, day);
-        // Basic validation to check if date is valid
         if (date.getFullYear() === year && date.getMonth() === month && date.getDate() === day) {
           return date;
         }
@@ -156,7 +143,6 @@ const parseDateFromExcel = (dateValue: any): Date | null => {
     }
   }
 
-  // Fallback for other string formats
   const parsedDate = new Date(dateValue);
   if (!isNaN(parsedDate.getTime())) {
     return parsedDate;
@@ -260,7 +246,7 @@ export function InventoryDataTable() {
           const workbook = XLSX.read(data, { type: 'array', cellDates: true });
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
-          const json = XLSX.utils.sheet_to_json(worksheet, { raw: false }); // Use raw: false to get formatted text
+          const json = XLSX.utils.sheet_to_json(worksheet, { defval: null });
 
           const newItems = [];
 
@@ -339,24 +325,25 @@ export function InventoryDataTable() {
       L: '@'           // supplier (Text)
     };
     
-    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:L1');
-    for(let C = range.s.c; C <= range.e.c; ++C) {
-        const colLetter = XLSX.utils.encode_col(C);
-        // Apply format to header to hint Excel, but more importantly to cells below
-        for(let R = range.s.r + 1; R <= 100; ++R) { // Apply format for next 100 rows
-            const cellRef = XLSX.utils.encode_cell({c: C, r: R});
-            if (columnFormats[colLetter]) {
-                if(!ws[cellRef]) ws[cellRef] = {t: 'z', v: undefined}; // Create empty cell if it doesn't exist
-                ws[cellRef].z = columnFormats[colLetter];
-            }
-        }
-    }
-    
     // Set column widths for better visibility
     ws['!cols'] = [
         { wch: 12 }, { wch: 30 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 10 },
         { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 25 }
     ];
+
+    // Apply formats to the columns for future rows
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:L1');
+    for(let C = range.s.c; C <= range.e.c; ++C) {
+        const colLetter = XLSX.utils.encode_col(C);
+        if (columnFormats[colLetter]) {
+             // This is a bit of a hack for XLSX.js to apply format to a whole column
+            for(let R = range.s.r + 1; R <= 1000; ++R) { // Apply for the next 1000 rows
+                const cellRef = XLSX.utils.encode_cell({c: C, r: R});
+                if(!ws[cellRef]) ws[cellRef] = {t: 'z', v: undefined}; // Create empty cell if it doesn't exist
+                 ws[cellRef].z = columnFormats[colLetter];
+            }
+        }
+    }
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Template');
@@ -756,7 +743,3 @@ export function InventoryDataTable() {
     </Card>
   );
 }
-
-    
-
-    
