@@ -134,15 +134,12 @@ export function TransactionsDataTable() {
 
   const onSubmit = async (values: TransactionFormValues) => {
     const transactionData = {
+      ...values, // Pass all form values
       date: format(values.date, "yyyy-MM-dd"),
       medicationName: values.items.map(i => `${i.itemName} (x${i.quantity})`).join(', '),
       quantity: values.items.reduce((sum, item) => sum + item.quantity, 0),
       type: 'OUT' as const,
-      patientType: values.patientType,
-      paymentMethod: values.paymentMethod,
       context: `MRN: ${values.medicalRecordNumber}`, 
-      totalPrice: values.totalPrice,
-      medicalRecordNumber: values.medicalRecordNumber || '',
       items: values.items.map(({ itemId, quantity, price }) => ({ itemId, quantity, price })),
     };
 
@@ -150,11 +147,13 @@ export function TransactionsDataTable() {
         if (values.id) {
           const originalTransaction = transactions.find(t => t.id === values.id);
           if (originalTransaction) {
-            await updateTransaction(values.id, transactionData, originalTransaction);
+            const { id, ...updateData } = transactionData;
+            await updateTransaction(id!, updateData, originalTransaction);
             toast({ title: "Success", description: "Transaction has been updated." });
           }
         } else {
-          await addTransaction(transactionData);
+          const { id, ...createData } = transactionData;
+          await addTransaction(createData);
           toast({ title: "Success", description: "New transaction has been added." });
         }
         form.reset();

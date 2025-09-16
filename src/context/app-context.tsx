@@ -22,7 +22,7 @@ interface AppContextType {
   transactions: Transaction[];
   loading: boolean;
   addInventoryItem: (item: Omit<InventoryItem, 'id'>) => Promise<void>;
-  updateInventoryItem: (id: string, updatedItem: Partial<InventoryItem>) => Promise<void>;
+  updateInventoryItem: (id: string, updatedItem: Partial<Omit<InventoryItem, 'id'>>) => Promise<void>;
   deleteInventoryItem: (id: string) => Promise<void>;
   bulkAddInventoryItems: (items: Omit<InventoryItem, 'id'>[]) => Promise<void>;
   addTransaction: (transaction: Omit<Transaction, 'id'>) => Promise<void>;
@@ -69,7 +69,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await addDoc(collection(db, 'inventory'), item);
   };
 
-  const updateInventoryItem = async (id: string, updatedItem: Partial<InventoryItem>) => {
+  const updateInventoryItem = async (id: string, updatedItem: Partial<Omit<InventoryItem, 'id'>>) => {
     const itemDoc = doc(db, 'inventory', id);
     await updateDoc(itemDoc, updatedItem);
   };

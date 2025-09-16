@@ -125,7 +125,7 @@ export function InventoryDataTable() {
     
         if (values.id) {
           const { id, ...updateData } = formattedValues;
-          await updateInventoryItem(id!, updateData);
+          await updateInventoryItem(id, updateData);
           toast({ title: "Success", description: "Item has been updated." });
         } else {
           const { id, ...createData } = formattedValues;
@@ -630,7 +630,3 @@ export function InventoryDataTable() {
     </Card>
   );
 }
-
-    
-
-    
