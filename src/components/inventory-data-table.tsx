@@ -97,7 +97,7 @@ type InventoryFormValues = z.infer<typeof inventorySchema>;
 const excelRowSchema = z.object({
   inputDate: z.any().refine(val => val !== null && val !== undefined, { message: "inputDate is required" }),
   itemName: z.string({ required_error: "itemName is required" }).min(1, "itemName is required"),
-  batchNumber: z.string({ required_error: "batchNumber is required" }).min(1, "batchNumber is required"),
+  batchNumber: z.any().refine(val => val !== null && val !== undefined, { message: "batchNumber is required" }).transform(val => String(val)),
   itemType: z.enum(['Alkes', 'Obat'], { required_error: "itemType is required" }),
   category: z.enum(['Oral', 'Topikal', 'Injeksi', 'Suppositoria', 'Inhalasi/Nasal', 'Vaksin', 'Lainnya'], { required_error: "category is required" }),
   unit: z.enum(['Tablet', 'Kapsul', 'Vial', 'Amp', 'Pcs', 'Cm', 'Btl'], { required_error: "unit is required" }),
@@ -130,17 +130,14 @@ const excelSerialDateToJSDate = (serial: number): Date => {
 const parseDateFromExcel = (dateValue: any): Date | null => {
     if (!dateValue) return null;
     
-    // Check if it's already a valid Date object
     if (dateValue instanceof Date && !isNaN(dateValue.getTime())) {
         return dateValue;
     }
     
-    // Handle Excel's numeric date format
     if (typeof dateValue === 'number') {
         return excelSerialDateToJSDate(dateValue);
     }
     
-    // Handle string format "dd/mm/yyyy"
     if (typeof dateValue === 'string') {
         const parts = dateValue.split('/');
         if (parts.length === 3) {
@@ -149,7 +146,6 @@ const parseDateFromExcel = (dateValue: any): Date | null => {
             const year = parseInt(parts[2], 10);
             if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
                 const date = new Date(year, month, day);
-                // Basic validation to check if date is valid
                 if (date.getFullYear() === year && date.getMonth() === month && date.getDate() === day) {
                     return date;
                 }
@@ -157,13 +153,12 @@ const parseDateFromExcel = (dateValue: any): Date | null => {
         }
     }
     
-    // If all else fails, try parsing with Date constructor, which is less reliable but a good fallback
     const parsedDate = new Date(dateValue);
     if (!isNaN(parsedDate.getTime())) {
         return parsedDate;
     }
 
-    return null; // Return null if format is unrecognized
+    return null;
 };
 
 
@@ -269,7 +264,7 @@ export function InventoryDataTable() {
 
           for (let i = 0; i < json.length; i++) {
             const row = json[i] as any;
-            const rowIndex = i + 2; // Excel rows are 1-based, plus header
+            const rowIndex = i + 2;
 
             const validationResult = excelRowSchema.safeParse(row);
 
@@ -306,7 +301,6 @@ export function InventoryDataTable() {
            console.error("File processing error:", error);
            toast({ variant: "destructive", title: "Upload Failed", description: error.message || "An unexpected error occurred while processing the file.", duration: 10000 });
         } finally {
-            // Reset file input to allow re-uploading the same file
             if (event.target) {
                 event.target.value = '';
             }
@@ -318,20 +312,58 @@ export function InventoryDataTable() {
   
   const handleDownloadTemplate = () => {
     const headers = [
-      'inputDate', 'itemName', 'batchNumber', 'itemType', 'category', 'unit', 
-      'quantity', 'purchasePrice', 'sellingPriceRJ', 'sellingPriceRI', 'expiredDate', 'supplier'
+        'inputDate', 'itemName', 'batchNumber', 'itemType', 'category', 'unit', 
+        'quantity', 'purchasePrice', 'sellingPriceRJ', 'sellingPriceRI', 'expiredDate', 'supplier'
     ];
-    // Add a sample row with the correct date format
-    const sampleRow = [
-      '01/08/2024', 'Sample Medicine', 'B123', 'Obat', 'Oral', 'Tablet',
-      100, 5000, 6000, 7000, '31/12/2025', 'Supplier ABC'
-    ]
-    const ws = XLSX.utils.aoa_to_sheet([headers, sampleRow]);
-    // Set column widths for better readability
+    
+    // Create an empty worksheet
+    const ws = XLSX.utils.aoa_to_sheet([headers]);
+
+    // Set column formats
+    const columnFormats = {
+      A: 'dd/mm/yyyy', // inputDate
+      B: '@',           // itemName (Text)
+      C: '@',           // batchNumber (Text)
+      D: '@',           // itemType (Text)
+      E: '@',           // category (Text)
+      F: '@',           // unit (Text)
+      G: '0',           // quantity (Number)
+      H: '0',           // purchasePrice (Number)
+      I: '0',           // sellingPriceRJ (Number)
+      J: '0',           // sellingPriceRI (Number)
+      K: 'dd/mm/yyyy', // expiredDate
+      L: '@'            // supplier (Text)
+    };
+    
+    // Apply formats to columns
+    Object.keys(columnFormats).forEach(col => {
+        // This ensures the format is applied to the entire column
+        ws['!cols'] = ws['!cols'] || [];
+        const colIndex = col.charCodeAt(0) - 'A'.charCodeAt(0);
+        ws['!cols'][colIndex] = { wch: headers[colIndex].length + 5 }; // Set width
+        
+        // Applying format to each cell in a column requires iterating, but setting it for the header is a good start.
+        // For a more robust solution, we set a sample row format which Excel usually autofills.
+        // Let's create a sample row with formatted cells.
+        const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+        for(let R = range.s.r + 1; R < 100; ++R) { // Apply to next 99 rows as an example
+            for(let C = range.s.c; C <= range.e.c; ++C) {
+                const cell_address = {c:C, r:R};
+                const cell_ref = XLSX.utils.encode_cell(cell_address);
+                if(!ws[cell_ref]) ws[cell_ref] = {t:'z', v:undefined}; // Create empty cell
+                const colLetter = XLSX.utils.encode_col(C);
+                if(columnFormats[colLetter as keyof typeof columnFormats]) {
+                  ws[cell_ref].z = columnFormats[colLetter as keyof typeof columnFormats];
+                }
+            }
+        }
+    });
+
      ws['!cols'] = [
         { wch: 12 }, { wch: 25 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 10 }, 
         { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 20 }
     ];
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Template');
     XLSX.writeFile(wb, 'inventory_template.xlsx');
