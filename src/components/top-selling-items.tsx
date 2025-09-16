@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import type { LucideIcon } from 'lucide-react';
-import type { Transaction, InventoryItem } from '@/lib/types';
+import type { Transaction, InventoryItem, TransactionItem } from '@/lib/types';
 import {
   Card,
   CardContent,
@@ -35,23 +35,19 @@ interface SoldItem {
 
 export function TopSellingItems({ title, icon: Icon, transactions, inventory, itemType }: TopSellingItemsProps) {
   const topItems = React.useMemo(() => {
+    if (inventory.length === 0) return [];
+    
     const itemSales: Record<string, number> = {};
 
     transactions.forEach(t => {
-      const items = t.medicationName.split(', ').map(itemStr => {
-        const match = itemStr.match(/(.+) \(x(\d+)\)/);
-        if (!match) return null;
-        return { name: match[1], quantity: parseInt(match[2], 10) };
-      }).filter(Boolean);
-
-      items.forEach(item => {
-        if (item) {
-          const inventoryItem = inventory.find(inv => inv.itemName === item.name);
-          if (inventoryItem && inventoryItem.itemType === itemType) {
-            itemSales[item.name] = (itemSales[item.name] || 0) + item.quantity;
-          }
-        }
-      });
+      if (t.items) {
+          t.items.forEach((item: TransactionItem) => {
+              const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+              if (inventoryItem && inventoryItem.itemType === itemType) {
+                 itemSales[inventoryItem.itemName] = (itemSales[inventoryItem.itemName] || 0) + item.quantity;
+              }
+          });
+      }
     });
 
     return Object.entries(itemSales)

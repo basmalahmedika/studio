@@ -104,8 +104,8 @@ export function TransactionsDataTable() {
   });
 
   const watchedItems = form.watch('items');
-  const paymentMethod = form.watch('paymentMethod');
   const patientType = form.watch('patientType');
+  const paymentMethod = form.watch('paymentMethod');
 
   React.useEffect(() => {
     const total = watchedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -130,26 +130,14 @@ export function TransactionsDataTable() {
           }
       });
     }
-  }, [paymentMethod, patientType, inventory, update, watchedItems]);
+  }, [patientType, paymentMethod, inventory, update, watchedItems]);
 
-  const onSubmit = (values: TransactionFormValues) => {
-    // Check if any item quantity exceeds available stock
-    for (const item of values.items) {
-        if (item.quantity > item.stock) {
-            toast({
-                variant: "destructive",
-                title: "Insufficient Stock",
-                description: `Quantity for ${item.itemName} exceeds available stock of ${item.stock}.`,
-            });
-            return;
-        }
-    }
-
-    const transactionData: Omit<Transaction, 'id'> = {
+  const onSubmit = async (values: TransactionFormValues) => {
+    const transactionData = {
       date: format(values.date, "yyyy-MM-dd"),
       medicationName: values.items.map(i => `${i.itemName} (x${i.quantity})`).join(', '),
       quantity: values.items.reduce((sum, item) => sum + item.quantity, 0),
-      type: 'OUT',
+      type: 'OUT' as const,
       patientType: values.patientType,
       paymentMethod: values.paymentMethod,
       context: `MRN: ${values.medicalRecordNumber}`, 
@@ -158,18 +146,27 @@ export function TransactionsDataTable() {
       items: values.items.map(({ itemId, quantity, price }) => ({ itemId, quantity, price })),
     };
 
-    if (values.id) {
-      const originalTransaction = transactions.find(t => t.id === values.id);
-      if (originalTransaction) {
-        updateTransaction(values.id, { id: values.id, ...transactionData }, originalTransaction);
-        toast({ title: "Success", description: "Transaction has been updated." });
-      }
-    } else {
-      addTransaction(transactionData);
-      toast({ title: "Success", description: "New transaction has been added." });
+    try {
+        if (values.id) {
+          const originalTransaction = transactions.find(t => t.id === values.id);
+          if (originalTransaction) {
+            await updateTransaction(values.id, transactionData, originalTransaction);
+            toast({ title: "Success", description: "Transaction has been updated." });
+          }
+        } else {
+          await addTransaction(transactionData);
+          toast({ title: "Success", description: "New transaction has been added." });
+        }
+        form.reset();
+        setIsDialogOpen(false);
+    } catch (error: any) {
+        console.error("Transaction Error: ", error);
+        toast({
+            variant: "destructive",
+            title: "Transaction Failed",
+            description: error.message || "An unexpected error occurred.",
+        });
     }
-    form.reset();
-    setIsDialogOpen(false);
   };
   
   const handleEdit = (transaction: Transaction) => {
@@ -194,11 +191,15 @@ export function TransactionsDataTable() {
     setIsDialogOpen(true);
 };
   
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     const transactionToDelete = transactions.find(t => t.id === id);
     if (transactionToDelete) {
-        deleteTransaction(id, transactionToDelete);
-        toast({ title: "Success", description: "Transaction has been deleted." });
+        try {
+            await deleteTransaction(id, transactionToDelete);
+            toast({ title: "Success", description: "Transaction has been deleted." });
+        } catch(error) {
+            toast({ variant: "destructive", title: "Error", description: "Failed to delete transaction." });
+        }
     }
   }
 
@@ -215,8 +216,8 @@ export function TransactionsDataTable() {
   }
 
   const handleAddItem = (item: InventoryItem) => {
-    const paymentMethodValue = form.getValues('paymentMethod');
     const patientTypeValue = form.getValues('patientType');
+    const paymentMethodValue = form.getValues('paymentMethod');
     
     if (item && !watchedItems.some(i => i.itemId === item.id)) {
        let price;

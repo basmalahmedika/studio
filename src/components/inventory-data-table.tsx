@@ -117,22 +117,29 @@ export function InventoryDataTable() {
     }
   });
 
-  const onSubmit = (values: InventoryFormValues) => {
-    const formattedValues: Omit<InventoryItem, 'id'> = {
-      ...values,
-      inputDate: format(values.inputDate, "yyyy-MM-dd"),
-      expiredDate: format(values.expiredDate, "yyyy-MM-dd"),
-    };
+  const onSubmit = async (values: InventoryFormValues) => {
+    try {
+        const formattedValues = {
+          ...values,
+          inputDate: format(values.inputDate, "yyyy-MM-dd"),
+          expiredDate: format(values.expiredDate, "yyyy-MM-dd"),
+        };
+        
+        delete formattedValues.id;
     
-    if (values.id) {
-      updateInventoryItem(values.id, { id: values.id, ...formattedValues });
-      toast({ title: "Success", description: "Item has been updated." });
-    } else {
-      addInventoryItem(formattedValues);
-      toast({ title: "Success", description: "New item has been added." });
+        if (values.id) {
+          await updateInventoryItem(values.id, formattedValues);
+          toast({ title: "Success", description: "Item has been updated." });
+        } else {
+          await addInventoryItem(formattedValues);
+          toast({ title: "Success", description: "New item has been added." });
+        }
+        form.reset();
+        setIsEditDialogOpen(false);
+    } catch(error) {
+       console.error("Error submitting form:", error);
+       toast({ variant: "destructive", title: "Error", description: "An error occurred while saving the item." });
     }
-    form.reset();
-    setIsEditDialogOpen(false);
   };
 
   const handleEdit = (item: InventoryItem) => {
@@ -144,9 +151,13 @@ export function InventoryDataTable() {
     setIsEditDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    deleteInventoryItem(id);
-    toast({ title: "Success", description: "Item has been deleted." });
+  const handleDelete = async (id: string) => {
+    try {
+        await deleteInventoryItem(id);
+        toast({ title: "Success", description: "Item has been deleted." });
+    } catch(error) {
+        toast({ variant: "destructive", title: "Error", description: "Failed to delete item." });
+    }
   }
 
   const handleOpenAddNew = () => {
@@ -167,13 +178,13 @@ export function InventoryDataTable() {
     setIsEditDialogOpen(true);
   }
   
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+ const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
-        complete: (results) => {
+        complete: async (results) => {
           try {
             const parsedData = z.array(inventorySchema.omit({id: true})).parse(results.data.map((d: any) => ({
                 ...d,
@@ -185,13 +196,13 @@ export function InventoryDataTable() {
                 sellingPriceRI: Number(d.sellingPriceRI),
             })));
             
-            const newItems: Omit<InventoryItem, 'id'>[] = parsedData.map(item => ({
+            const newItems = parsedData.map(item => ({
               ...item,
               inputDate: format(item.inputDate, "yyyy-MM-dd"),
               expiredDate: format(item.expiredDate, "yyyy-MM-dd"),
             }));
 
-            bulkAddInventoryItems(newItems);
+            await bulkAddInventoryItems(newItems);
             toast({ title: "Upload Successful", description: `${newItems.length} new items have been added.` });
           } catch (error) {
              if (error instanceof z.ZodError) {
@@ -208,7 +219,6 @@ export function InventoryDataTable() {
         }
       });
     }
-    // Reset file input
     if (event.target) event.target.value = '';
   };
   

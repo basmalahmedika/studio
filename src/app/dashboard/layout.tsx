@@ -7,6 +7,43 @@ import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar'
 import SidebarNav from '@/components/layout/sidebar-nav';
 import Header from '@/components/layout/header';
 import { AppProvider } from '@/context/app-context';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useAppContext } from '@/context/app-context';
+
+
+function DashboardContent({ children }: { children: ReactNode }) {
+  const { loading } = useAppContext();
+
+  if (loading) {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <Header />
+        <main className="flex-1 p-4 md:p-6 lg:p-8">
+           <div className="space-y-4">
+              <Skeleton className="h-8 w-1/4" />
+              <Skeleton className="h-4 w-1/2" />
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Skeleton className="h-24" />
+                <Skeleton className="h-24" />
+                <Skeleton className="h-24" />
+                <Skeleton className="h-24" />
+              </div>
+               <Skeleton className="h-96" />
+            </div>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col min-h-screen">
+      <Header />
+      <main className="flex-1 p-4 md:p-6 lg:p-8">
+        {children}
+      </main>
+    </div>
+  )
+}
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
    // Effect to apply theme from localStorage on initial load
@@ -90,12 +127,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <SidebarNav />
         </Sidebar>
         <SidebarInset>
-          <div className="flex flex-col min-h-screen">
-            <Header />
-            <main className="flex-1 p-4 md:p-6 lg:p-8">
-              {children}
-            </main>
-          </div>
+          <DashboardContent>{children}</DashboardContent>
         </SidebarInset>
       </SidebarProvider>
     </AppProvider>

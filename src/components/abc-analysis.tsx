@@ -15,7 +15,8 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import type { Transaction } from '@/lib/types';
+import type { Transaction, TransactionItem } from '@/lib/types';
+import { useAppContext } from '@/context/app-context';
 
 type AnalysisCategory = 'A' | 'B' | 'C';
 
@@ -42,25 +43,27 @@ const getCategory = (cumulativePercent: number): AnalysisCategory => {
 };
 
 export function AbcAnalysis({ transactions }: AbcAnalysisProps) {
+  const { inventory } = useAppContext();
   const [analyzedItems, setAnalyzedItems] = React.useState<AnalyzedItem[]>([]);
 
   React.useEffect(() => {
-    if (transactions.length === 0) {
+    if (transactions.length === 0 || inventory.length === 0) {
       setAnalyzedItems([]);
       return;
     }
 
     // 1. Aggregate sales data for each item
     const salesByItem = transactions.reduce((acc, t) => {
-      const items = t.medicationName.split(', ').map(itemStr => {
-        const match = itemStr.match(/(.+) \(x\d+\)/);
-        return match ? match[1] : itemStr; // Extract item name
-      });
-      
-      items.forEach(itemName => {
-         acc[itemName] = (acc[itemName] || 0) + t.totalPrice / items.length; // Approximate value per item in transaction
-      });
-
+        if (t.items) {
+            t.items.forEach((item: TransactionItem) => {
+                const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+                if (inventoryItem) {
+                    const itemName = inventoryItem.itemName;
+                    const itemValue = item.price * item.quantity;
+                    acc[itemName] = (acc[itemName] || 0) + itemValue;
+                }
+            });
+        }
       return acc;
     }, {} as Record<string, number>);
 
@@ -75,8 +78,8 @@ export function AbcAnalysis({ transactions }: AbcAnalysisProps) {
     let cumulativeSales = 0;
     const classifiedItems = sortedItems.map(item => {
       cumulativeSales += item.totalSales;
-      const contributionPercent = (item.totalSales / totalSalesOverall) * 100;
-      const cumulativePercent = (cumulativeSales / totalSalesOverall) * 100;
+      const contributionPercent = totalSalesOverall > 0 ? (item.totalSales / totalSalesOverall) * 100 : 0;
+      const cumulativePercent = totalSalesOverall > 0 ? (cumulativeSales / totalSalesOverall) * 100 : 0;
       return {
         ...item,
         contributionPercent,
@@ -86,7 +89,7 @@ export function AbcAnalysis({ transactions }: AbcAnalysisProps) {
     });
     
     setAnalyzedItems(classifiedItems);
-  }, [transactions]);
+  }, [transactions, inventory]);
 
   const getBadgeClass = (category: AnalysisCategory) => {
     switch (category) {
