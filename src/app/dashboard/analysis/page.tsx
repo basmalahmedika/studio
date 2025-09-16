@@ -2,19 +2,15 @@
 'use client';
 
 import * as React from 'react';
-import { DateRange } from 'react-day-picker';
-import { addDays, format, startOfMonth } from 'date-fns';
-import { Calendar as CalendarIcon } from 'lucide-react';
+import type { DateRange } from 'react-day-picker';
+import { startOfMonth } from 'date-fns';
 import { AbcAnalysis } from '@/components/abc-analysis';
 import { SalesTrendsChart } from '@/components/sales-trends-chart';
 import { transactions as allTransactions } from '@/lib/data';
 import type { Transaction } from '@/lib/types';
-import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
-import { Calendar } from '@/components/ui/calendar';
+import { DateRangePicker } from '@/components/date-range-picker';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type PatientType = 'all' | 'Rawat Jalan' | 'Rawat Inap';
 type PaymentMethod = 'all' | 'UMUM' | 'BPJS';
@@ -31,9 +27,19 @@ export default function AnalysisPage() {
   React.useEffect(() => {
     const filtered = allTransactions.filter(t => {
       const transactionDate = new Date(t.date);
-      const isDateInRange = date?.from && date?.to 
-        ? transactionDate >= date.from && transactionDate <= date.to 
+      // Set time to 0 to compare dates only
+      transactionDate.setHours(0, 0, 0, 0);
+
+      const fromDate = date?.from;
+      if (fromDate) fromDate.setHours(0, 0, 0, 0);
+      
+      const toDate = date?.to;
+      if (toDate) toDate.setHours(0, 0, 0, 0);
+
+      const isDateInRange = fromDate && toDate 
+        ? transactionDate >= fromDate && transactionDate <= toDate 
         : true;
+      
       const isPatientTypeMatch = patientType === 'all' || t.patientType === patientType;
       const isPaymentMethodMatch = paymentMethod === 'all' || t.paymentMethod === paymentMethod;
       return isDateInRange && isPatientTypeMatch && isPaymentMethodMatch;
@@ -42,15 +48,14 @@ export default function AnalysisPage() {
   }, [date, patientType, paymentMethod]);
 
   const salesByMonth = React.useMemo(() => {
-    const sales = filteredTransactions.reduce((acc, t) => {
-      const month = format(new Date(t.date), 'MMM yyyy');
-      acc[month] = (acc[month] || 0) + t.totalPrice;
-      return acc;
-    }, {} as Record<string, number>);
+    const sales: Record<string, number> = {};
+    filteredTransactions.forEach(t => {
+      const month = new Date(t.date).toLocaleString('default', { month: 'short', year: 'numeric' });
+      sales[month] = (sales[month] || 0) + t.totalPrice;
+    });
 
-    return Object.entries(sales)
-      .map(([name, total]) => ({ name, total }))
-      .sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime());
+    const sortedMonths = Object.keys(sales).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+    return sortedMonths.map(month => ({ name: month, total: sales[month] }));
   }, [filteredTransactions]);
 
   return (
@@ -65,42 +70,7 @@ export default function AnalysisPage() {
       <Card>
         <CardContent className="p-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    id="date"
-                    variant={"outline"}
-                    className={cn(
-                      "justify-start text-left font-normal",
-                      !date && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {date?.from ? (
-                      date.to ? (
-                        <>
-                          {format(date.from, "LLL dd, y")} -{" "}
-                          {format(date.to, "LLL dd, y")}
-                        </>
-                      ) : (
-                        format(date.from, "LLL dd, y")
-                      )
-                    ) : (
-                      <span>Pick a date</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    initialFocus
-                    mode="range"
-                    defaultMonth={date?.from}
-                    selected={date}
-                    onSelect={setDate}
-                    numberOfMonths={2}
-                  />
-                </PopoverContent>
-              </Popover>
+              <DateRangePicker date={date} onDateChange={setDate} />
             <Select value={patientType} onValueChange={(value) => setPatientType(value as PatientType)}>
               <SelectTrigger>
                 <SelectValue placeholder="Select Patient Type" />
