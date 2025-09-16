@@ -13,29 +13,28 @@ export const medications: Medication[] = [
   { id: 'med010', name: 'Cough Syrup 100ml', stock: 110, price: 17000 },
 ];
 
-const randomDate = (start: Date, end: Date): Date => {
-  return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
-};
-
 const generateTransactions = (): Transaction[] => {
   const transactions: Transaction[] = [];
-  const medicationNames = medications.map(m => m.name);
   const patientTypes: ('Rawat Jalan' | 'Rawat Inap')[] = ['Rawat Jalan', 'Rawat Inap'];
   const paymentMethods: ('BPJS' | 'UMUM')[] = ['BPJS', 'UMUM'];
-  const startDate = new Date(2023, 0, 1);
-  const endDate = new Date();
+  
+  const sampleDates = [
+    '2024-07-20', '2024-07-19', '2024-07-18', '2024-07-15', '2024-07-12', 
+    '2024-06-28', '2024-06-25', '2024-06-22', '2024-06-18', '2024-06-15',
+    '2024-05-30', '2024-05-27', '2024-05-21', '2024-05-15', '2024-05-10'
+  ];
 
   for (let i = 0; i < 150; i++) {
-    const med = medications[Math.floor(Math.random() * medications.length)];
-    const quantity = Math.floor(Math.random() * 5) + 1;
+    const med = medications[i % medications.length];
+    const quantity = (i % 5) + 1;
     transactions.push({
       id: `trx${String(i + 1).padStart(3, '0')}`,
-      date: randomDate(startDate, endDate).toISOString().split('T')[0],
+      date: sampleDates[i % sampleDates.length],
       medicationName: med.name,
       quantity,
       type: 'OUT',
-      patientType: patientTypes[Math.floor(Math.random() * patientTypes.length)],
-      paymentMethod: paymentMethods[Math.floor(Math.random() * paymentMethods.length)],
+      patientType: patientTypes[i % patientTypes.length],
+      paymentMethod: paymentMethods[i % paymentMethods.length],
       context: 'Resep dokter',
       totalPrice: med.price * quantity,
     });
