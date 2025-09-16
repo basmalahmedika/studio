@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -100,9 +101,17 @@ export function InventoryDataTable() {
   const form = useForm<InventoryFormValues>({
     resolver: zodResolver(inventorySchema),
     defaultValues: {
+      itemName: '',
+      batchNumber: '',
+      supplier: '',
+      quantity: 0,
+      purchasePrice: 0,
+      sellingPrice: 0,
       itemType: 'Obat',
       category: 'Oral',
       unit: 'Tablet',
+      inputDate: new Date(),
+      expiredDate: new Date(),
     }
   });
 
@@ -152,9 +161,17 @@ export function InventoryDataTable() {
 
   const handleOpenAddNew = () => {
     form.reset({
+      itemName: '',
+      batchNumber: '',
+      supplier: '',
+      quantity: 0,
+      purchasePrice: 0,
+      sellingPrice: 0,
       itemType: 'Obat',
       category: 'Oral',
       unit: 'Tablet',
+      inputDate: new Date(),
+      expiredDate: new Date(),
     });
     setIsEditDialogOpen(true);
   }
@@ -604,3 +621,5 @@ export function InventoryDataTable() {
     </Card>
   );
 }
+
+    
