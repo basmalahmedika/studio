@@ -4,8 +4,9 @@ import * as React from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { PlusCircle, MoreHorizontal, Pen, Trash2, CalendarIcon, X } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Pen, Trash2, CalendarIcon, X, FileDown } from 'lucide-react';
 import { format } from "date-fns";
+import Papa from 'papaparse';
 import {
   Table,
   TableBody,
@@ -56,7 +57,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { transactions, inventory } from '@/lib/data';
-import type { Transaction } from '@/lib/types';
+import type { Transaction, InventoryItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
@@ -143,22 +144,37 @@ export function TransactionsDataTable() {
   };
   
   const handleEdit = (transaction: Transaction) => {
+     const itemsInTransaction = transaction.medicationName.split(', ').map(itemStr => {
+        const match = itemStr.match(/(.+) \(x(\d+)\)/);
+        if (!match) return null;
+
+        const itemName = match[1];
+        const quantity = parseInt(match[2], 10);
+        const inventoryItem = inventory.find(i => i.itemName === itemName);
+
+        if (!inventoryItem) return null;
+        
+        const price = transaction.paymentMethod === 'BPJS' ? inventoryItem.purchasePrice : inventoryItem.sellingPrice;
+
+        return {
+            itemId: inventoryItem.id,
+            itemName: inventoryItem.itemName,
+            quantity: quantity,
+            price: price,
+        };
+    }).filter((item): item is { itemId: string; itemName: string; quantity: number; price: number; } => item !== null);
+
     form.reset({
-      id: transaction.id,
-      date: new Date(transaction.date),
-      medicalRecordNumber: transaction.medicalRecordNumber || 'N/A',
-      patientType: transaction.patientType,
-      paymentMethod: transaction.paymentMethod,
-      items: [{
-          itemId: inventory.find(i => i.itemName === transaction.medicationName)?.id || 'unknown',
-          itemName: transaction.medicationName.split(' (x')[0],
-          quantity: transaction.quantity,
-          price: transaction.totalPrice / transaction.quantity
-      }],
-      totalPrice: transaction.totalPrice
+        id: transaction.id,
+        date: new Date(transaction.date),
+        medicalRecordNumber: transaction.medicalRecordNumber || 'N/A',
+        patientType: transaction.patientType,
+        paymentMethod: transaction.paymentMethod,
+        items: itemsInTransaction,
+        totalPrice: transaction.totalPrice,
     });
     setIsDialogOpen(true);
-  };
+};
   
   const handleDelete = (id: string) => {
     setData(data.filter(item => item.id !== id));
@@ -172,10 +188,10 @@ export function TransactionsDataTable() {
 
   const handleAddItem = (itemId: string) => {
     const item = inventory.find(i => i.id === itemId);
-    const paymentMethod = form.getValues('paymentMethod');
+    const paymentMethodValue = form.getValues('paymentMethod');
     
     if (item && !watchedItems.some(i => i.itemId === itemId)) {
-       const price = paymentMethod === 'BPJS' ? item.purchasePrice : item.sellingPrice;
+       const price = paymentMethodValue === 'BPJS' ? item.purchasePrice : item.sellingPrice;
        form.setValue('items', [...watchedItems, { itemId: item.id, itemName: item.itemName, quantity: 1, price }]);
     }
     setItemSearch(''); // Clear search after adding
@@ -186,6 +202,20 @@ export function TransactionsDataTable() {
     newItems.splice(index, 1);
     form.setValue('items', newItems);
   }
+  
+  const handleExportData = () => {
+    const csv = Papa.unparse(data);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'transactions_export.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
 
   const [filters, setFilters] = React.useState({
     medicationName: '',
@@ -226,7 +256,12 @@ export function TransactionsDataTable() {
       <CardHeader>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <CardTitle>Transaction Log</CardTitle>
-           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <div className="flex flex-wrap gap-2">
+             <Button variant="outline" onClick={handleExportData}>
+              <FileDown className="mr-2 h-4 w-4" />
+              Export CSV
+            </Button>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button onClick={handleOpenAddNew}>
                   <PlusCircle className="mr-2 h-4 w-4" />
@@ -394,6 +429,7 @@ export function TransactionsDataTable() {
                 </Form>
               </DialogContent>
             </Dialog>
+          </div>
         </div>
         <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-center">
           <Input
@@ -436,6 +472,7 @@ export function TransactionsDataTable() {
             <TableHeader>
               <TableRow>
                 <TableHead>Date</TableHead>
+                <TableHead>No. Medical Record</TableHead>
                 <TableHead>Medication/Item</TableHead>
                 <TableHead>Qty</TableHead>
                 <TableHead>Patient Type</TableHead>
@@ -449,6 +486,7 @@ export function TransactionsDataTable() {
                 filteredData.map((transaction) => (
                   <TableRow key={transaction.id}>
                     <TableCell>{transaction.date}</TableCell>
+                    <TableCell>{transaction.medicalRecordNumber}</TableCell>
                     <TableCell className="font-medium max-w-xs truncate">{transaction.medicationName}</TableCell>
                     <TableCell>{transaction.quantity}</TableCell>
                     <TableCell>{transaction.patientType}</TableCell>
@@ -469,9 +507,9 @@ export function TransactionsDataTable() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEdit(transaction)} disabled>
+                          <DropdownMenuItem onClick={() => handleEdit(transaction)}>
                              <Pen className="mr-2 h-4 w-4" />
-                            Edit (Coming Soon)
+                            Edit
                           </DropdownMenuItem>
                            <AlertDialog>
                             <AlertDialogTrigger asChild>
@@ -502,7 +540,7 @@ export function TransactionsDataTable() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center">
+                  <TableCell colSpan={8} className="h-24 text-center">
                     No results found.
                   </TableCell>
                 </TableRow>
