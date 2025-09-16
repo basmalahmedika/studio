@@ -27,7 +27,8 @@ const generateTransactions = (): Transaction[] => {
   for (let i = 0; i < 150; i++) {
     const med = medications[i % medications.length];
     const quantity = (i % 5) + 1;
-    const medicalRecordNumber = `MR${String(Math.floor(Math.random() * 900) + 100).padStart(3, '0')}`;
+    // Use a deterministic value for medicalRecordNumber to prevent hydration errors
+    const medicalRecordNumber = `MR${String(100 + i).padStart(3, '0')}`;
     transactions.push({
       id: `trx${String(i + 1).padStart(3, '0')}`,
       date: sampleDates[i % sampleDates.length],
