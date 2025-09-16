@@ -8,6 +8,7 @@ export type Transaction = {
   paymentMethod: 'BPJS' | 'UMUM';
   context: string;
   totalPrice: number;
+  medicalRecordNumber?: string;
 };
 
 export type Medication = {
