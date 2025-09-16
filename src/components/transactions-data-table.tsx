@@ -106,18 +106,20 @@ export function TransactionsDataTable() {
   
   React.useEffect(() => {
     // When payment method changes, update prices for existing items
-    const updatedItems = watchedItems.map(cartItem => {
-        const inventoryItem = inventory.find(i => i.id === cartItem.itemId);
-        if (inventoryItem) {
-            return {
-                ...cartItem,
-                price: paymentMethod === 'BPJS' ? inventoryItem.purchasePrice : inventoryItem.sellingPrice,
-            };
-        }
-        return cartItem;
-    });
-    form.setValue('items', updatedItems);
-  }, [paymentMethod, form, watchedItems]);
+    if (watchedItems.length > 0) {
+      const updatedItems = watchedItems.map(cartItem => {
+          const inventoryItem = inventory.find(i => i.id === cartItem.itemId);
+          if (inventoryItem) {
+              return {
+                  ...cartItem,
+                  price: paymentMethod === 'BPJS' ? inventoryItem.purchasePrice : inventoryItem.sellingPrice,
+              };
+          }
+          return cartItem;
+      });
+      form.setValue('items', updatedItems);
+    }
+  }, [paymentMethod, form]);
 
   const onSubmit = (values: TransactionFormValues) => {
     const newOrUpdatedTransaction: Transaction = {
