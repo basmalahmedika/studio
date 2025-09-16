@@ -2,7 +2,14 @@
 'use client';
 
 import * as React from 'react';
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } from 'firebase/auth';
+import { 
+  onAuthStateChanged, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  signOut, 
+  type User 
+} from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -10,6 +17,8 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   signIn: (email: string, pass: string) => Promise<any>;
+  signUp: (email: string, pass: string) => Promise<any>;
+  sendPasswordReset: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -31,6 +40,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = (email: string, pass: string) => {
     return signInWithEmailAndPassword(auth, email, pass);
   };
+  
+  const signUp = (email: string, pass: string) => {
+    return createUserWithEmailAndPassword(auth, email, pass);
+  };
+  
+  const sendPasswordReset = (email: string) => {
+    return sendPasswordResetEmail(auth, email);
+  }
 
   const handleSignOut = () => {
     return signOut(auth);
@@ -40,6 +57,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     loading,
     signIn,
+    signUp,
+    sendPasswordReset,
     signOut: handleSignOut,
   };
 

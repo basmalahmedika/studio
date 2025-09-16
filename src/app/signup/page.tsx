@@ -16,17 +16,21 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 
-const loginSchema = z.object({
+const signupSchema = z.object({
   email: z.string().email('Invalid email address'),
-  password: z.string().min(1, 'Password is required'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+  confirmPassword: z.string(),
+}).refine(data => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ['confirmPassword'],
 });
 
-type LoginFormValues = z.infer<typeof loginSchema>;
+type SignupFormValues = z.infer<typeof signupSchema>;
 
-export default function LoginPage() {
+export default function SignupPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { signIn, user } = useAuth();
+  const { signUp, user } = useAuth();
   const [appName, setAppName] = React.useState('PharmaFlow');
   const [logo, setLogo] = React.useState<string | null>(null);
 
@@ -39,49 +43,39 @@ export default function LoginPage() {
     }
   }, []);
 
-
-  const form = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
+  const form = useForm<SignupFormValues>({
+    resolver: zodResolver(signupSchema),
     defaultValues: {
       email: '',
       password: '',
+      confirmPassword: '',
     },
   });
 
-  const onSubmit = async (values: LoginFormValues) => {
+  const onSubmit = async (values: SignupFormValues) => {
     try {
-      await signIn(values.email, values.password);
-      toast({ title: 'Success', description: 'Logged in successfully.' });
-      router.push('/dashboard');
+      await signUp(values.email, values.password);
+      toast({ title: 'Success', description: 'Account created successfully. Please sign in.' });
+      router.push('/login');
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.error('Signup error:', error);
       let errorMessage = 'An unexpected error occurred.';
-      if (error.code) {
-        switch (error.code) {
-          case 'auth/user-not-found':
-          case 'auth/wrong-password':
-          case 'auth/invalid-credential':
-            errorMessage = 'Invalid email or password.';
-            break;
-          default:
-            errorMessage = 'Failed to log in. Please try again.';
-        }
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = 'This email is already in use.';
       }
       toast({
         variant: 'destructive',
-        title: 'Login Failed',
+        title: 'Signup Failed',
         description: errorMessage,
       });
     }
   };
   
-  // If user is already logged in, redirect to dashboard
   React.useEffect(() => {
     if (user) {
       router.push('/dashboard');
     }
   }, [user, router]);
-
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -94,8 +88,8 @@ export default function LoginPage() {
               <Boxes className="w-10 h-10 text-primary" />
             )}
           </div>
-          <CardTitle className="text-2xl font-bold">{appName}</CardTitle>
-          <CardDescription>Enter your credentials to access your dashboard.</CardDescription>
+          <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
+          <CardDescription>Enter your details to create a new account.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -126,22 +120,30 @@ export default function LoginPage() {
                   </FormItem>
                 )}
               />
-              <div className="text-right text-sm">
-                <Link href="/forgot-password" className="underline hover:text-primary">
-                  Forgot Password?
-                </Link>
-              </div>
+              <FormField
+                control={form.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirm Password</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="••••••••" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? 'Signing In...' : 'Sign In'}
+                {form.formState.isSubmitting ? 'Creating Account...' : 'Create Account'}
               </Button>
             </form>
           </Form>
         </CardContent>
         <CardFooter className="text-center text-sm">
           <p>
-            Don&apos;t have an account?{' '}
-            <Link href="/signup" className="underline hover:text-primary">
-              Create an account
+            Already have an account?{' '}
+            <Link href="/login" className="underline hover:text-primary">
+              Sign In
             </Link>
           </p>
         </CardFooter>

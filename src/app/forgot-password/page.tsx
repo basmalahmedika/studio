@@ -3,7 +3,6 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -16,17 +15,15 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 
-const loginSchema = z.object({
+const forgotPasswordSchema = z.object({
   email: z.string().email('Invalid email address'),
-  password: z.string().min(1, 'Password is required'),
 });
 
-type LoginFormValues = z.infer<typeof loginSchema>;
+type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
 
-export default function LoginPage() {
-  const router = useRouter();
+export default function ForgotPasswordPage() {
   const { toast } = useToast();
-  const { signIn, user } = useAuth();
+  const { sendPasswordReset } = useAuth();
   const [appName, setAppName] = React.useState('PharmaFlow');
   const [logo, setLogo] = React.useState<string | null>(null);
 
@@ -39,63 +36,46 @@ export default function LoginPage() {
     }
   }, []);
 
-
-  const form = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
+  const form = useForm<ForgotPasswordFormValues>({
+    resolver: zodResolver(forgotPasswordSchema),
     defaultValues: {
       email: '',
-      password: '',
     },
   });
 
-  const onSubmit = async (values: LoginFormValues) => {
+  const onSubmit = async (values: ForgotPasswordFormValues) => {
     try {
-      await signIn(values.email, values.password);
-      toast({ title: 'Success', description: 'Logged in successfully.' });
-      router.push('/dashboard');
+      await sendPasswordReset(values.email);
+      toast({
+        title: 'Check Your Email',
+        description: 'A password reset link has been sent to your email address.',
+      });
+      form.reset();
     } catch (error: any) {
-      console.error('Login error:', error);
-      let errorMessage = 'An unexpected error occurred.';
-      if (error.code) {
-        switch (error.code) {
-          case 'auth/user-not-found':
-          case 'auth/wrong-password':
-          case 'auth/invalid-credential':
-            errorMessage = 'Invalid email or password.';
-            break;
-          default:
-            errorMessage = 'Failed to log in. Please try again.';
-        }
-      }
+      console.error('Forgot password error:', error);
       toast({
         variant: 'destructive',
-        title: 'Login Failed',
-        description: errorMessage,
+        title: 'Error',
+        description: 'Failed to send password reset email. Please try again.',
       });
     }
   };
-  
-  // If user is already logged in, redirect to dashboard
-  React.useEffect(() => {
-    if (user) {
-      router.push('/dashboard');
-    }
-  }, [user, router]);
-
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-           <div className="flex justify-center items-center gap-2 mb-4">
-             {logo ? (
+          <div className="flex justify-center items-center gap-2 mb-4">
+            {logo ? (
               <img src={logo} alt="App Logo" className="w-10 h-10 object-contain" />
             ) : (
               <Boxes className="w-10 h-10 text-primary" />
             )}
           </div>
-          <CardTitle className="text-2xl font-bold">{appName}</CardTitle>
-          <CardDescription>Enter your credentials to access your dashboard.</CardDescription>
+          <CardTitle className="text-2xl font-bold">Forgot Password</CardTitle>
+          <CardDescription>
+            Enter your email and we&apos;ll send you a link to reset your password.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -113,37 +93,16 @@ export default function LoginPage() {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <FormControl>
-                      <Input type="password" placeholder="••••••••" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="text-right text-sm">
-                <Link href="/forgot-password" className="underline hover:text-primary">
-                  Forgot Password?
-                </Link>
-              </div>
               <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? 'Signing In...' : 'Sign In'}
+                {form.formState.isSubmitting ? 'Sending...' : 'Send Reset Link'}
               </Button>
             </form>
           </Form>
         </CardContent>
         <CardFooter className="text-center text-sm">
-          <p>
-            Don&apos;t have an account?{' '}
-            <Link href="/signup" className="underline hover:text-primary">
-              Create an account
-            </Link>
-          </p>
+          <Link href="/login" className="underline hover:text-primary">
+            Back to Sign In
+          </Link>
         </CardFooter>
       </Card>
     </main>
