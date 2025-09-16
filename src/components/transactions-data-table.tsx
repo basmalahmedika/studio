@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -104,6 +105,7 @@ export function TransactionsDataTable() {
 
   const watchedItems = form.watch('items');
   const paymentMethod = form.watch('paymentMethod');
+  const patientType = form.watch('patientType');
 
   React.useEffect(() => {
     const total = watchedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -115,14 +117,20 @@ export function TransactionsDataTable() {
       watchedItems.forEach((cartItem, index) => {
           const inventoryItem = inventory.find(i => i.id === cartItem.itemId);
           if (inventoryItem) {
-              const newPrice = paymentMethod === 'BPJS' ? inventoryItem.purchasePrice : inventoryItem.sellingPrice;
+              let newPrice: number;
+              if (paymentMethod === 'BPJS') {
+                  newPrice = inventoryItem.purchasePrice;
+              } else {
+                  newPrice = patientType === 'Rawat Inap' ? inventoryItem.sellingPriceRI : inventoryItem.sellingPriceRJ;
+              }
+              
               if (cartItem.price !== newPrice) {
                 update(index, { ...cartItem, price: newPrice });
               }
           }
       });
     }
-  }, [paymentMethod, inventory, update, watchedItems]);
+  }, [paymentMethod, patientType, inventory, update, watchedItems]);
 
   const onSubmit = (values: TransactionFormValues) => {
     // Check if any item quantity exceeds available stock
@@ -208,9 +216,15 @@ export function TransactionsDataTable() {
 
   const handleAddItem = (item: InventoryItem) => {
     const paymentMethodValue = form.getValues('paymentMethod');
+    const patientTypeValue = form.getValues('patientType');
     
     if (item && !watchedItems.some(i => i.itemId === item.id)) {
-       const price = paymentMethodValue === 'BPJS' ? item.purchasePrice : item.sellingPrice;
+       let price;
+       if (paymentMethodValue === 'BPJS') {
+           price = item.purchasePrice;
+       } else {
+           price = patientTypeValue === 'Rawat Inap' ? item.sellingPriceRI : item.sellingPriceRJ;
+       }
        append({ 
          itemId: item.id, 
          itemName: item.itemName, 
@@ -571,3 +585,5 @@ export function TransactionsDataTable() {
     </Card>
   );
 }
+
+    

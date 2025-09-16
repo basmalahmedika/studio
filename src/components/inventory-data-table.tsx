@@ -83,7 +83,8 @@ const inventorySchema = z.object({
   unit: z.enum(['Tablet', 'Kapsul', 'Vial', 'Amp', 'Pcs', 'Cm', 'Btl']),
   quantity: z.coerce.number().min(0, 'Quantity must be a positive number'),
   purchasePrice: z.coerce.number().min(0, 'Purchase price must be a positive number'),
-  sellingPrice: z.coerce.number().min(0, 'Selling price must be a positive number'),
+  sellingPriceRJ: z.coerce.number().min(0, 'Selling price is required'),
+  sellingPriceRI: z.coerce.number().min(0, 'Selling price is required'),
   expiredDate: z.date({
     required_error: "An expiration date is required.",
   }),
@@ -106,7 +107,8 @@ export function InventoryDataTable() {
       supplier: '',
       quantity: 0,
       purchasePrice: 0,
-      sellingPrice: 0,
+      sellingPriceRJ: 0,
+      sellingPriceRI: 0,
       itemType: 'Obat',
       category: 'Oral',
       unit: 'Tablet',
@@ -114,18 +116,6 @@ export function InventoryDataTable() {
       expiredDate: new Date(),
     }
   });
-
-  const { watch } = form;
-  const purchasePrice = watch('purchasePrice');
-  const sellingPrice = watch('sellingPrice');
-
-  const margin = React.useMemo(() => {
-    if (purchasePrice > 0 && sellingPrice > 0 && sellingPrice > purchasePrice) {
-      return ((sellingPrice - purchasePrice) / purchasePrice) * 100;
-    }
-    return 0;
-  }, [purchasePrice, sellingPrice]);
-
 
   const onSubmit = (values: InventoryFormValues) => {
     const formattedValues: Omit<InventoryItem, 'id'> = {
@@ -166,7 +156,8 @@ export function InventoryDataTable() {
       supplier: '',
       quantity: 0,
       purchasePrice: 0,
-      sellingPrice: 0,
+      sellingPriceRJ: 0,
+      sellingPriceRI: 0,
       itemType: 'Obat',
       category: 'Oral',
       unit: 'Tablet',
@@ -190,7 +181,8 @@ export function InventoryDataTable() {
                 expiredDate: new Date(d.expiredDate as string),
                 quantity: Number(d.quantity),
                 purchasePrice: Number(d.purchasePrice),
-                sellingPrice: Number(d.sellingPrice)
+                sellingPriceRJ: Number(d.sellingPriceRJ),
+                sellingPriceRI: Number(d.sellingPriceRI),
             })));
             
             const newItems: Omit<InventoryItem, 'id'>[] = parsedData.map(item => ({
@@ -223,7 +215,7 @@ export function InventoryDataTable() {
   const handleDownloadTemplate = () => {
     const headers = [
       'inputDate', 'itemName', 'batchNumber', 'itemType', 'category', 'unit', 
-      'quantity', 'purchasePrice', 'sellingPrice', 'expiredDate', 'supplier'
+      'quantity', 'purchasePrice', 'sellingPriceRJ', 'sellingPriceRI', 'expiredDate', 'supplier'
     ];
     const csv = Papa.unparse([headers]);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -460,10 +452,10 @@ export function InventoryDataTable() {
                       />
                       <FormField
                         control={form.control}
-                        name="sellingPrice"
+                        name="sellingPriceRJ"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Selling Price</FormLabel>
+                            <FormLabel>Selling Price (RJ)</FormLabel>
                             <FormControl>
                               <Input type="number" placeholder="Rp 0" {...field} />
                             </FormControl>
@@ -471,12 +463,19 @@ export function InventoryDataTable() {
                           </FormItem>
                         )}
                       />
-                       <FormItem>
-                          <FormLabel>Margin (%)</FormLabel>
-                          <FormControl>
-                            <Input type="text" value={`${margin.toFixed(2)}%`} disabled />
-                          </FormControl>
-                        </FormItem>
+                       <FormField
+                        control={form.control}
+                        name="sellingPriceRI"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Selling Price (RI)</FormLabel>
+                            <FormControl>
+                              <Input type="number" placeholder="Rp 0" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                        <FormField
                         control={form.control}
                         name="expiredDate"
@@ -554,7 +553,8 @@ export function InventoryDataTable() {
                 <TableHead>Qty</TableHead>
                 <TableHead>Unit</TableHead>
                 <TableHead>Purchase Price</TableHead>
-                <TableHead>Selling Price</TableHead>
+                <TableHead>Selling Price (RJ)</TableHead>
+                <TableHead>Selling Price (RI)</TableHead>
                 <TableHead>Expired</TableHead>
                 <TableHead>Supplier</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -570,7 +570,8 @@ export function InventoryDataTable() {
                   <TableCell>{item.quantity}</TableCell>
                   <TableCell>{item.unit}</TableCell>
                   <TableCell>Rp {item.purchasePrice.toLocaleString('id-ID')}</TableCell>
-                  <TableCell>Rp {item.sellingPrice.toLocaleString('id-ID')}</TableCell>
+                  <TableCell>Rp {item.sellingPriceRJ.toLocaleString('id-ID')}</TableCell>
+                  <TableCell>Rp {item.sellingPriceRI.toLocaleString('id-ID')}</TableCell>
                   <TableCell>{item.expiredDate}</TableCell>
                   <TableCell>{item.supplier}</TableCell>
                   <TableCell className="text-right">

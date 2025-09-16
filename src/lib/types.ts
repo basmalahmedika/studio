@@ -1,3 +1,4 @@
+
 export type TransactionItem = {
   itemId: string;
   quantity: number;
@@ -40,7 +41,10 @@ export type InventoryItem = {
   unit: 'Tablet' | 'Kapsul' | 'Vial' | 'Amp' | 'Pcs' | 'Cm' | 'Btl';
   quantity: number;
   purchasePrice: number;
-  sellingPrice: number;
+  sellingPriceRJ: number;
+  sellingPriceRI: number;
   expiredDate: string;
   supplier: string;
 };
+
+    
