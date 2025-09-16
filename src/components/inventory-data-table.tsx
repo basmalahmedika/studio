@@ -4,9 +4,10 @@ import * as React from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { PlusCircle, MoreHorizontal, Pen, Trash2 } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Pen, Trash2, Upload } from 'lucide-react';
 import { format } from "date-fns"
 import { Calendar as CalendarIcon } from "lucide-react"
+import Papa from 'papaparse';
 
 import {
   Table,
@@ -75,6 +76,7 @@ const inventorySchema = z.object({
     required_error: "A date of input is required.",
   }),
   itemName: z.string().min(1, 'Item name is required'),
+  batchNumber: z.string().min(1, 'Batch number is required'),
   itemType: z.enum(['Alkes', 'Obat']),
   category: z.enum(['Oral', 'Topikal', 'Injeksi', 'Suppositoria', 'Inhalasi/Nasal', 'Vaksin', 'Lainnya']),
   unit: z.enum(['Tablet', 'Kapsul', 'Vial', 'Amp', 'Pcs', 'Cm', 'Btl']),
@@ -92,6 +94,7 @@ type InventoryFormValues = z.infer<typeof inventorySchema>;
 export function InventoryDataTable() {
   const [data, setData] = React.useState<InventoryItem[]>(inventory);
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const form = useForm<InventoryFormValues>({
@@ -103,7 +106,7 @@ export function InventoryDataTable() {
     }
   });
 
-  const { watch, setValue } = form;
+  const { watch } = form;
   const purchasePrice = watch('purchasePrice');
   const sellingPrice = watch('sellingPrice');
 
@@ -158,263 +161,334 @@ export function InventoryDataTable() {
     });
     setIsEditDialogOpen(true);
   }
+  
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          try {
+            const parsedData = z.array(inventorySchema.omit({id: true})).parse(results.data.map(d => ({
+                ...d,
+                inputDate: new Date(d.inputDate as string),
+                expiredDate: new Date(d.expiredDate as string),
+                quantity: Number(d.quantity),
+                purchasePrice: Number(d.purchasePrice),
+                sellingPrice: Number(d.sellingPrice)
+            })));
+            
+            const newItems: InventoryItem[] = parsedData.map((item, index) => ({
+              ...item,
+              id: `inv${String(data.length + index + 1).padStart(3, '0')}`,
+              inputDate: format(item.inputDate, "yyyy-MM-dd"),
+              expiredDate: format(item.expiredDate, "yyyy-MM-dd"),
+            }));
+
+            setData(prevData => [...prevData, ...newItems]);
+            toast({ title: "Upload Successful", description: `${newItems.length} new items have been added.` });
+          } catch (error) {
+             if (error instanceof z.ZodError) {
+                console.error("CSV validation error:", error.issues);
+                toast({ variant: "destructive", title: "Upload Failed", description: "CSV data is invalid. Please check the file and try again." });
+            } else {
+                console.error("An unexpected error occurred:", error);
+                toast({ variant: "destructive", title: "Upload Failed", description: "An unexpected error occurred during file processing." });
+            }
+          }
+        },
+        error: (error) => {
+           toast({ variant: "destructive", title: "Upload Failed", description: error.message });
+        }
+      });
+    }
+    // Reset file input
+    event.target.value = '';
+  };
 
   return (
     <Card>
       <CardHeader>
         <div className="flex justify-between items-center">
           <CardTitle>Inventory List</CardTitle>
-          <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={handleOpenAddNew}>
-                <PlusCircle className="mr-2" />
-                Add New Item
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>{form.getValues('id') ? 'Edit Item' : 'Add New Item'}</DialogTitle>
-                <DialogDescription>
-                  Fill in the form below to add a new item to the inventory.
-                </DialogDescription>
-              </DialogHeader>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 py-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="itemName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Item Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g., Paracetamol 500mg" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                     <FormField
-                      control={form.control}
-                      name="inputDate"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                          <FormLabel>Input Date</FormLabel>
-                          <Popover>
-                            <PopoverTrigger asChild>
+          <div className="flex gap-2">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              className="hidden"
+              accept=".csv"
+            />
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+              <Upload className="mr-2" />
+              Upload File
+            </Button>
+            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={handleOpenAddNew}>
+                  <PlusCircle className="mr-2" />
+                  Add New Item
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>{form.getValues('id') ? 'Edit Item' : 'Add New Item'}</DialogTitle>
+                  <DialogDescription>
+                    Fill in the form below to add a new item to the inventory.
+                  </DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 py-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="itemName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Item Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., Paracetamol 500mg" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="batchNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>No. Batch</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., B12345" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                       <FormField
+                        control={form.control}
+                        name="inputDate"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col">
+                            <FormLabel>Input Date</FormLabel>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant={"outline"}
+                                    className={cn(
+                                      "w-full pl-3 text-left font-normal",
+                                      !field.value && "text-muted-foreground"
+                                    )}
+                                  >
+                                    {field.value ? (
+                                      format(field.value, "PPP")
+                                    ) : (
+                                      <span>Pick a date</span>
+                                    )}
+                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={field.value}
+                                  onSelect={field.onChange}
+                                  disabled={(date) =>
+                                    date > new Date() || date < new Date("1900-01-01")
+                                  }
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="itemType"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Item Type</FormLabel>
+                             <Select onValueChange={field.onChange} defaultValue={field.value}>
                               <FormControl>
-                                <Button
-                                  variant={"outline"}
-                                  className={cn(
-                                    "w-full pl-3 text-left font-normal",
-                                    !field.value && "text-muted-foreground"
-                                  )}
-                                >
-                                  {field.value ? (
-                                    format(field.value, "PPP")
-                                  ) : (
-                                    <span>Pick a date</span>
-                                  )}
-                                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                </Button>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select item type" />
+                                </SelectTrigger>
                               </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={field.value}
-                                onSelect={field.onChange}
-                                disabled={(date) =>
-                                  date > new Date() || date < new Date("1900-01-01")
-                                }
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="itemType"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Item Type</FormLabel>
-                           <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select item type" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="Obat">Obat</SelectItem>
-                              <SelectItem value="Alkes">Alkes</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                     <FormField
-                      control={form.control}
-                      name="category"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Category</FormLabel>
-                           <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select a category" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                               <SelectItem value="Oral">Oral</SelectItem>
-                               <SelectItem value="Topikal">Topikal</SelectItem>
-                               <SelectItem value="Injeksi">Injeksi</SelectItem>
-                               <SelectItem value="Suppositoria">Suppositoria</SelectItem>
-                               <SelectItem value="Inhalasi/Nasal">Inhalasi/Nasal</SelectItem>
-                               <SelectItem value="Vaksin">Vaksin</SelectItem>
-                               <SelectItem value="Lainnya">Lainnya</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                     <FormField
-                      control={form.control}
-                      name="unit"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Unit</FormLabel>
-                           <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select a unit" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                               <SelectItem value="Tablet">Tablet</SelectItem>
-                               <SelectItem value="Kapsul">Kapsul</SelectItem>
-                               <SelectItem value="Vial">Vial</SelectItem>
-                               <SelectItem value="Amp">Amp</SelectItem>
-                               <SelectItem value="Pcs">Pcs</SelectItem>
-                               <SelectItem value="Cm">Cm</SelectItem>
-                               <SelectItem value="Btl">Btl</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="quantity"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Quantity</FormLabel>
-                          <FormControl>
-                            <Input type="number" placeholder="0" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="purchasePrice"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Purchase Price</FormLabel>
-                          <FormControl>
-                            <Input type="number" placeholder="Rp 0" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="sellingPrice"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Selling Price</FormLabel>
-                          <FormControl>
-                            <Input type="number" placeholder="Rp 0" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                     <FormItem>
-                        <FormLabel>Margin (%)</FormLabel>
-                        <FormControl>
-                          <Input type="text" value={`${margin.toFixed(2)}%`} disabled />
-                        </FormControl>
-                      </FormItem>
-                     <FormField
-                      control={form.control}
-                      name="expiredDate"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                          <FormLabel>Expiration Date</FormLabel>
-                          <Popover>
-                            <PopoverTrigger asChild>
+                              <SelectContent>
+                                <SelectItem value="Obat">Obat</SelectItem>
+                                <SelectItem value="Alkes">Alkes</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                       <FormField
+                        control={form.control}
+                        name="category"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Category</FormLabel>
+                             <Select onValueChange={field.onChange} defaultValue={field.value}>
                               <FormControl>
-                                <Button
-                                  variant={"outline"}
-                                  className={cn(
-                                    "w-full pl-3 text-left font-normal",
-                                    !field.value && "text-muted-foreground"
-                                  )}
-                                >
-                                  {field.value ? (
-                                    format(field.value, "PPP")
-                                  ) : (
-                                    <span>Pick a date</span>
-                                  )}
-                                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                </Button>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select a category" />
+                                </SelectTrigger>
                               </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={field.value}
-                                onSelect={field.onChange}
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="supplier"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Supplier</FormLabel>
+                              <SelectContent>
+                                 <SelectItem value="Oral">Oral</SelectItem>
+                                 <SelectItem value="Topikal">Topikal</SelectItem>
+                                 <SelectItem value="Injeksi">Injeksi</SelectItem>
+                                 <SelectItem value="Suppositoria">Suppositoria</SelectItem>
+                                 <SelectItem value="Inhalasi/Nasal">Inhalasi/Nasal</SelectItem>
+                                 <SelectItem value="Vaksin">Vaksin</SelectItem>
+                                 <SelectItem value="Lainnya">Lainnya</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                       <FormField
+                        control={form.control}
+                        name="unit"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Unit</FormLabel>
+                             <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select a unit" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                 <SelectItem value="Tablet">Tablet</SelectItem>
+                                 <SelectItem value="Kapsul">Kapsul</SelectItem>
+                                 <SelectItem value="Vial">Vial</SelectItem>
+                                 <SelectItem value="Amp">Amp</SelectItem>
+                                 <SelectItem value="Pcs">Pcs</SelectItem>
+                                 <SelectItem value="Cm">Cm</SelectItem>
+                                 <SelectItem value="Btl">Btl</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="quantity"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Quantity</FormLabel>
+                            <FormControl>
+                              <Input type="number" placeholder="0" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="purchasePrice"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Purchase Price</FormLabel>
+                            <FormControl>
+                              <Input type="number" placeholder="Rp 0" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="sellingPrice"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Selling Price</FormLabel>
+                            <FormControl>
+                              <Input type="number" placeholder="Rp 0" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                       <FormItem>
+                          <FormLabel>Margin (%)</FormLabel>
                           <FormControl>
-                            <Input placeholder="e.g., Supplier A" {...field} />
+                            <Input type="text" value={`${margin.toFixed(2)}%`} disabled />
                           </FormControl>
-                          <FormMessage />
                         </FormItem>
-                      )}
-                    />
-                  </div>
-                  <DialogFooter>
-                    <DialogClose asChild>
-                        <Button type="button" variant="secondary">Cancel</Button>
-                    </DialogClose>
-                    <Button type="submit">Save changes</Button>
-                  </DialogFooter>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
+                       <FormField
+                        control={form.control}
+                        name="expiredDate"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col">
+                            <FormLabel>Expiration Date</FormLabel>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant={"outline"}
+                                    className={cn(
+                                      "w-full pl-3 text-left font-normal",
+                                      !field.value && "text-muted-foreground"
+                                    )}
+                                  >
+                                    {field.value ? (
+                                      format(field.value, "PPP")
+                                    ) : (
+                                      <span>Pick a date</span>
+                                    )}
+                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={field.value}
+                                  onSelect={field.onChange}
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="supplier"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Supplier</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., Supplier A" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <DialogFooter>
+                      <DialogClose asChild>
+                          <Button type="button" variant="secondary">Cancel</Button>
+                      </DialogClose>
+                      <Button type="submit">Save changes</Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -423,6 +497,7 @@ export function InventoryDataTable() {
             <TableHeader>
               <TableRow>
                 <TableHead>Item Name</TableHead>
+                <TableHead>No. Batch</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead>Qty</TableHead>
@@ -438,6 +513,7 @@ export function InventoryDataTable() {
               {data.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">{item.itemName}</TableCell>
+                  <TableCell>{item.batchNumber}</TableCell>
                   <TableCell>{item.itemType}</TableCell>
                   <TableCell>{item.category}</TableCell>
                   <TableCell>{item.quantity}</TableCell>

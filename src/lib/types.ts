@@ -31,6 +31,7 @@ export type InventoryItem = {
   id: string;
   inputDate: string;
   itemName: string;
+  batchNumber: string;
   itemType: 'Alkes' | 'Obat';
   category: 'Oral' | 'Topikal' | 'Injeksi' | 'Suppositoria' | 'Inhalasi/Nasal' | 'Vaksin' | 'Lainnya';
   unit: 'Tablet' | 'Kapsul' | 'Vial' | 'Amp' | 'Pcs' | 'Cm' | 'Btl';
