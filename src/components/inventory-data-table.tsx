@@ -246,7 +246,7 @@ export function InventoryDataTable() {
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
           // Use { raw: false } to get formatted text for dates if available
-          const json = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+          const json = XLSX.utils.sheet_to_json(worksheet);
           
           const validationResult = excelImportSchema.safeParse(json);
 
@@ -421,6 +421,9 @@ export function InventoryDataTable() {
                                   disabled={(date) =>
                                     date > new Date() || date < new Date("1900-01-01")
                                   }
+                                  captionLayout="dropdown-buttons"
+                                  fromYear={1900}
+                                  toYear={new Date().getFullYear() + 5}
                                   initialFocus
                                 />
                               </PopoverContent>
@@ -584,6 +587,9 @@ export function InventoryDataTable() {
                                   mode="single"
                                   selected={field.value}
                                   onSelect={field.onChange}
+                                  captionLayout="dropdown-buttons"
+                                  fromYear={1900}
+                                  toYear={new Date().getFullYear() + 15}
                                   initialFocus
                                 />
                               </PopoverContent>
