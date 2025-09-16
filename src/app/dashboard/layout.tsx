@@ -7,6 +7,7 @@ import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar'
 import SidebarNav from '@/components/layout/sidebar-nav';
 import Header from '@/components/layout/header';
 import { AppProvider } from '@/context/app-context';
+import { AuthProvider } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAppContext } from '@/context/app-context';
 import PrivateRoute from '@/components/auth/private-route';
@@ -122,17 +123,19 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
 
   return (
-    <PrivateRoute>
-      <AppProvider>
-        <SidebarProvider>
-          <Sidebar>
-            <SidebarNav />
-          </Sidebar>
-          <SidebarInset>
-            <DashboardContent>{children}</DashboardContent>
-          </SidebarInset>
-        </SidebarProvider>
-      </AppProvider>
-    </PrivateRoute>
+    <AuthProvider>
+        <PrivateRoute>
+            <AppProvider>
+                <SidebarProvider>
+                <Sidebar>
+                    <SidebarNav />
+                </Sidebar>
+                <SidebarInset>
+                    <DashboardContent>{children}</DashboardContent>
+                </SidebarInset>
+                </SidebarProvider>
+            </AppProvider>
+        </PrivateRoute>
+    </AuthProvider>
   );
 }
