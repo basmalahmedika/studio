@@ -64,7 +64,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Input } from '@/components/ui/input';
 import { Calendar } from "@/components/ui/calendar"
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { inventory } from '@/lib/data';
+import { useAppContext } from '@/context/app-context';
 import type { InventoryItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -92,7 +92,7 @@ const inventorySchema = z.object({
 type InventoryFormValues = z.infer<typeof inventorySchema>;
 
 export function InventoryDataTable() {
-  const [data, setData] = React.useState<InventoryItem[]>(inventory);
+  const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem, bulkAddInventoryItems } = useAppContext();
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -119,20 +119,17 @@ export function InventoryDataTable() {
 
 
   const onSubmit = (values: InventoryFormValues) => {
-    const formattedValues: InventoryItem = {
+    const formattedValues: Omit<InventoryItem, 'id'> = {
       ...values,
-      id: values.id || `inv${String(data.length + 1).padStart(3, '0')}`,
       inputDate: format(values.inputDate, "yyyy-MM-dd"),
       expiredDate: format(values.expiredDate, "yyyy-MM-dd"),
     };
     
     if (values.id) {
-      // Update
-      setData(data.map(item => item.id === values.id ? formattedValues : item));
-       toast({ title: "Success", description: "Item has been updated." });
+      updateInventoryItem(values.id, { id: values.id, ...formattedValues });
+      toast({ title: "Success", description: "Item has been updated." });
     } else {
-      // Create
-      setData([...data, formattedValues]);
+      addInventoryItem(formattedValues);
       toast({ title: "Success", description: "New item has been added." });
     }
     form.reset();
@@ -149,7 +146,7 @@ export function InventoryDataTable() {
   };
 
   const handleDelete = (id: string) => {
-    setData(data.filter(item => item.id !== id));
+    deleteInventoryItem(id);
     toast({ title: "Success", description: "Item has been deleted." });
   }
 
@@ -170,7 +167,7 @@ export function InventoryDataTable() {
         skipEmptyLines: true,
         complete: (results) => {
           try {
-            const parsedData = z.array(inventorySchema.omit({id: true})).parse(results.data.map(d => ({
+            const parsedData = z.array(inventorySchema.omit({id: true})).parse(results.data.map((d: any) => ({
                 ...d,
                 inputDate: new Date(d.inputDate as string),
                 expiredDate: new Date(d.expiredDate as string),
@@ -179,14 +176,13 @@ export function InventoryDataTable() {
                 sellingPrice: Number(d.sellingPrice)
             })));
             
-            const newItems: InventoryItem[] = parsedData.map((item, index) => ({
+            const newItems: Omit<InventoryItem, 'id'>[] = parsedData.map(item => ({
               ...item,
-              id: `inv${String(data.length + index + 1).padStart(3, '0')}`,
               inputDate: format(item.inputDate, "yyyy-MM-dd"),
               expiredDate: format(item.expiredDate, "yyyy-MM-dd"),
             }));
 
-            setData(prevData => [...prevData, ...newItems]);
+            bulkAddInventoryItems(newItems);
             toast({ title: "Upload Successful", description: `${newItems.length} new items have been added.` });
           } catch (error) {
              if (error instanceof z.ZodError) {
@@ -204,7 +200,7 @@ export function InventoryDataTable() {
       });
     }
     // Reset file input
-    event.target.value = '';
+    if (event.target) event.target.value = '';
   };
   
   const handleDownloadTemplate = () => {
@@ -225,7 +221,7 @@ export function InventoryDataTable() {
   };
 
   const handleExportData = () => {
-    const csv = Papa.unparse(data);
+    const csv = Papa.unparse(inventory);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -548,7 +544,7 @@ export function InventoryDataTable() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((item) => (
+              {inventory.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">{item.itemName}</TableCell>
                   <TableCell>{item.batchNumber}</TableCell>

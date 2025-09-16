@@ -15,7 +15,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { inventory } from '@/lib/data';
+import { useAppContext } from '@/context/app-context';
 import type { InventoryItem } from '@/lib/types';
 import { Clock, FileDown } from 'lucide-react';
 
@@ -43,6 +43,7 @@ const getExpiryZone = (expiredDate: string): { zone: ExpiryZone, monthsLeft: num
 };
 
 export function ExpiringStockReport() {
+  const { inventory } = useAppContext();
   const [expiringItems, setExpiringItems] = React.useState<ExpiringItem[]>([]);
 
   React.useEffect(() => {
@@ -52,7 +53,7 @@ export function ExpiringStockReport() {
     })
     .sort((a, b) => a.monthsLeft - b.monthsLeft);
     setExpiringItems(classifiedItems);
-  }, []);
+  }, [inventory]);
 
   const getBadgeClass = (zone: ExpiryZone) => {
     switch (zone) {

@@ -9,11 +9,12 @@ import { StatCard } from '@/components/stat-card';
 import { RecentTransactions } from '@/components/recent-transactions';
 import { TopSellingItems } from '@/components/top-selling-items';
 import { DateRangePicker } from '@/components/date-range-picker';
-import { transactions as allTransactions, inventory as allInventory } from '@/lib/data';
+import { useAppContext } from '@/context/app-context';
 import type { Transaction } from '@/lib/types';
-import { Card, CardContent } from '@/components/ui/card';
 
 export default function DashboardPage() {
+  const { transactions, inventory } = useAppContext();
+
   const [date, setDate] = React.useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
     to: new Date(),
@@ -22,7 +23,7 @@ export default function DashboardPage() {
   const [filteredTransactions, setFilteredTransactions] = React.useState<Transaction[]>([]);
 
   React.useEffect(() => {
-    const filtered = allTransactions.filter(t => {
+    const filtered = transactions.filter(t => {
       const transactionDate = new Date(t.date);
       transactionDate.setHours(0, 0, 0, 0);
 
@@ -37,7 +38,7 @@ export default function DashboardPage() {
         : true;
     });
     setFilteredTransactions(filtered);
-  }, [date]);
+  }, [date, transactions]);
 
   const stats = React.useMemo(() => {
     const data = {
@@ -101,14 +102,14 @@ export default function DashboardPage() {
         <TopSellingItems 
           title="Top Selling Medications"
           transactions={filteredTransactions}
-          inventory={allInventory}
+          inventory={inventory}
           itemType="Obat"
           icon={Pill}
         />
         <TopSellingItems 
           title="Top Selling Medical Devices"
           transactions={filteredTransactions}
-          inventory={allInventory}
+          inventory={inventory}
           itemType="Alkes"
           icon={Stethoscope}
         />

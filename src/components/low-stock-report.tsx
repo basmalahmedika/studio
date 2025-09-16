@@ -12,19 +12,20 @@ import {
 } from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { inventory } from '@/lib/data';
+import { useAppContext } from '@/context/app-context';
 import type { InventoryItem } from '@/lib/types';
 import { AlertTriangle, FileDown } from 'lucide-react';
 
 const LOW_STOCK_THRESHOLD = 50;
 
 export function LowStockReport() {
+  const { inventory } = useAppContext();
   const [lowStockItems, setLowStockItems] = React.useState<InventoryItem[]>([]);
 
   React.useEffect(() => {
     const filteredItems = inventory.filter(item => item.quantity < LOW_STOCK_THRESHOLD);
     setLowStockItems(filteredItems);
-  }, []);
+  }, [inventory]);
 
   const handleExportData = () => {
     const dataToExport = lowStockItems.map((item) => ({

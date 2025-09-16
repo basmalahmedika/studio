@@ -1,3 +1,9 @@
+export type TransactionItem = {
+  itemId: string;
+  quantity: number;
+  price: number;
+};
+
 export type Transaction = {
   id: string;
   date: string;
@@ -9,6 +15,7 @@ export type Transaction = {
   context: string;
   totalPrice: number;
   medicalRecordNumber?: string;
+  items?: TransactionItem[];
 };
 
 export type Medication = {

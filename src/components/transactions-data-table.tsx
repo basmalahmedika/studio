@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { z } from 'zod';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { PlusCircle, MoreHorizontal, Pen, Trash2, CalendarIcon, X, FileDown } from 'lucide-react';
 import { format } from "date-fns";
@@ -56,7 +56,7 @@ import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { transactions, inventory } from '@/lib/data';
+import { useAppContext } from '@/context/app-context';
 import type { Transaction, InventoryItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -72,6 +72,7 @@ const transactionSchema = z.object({
     itemName: z.string(),
     quantity: z.coerce.number().min(1, 'Quantity must be at least 1'),
     price: z.number(),
+    stock: z.number(),
   })).min(1, 'At least one item is required'),
   totalPrice: z.number(),
 });
@@ -79,7 +80,7 @@ const transactionSchema = z.object({
 type TransactionFormValues = z.infer<typeof transactionSchema>;
 
 export function TransactionsDataTable() {
-  const [data, setData] = React.useState<Transaction[]>(transactions);
+  const { transactions, inventory, addTransaction, updateTransaction, deleteTransaction } = useAppContext();
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [itemSearch, setItemSearch] = React.useState('');
   const { toast } = useToast();
@@ -96,6 +97,11 @@ export function TransactionsDataTable() {
     },
   });
   
+  const { fields, append, remove, update } = useFieldArray({
+    control: form.control,
+    name: "items"
+  });
+
   const watchedItems = form.watch('items');
   const paymentMethod = form.watch('paymentMethod');
 
@@ -105,25 +111,33 @@ export function TransactionsDataTable() {
   }, [watchedItems, form]);
   
   React.useEffect(() => {
-    // When payment method changes, update prices for existing items
     if (watchedItems.length > 0) {
-      const updatedItems = watchedItems.map(cartItem => {
+      watchedItems.forEach((cartItem, index) => {
           const inventoryItem = inventory.find(i => i.id === cartItem.itemId);
           if (inventoryItem) {
-              return {
-                  ...cartItem,
-                  price: paymentMethod === 'BPJS' ? inventoryItem.purchasePrice : inventoryItem.sellingPrice,
-              };
+              const newPrice = paymentMethod === 'BPJS' ? inventoryItem.purchasePrice : inventoryItem.sellingPrice;
+              if (cartItem.price !== newPrice) {
+                update(index, { ...cartItem, price: newPrice });
+              }
           }
-          return cartItem;
       });
-      form.setValue('items', updatedItems);
     }
-  }, [paymentMethod, form]);
+  }, [paymentMethod, inventory, update, watchedItems]);
 
   const onSubmit = (values: TransactionFormValues) => {
-    const newOrUpdatedTransaction: Transaction = {
-      id: values.id || `trx${String(data.length + 1).padStart(3, '0')}`,
+    // Check if any item quantity exceeds available stock
+    for (const item of values.items) {
+        if (item.quantity > item.stock) {
+            toast({
+                variant: "destructive",
+                title: "Insufficient Stock",
+                description: `Quantity for ${item.itemName} exceeds available stock of ${item.stock}.`,
+            });
+            return;
+        }
+    }
+
+    const transactionData: Omit<Transaction, 'id'> = {
       date: format(values.date, "yyyy-MM-dd"),
       medicationName: values.items.map(i => `${i.itemName} (x${i.quantity})`).join(', '),
       quantity: values.items.reduce((sum, item) => sum + item.quantity, 0),
@@ -132,14 +146,18 @@ export function TransactionsDataTable() {
       paymentMethod: values.paymentMethod,
       context: `MRN: ${values.medicalRecordNumber}`, 
       totalPrice: values.totalPrice,
-      medicalRecordNumber: values.medicalRecordNumber,
+      medicalRecordNumber: values.medicalRecordNumber || '',
+      items: values.items.map(({ itemId, quantity, price }) => ({ itemId, quantity, price })),
     };
 
     if (values.id) {
-      setData(data.map(item => item.id === values.id ? newOrUpdatedTransaction : item));
-      toast({ title: "Success", description: "Transaction has been updated." });
+      const originalTransaction = transactions.find(t => t.id === values.id);
+      if (originalTransaction) {
+        updateTransaction(values.id, { id: values.id, ...transactionData }, originalTransaction);
+        toast({ title: "Success", description: "Transaction has been updated." });
+      }
     } else {
-      setData([newOrUpdatedTransaction, ...data]);
+      addTransaction(transactionData);
       toast({ title: "Success", description: "New transaction has been added." });
     }
     form.reset();
@@ -147,25 +165,14 @@ export function TransactionsDataTable() {
   };
   
   const handleEdit = (transaction: Transaction) => {
-     const itemsInTransaction = transaction.medicationName.split(', ').map(itemStr => {
-        const match = itemStr.match(/(.+) \(x(\d+)\)/);
-        if (!match) return null;
-
-        const itemName = match[1];
-        const quantity = parseInt(match[2], 10);
-        const inventoryItem = inventory.find(i => i.itemName === itemName);
-
-        if (!inventoryItem) return null;
-        
-        const price = transaction.paymentMethod === 'BPJS' ? inventoryItem.purchasePrice : inventoryItem.sellingPrice;
-
+     const itemsInTransaction = (transaction.items || []).map(item => {
+        const inventoryItem = inventory.find(i => i.id === item.itemId);
         return {
-            itemId: inventoryItem.id,
-            itemName: inventoryItem.itemName,
-            quantity: quantity,
-            price: price,
+            ...item,
+            itemName: inventoryItem?.itemName || 'Unknown Item',
+            stock: inventoryItem?.quantity || 0,
         };
-    }).filter((item): item is { itemId: string; itemName: string; quantity: number; price: number; } => item !== null);
+    });
 
     form.reset({
         id: transaction.id,
@@ -180,34 +187,43 @@ export function TransactionsDataTable() {
 };
   
   const handleDelete = (id: string) => {
-    setData(data.filter(item => item.id !== id));
-    toast({ title: "Success", description: "Transaction has been deleted." });
+    const transactionToDelete = transactions.find(t => t.id === id);
+    if (transactionToDelete) {
+        deleteTransaction(id, transactionToDelete);
+        toast({ title: "Success", description: "Transaction has been deleted." });
+    }
   }
 
   const handleOpenAddNew = () => {
-    form.reset();
+    form.reset({
+      date: new Date(),
+      items: [],
+      patientType: 'Rawat Jalan',
+      paymentMethod: 'UMUM',
+      totalPrice: 0,
+      medicalRecordNumber: '',
+    });
     setIsDialogOpen(true);
   }
 
-  const handleAddItem = (itemId: string) => {
-    const item = inventory.find(i => i.id === itemId);
+  const handleAddItem = (item: InventoryItem) => {
     const paymentMethodValue = form.getValues('paymentMethod');
     
-    if (item && !watchedItems.some(i => i.itemId === itemId)) {
+    if (item && !watchedItems.some(i => i.itemId === item.id)) {
        const price = paymentMethodValue === 'BPJS' ? item.purchasePrice : item.sellingPrice;
-       form.setValue('items', [...watchedItems, { itemId: item.id, itemName: item.itemName, quantity: 1, price }]);
+       append({ 
+         itemId: item.id, 
+         itemName: item.itemName, 
+         quantity: 1, 
+         price,
+         stock: item.quantity
+       });
     }
     setItemSearch(''); // Clear search after adding
   }
-
-  const handleRemoveItem = (index: number) => {
-    const newItems = [...watchedItems];
-    newItems.splice(index, 1);
-    form.setValue('items', newItems);
-  }
   
   const handleExportData = () => {
-    const csv = Papa.unparse(data);
+    const csv = Papa.unparse(transactions);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -234,7 +250,7 @@ export function TransactionsDataTable() {
   };
   
   const filteredData = React.useMemo(() => {
-    return data.filter((transaction) => {
+    return transactions.filter((transaction) => {
       const nameMatch = transaction.medicationName
         .toLowerCase()
         .includes(filters.medicationName.toLowerCase());
@@ -244,7 +260,7 @@ export function TransactionsDataTable() {
         filters.paymentMethod === 'all' || transaction.paymentMethod === filters.paymentMethod;
       return nameMatch && patientTypeMatch && paymentMethodMatch;
     });
-  }, [data, filters]);
+  }, [transactions, filters]);
 
   const filteredInventory = React.useMemo(() => {
     if (!itemSearch) return [];
@@ -252,7 +268,7 @@ export function TransactionsDataTable() {
       item.itemName.toLowerCase().includes(itemSearch.toLowerCase()) &&
       !watchedItems.some(cartItem => cartItem.itemId === item.id)
     );
-  }, [itemSearch, watchedItems]);
+  }, [itemSearch, watchedItems, inventory]);
 
   return (
     <Card>
@@ -381,7 +397,7 @@ export function TransactionsDataTable() {
                                   {filteredInventory.map(item => (
                                     <div 
                                       key={item.id} 
-                                      onClick={() => handleAddItem(item.id)}
+                                      onClick={() => handleAddItem(item)}
                                       className="px-3 py-2 text-sm cursor-pointer hover:bg-accent"
                                     >
                                       {item.itemName} (Stock: {item.quantity})
@@ -391,8 +407,8 @@ export function TransactionsDataTable() {
                               )}
                            </div>
                            <div className="space-y-2">
-                            {watchedItems.map((item, index) => (
-                              <div key={index} className="flex items-center justify-between gap-2 p-2 rounded-md bg-muted">
+                            {fields.map((item, index) => (
+                              <div key={item.id} className="flex items-center justify-between gap-2 p-2 rounded-md bg-muted">
                                   <div className="flex-1 font-medium">{item.itemName}</div>
                                   <div className="w-40">
                                       <FormField
@@ -408,7 +424,7 @@ export function TransactionsDataTable() {
                                       />
                                   </div>
                                   <div className="w-32 text-right">Rp {(item.price * item.quantity).toLocaleString('id-ID')}</div>
-                                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => handleRemoveItem(index)}>
+                                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => remove(index)}>
                                     <X className="h-4 w-4" />
                                   </Button>
                               </div>

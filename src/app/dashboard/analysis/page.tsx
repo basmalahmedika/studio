@@ -6,7 +6,7 @@ import type { DateRange } from 'react-day-picker';
 import { startOfMonth } from 'date-fns';
 import { AbcAnalysis } from '@/components/abc-analysis';
 import { SalesTrendsChart } from '@/components/sales-trends-chart';
-import { transactions as allTransactions } from '@/lib/data';
+import { useAppContext } from '@/context/app-context';
 import type { Transaction } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { DateRangePicker } from '@/components/date-range-picker';
@@ -16,6 +16,7 @@ type PatientType = 'all' | 'Rawat Jalan' | 'Rawat Inap';
 type PaymentMethod = 'all' | 'UMUM' | 'BPJS';
 
 export default function AnalysisPage() {
+  const { transactions } = useAppContext();
   const [date, setDate] = React.useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
     to: new Date(),
@@ -25,7 +26,7 @@ export default function AnalysisPage() {
   const [filteredTransactions, setFilteredTransactions] = React.useState<Transaction[]>([]);
 
   React.useEffect(() => {
-    const filtered = allTransactions.filter(t => {
+    const filtered = transactions.filter(t => {
       const transactionDate = new Date(t.date);
       // Set time to 0 to compare dates only
       transactionDate.setHours(0, 0, 0, 0);
@@ -45,7 +46,7 @@ export default function AnalysisPage() {
       return isDateInRange && isPatientTypeMatch && isPaymentMethodMatch;
     });
     setFilteredTransactions(filtered);
-  }, [date, patientType, paymentMethod]);
+  }, [date, patientType, paymentMethod, transactions]);
 
   const salesByMonth = React.useMemo(() => {
     const sales: Record<string, number> = {};
