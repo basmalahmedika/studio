@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { z } from 'zod';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { PlusCircle, MoreHorizontal, Pen, Trash2, CalendarIcon, X } from 'lucide-react';
 import { format } from "date-fns";
@@ -55,9 +55,8 @@ import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Label } from '@/components/ui/label';
 import { transactions, inventory } from '@/lib/data';
-import type { Transaction, InventoryItem } from '@/lib/types';
+import type { Transaction } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
@@ -81,6 +80,7 @@ type TransactionFormValues = z.infer<typeof transactionSchema>;
 export function TransactionsDataTable() {
   const [data, setData] = React.useState<Transaction[]>(transactions);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const [itemSearch, setItemSearch] = React.useState('');
   const { toast } = useToast();
 
   const form = useForm<TransactionFormValues>({
@@ -94,18 +94,30 @@ export function TransactionsDataTable() {
     },
   });
   
-  const { fields, append, remove, control } = form.control;
   const watchedItems = form.watch('items');
+  const paymentMethod = form.watch('paymentMethod');
 
   React.useEffect(() => {
     const total = watchedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     form.setValue('totalPrice', total);
   }, [watchedItems, form]);
+  
+  React.useEffect(() => {
+    // When payment method changes, update prices for existing items
+    const updatedItems = watchedItems.map(cartItem => {
+        const inventoryItem = inventory.find(i => i.id === cartItem.itemId);
+        if (inventoryItem) {
+            return {
+                ...cartItem,
+                price: paymentMethod === 'BPJS' ? inventoryItem.purchasePrice : inventoryItem.sellingPrice,
+            };
+        }
+        return cartItem;
+    });
+    form.setValue('items', updatedItems);
+  }, [paymentMethod, form]); // Only re-run when paymentMethod or form changes
 
   const onSubmit = (values: TransactionFormValues) => {
-    // This is a simplified approach. In a real app, you would create
-    // a separate transaction for each item or structure the data differently.
-    // For this prototype, we'll just use the first item's name for the main transaction record.
     const newOrUpdatedTransaction: Transaction = {
       id: values.id || `trx${String(data.length + 1).padStart(3, '0')}`,
       date: format(values.date, "yyyy-MM-dd"),
@@ -114,7 +126,7 @@ export function TransactionsDataTable() {
       type: 'OUT',
       patientType: values.patientType,
       paymentMethod: values.paymentMethod,
-      context: `MRN: ${values.medicalRecordNumber}`, // Store MRN in context
+      context: `MRN: ${values.medicalRecordNumber}`, 
       totalPrice: values.totalPrice,
       medicalRecordNumber: values.medicalRecordNumber,
     };
@@ -131,9 +143,6 @@ export function TransactionsDataTable() {
   };
   
   const handleEdit = (transaction: Transaction) => {
-     // Note: This is a simplified edit. It doesn't reconstruct the full item list
-     // from the `medicationName` string. A real implementation would need to store
-     // transaction items separately.
     form.reset({
       id: transaction.id,
       date: new Date(transaction.date),
@@ -163,9 +172,13 @@ export function TransactionsDataTable() {
 
   const handleAddItem = (itemId: string) => {
     const item = inventory.find(i => i.id === itemId);
+    const paymentMethod = form.getValues('paymentMethod');
+    
     if (item && !watchedItems.some(i => i.itemId === itemId)) {
-       form.setValue('items', [...watchedItems, { itemId: item.id, itemName: item.itemName, quantity: 1, price: item.sellingPrice }]);
+       const price = paymentMethod === 'BPJS' ? item.purchasePrice : item.sellingPrice;
+       form.setValue('items', [...watchedItems, { itemId: item.id, itemName: item.itemName, quantity: 1, price }]);
     }
+    setItemSearch(''); // Clear search after adding
   }
 
   const handleRemoveItem = (index: number) => {
@@ -199,6 +212,14 @@ export function TransactionsDataTable() {
       return nameMatch && patientTypeMatch && paymentMethodMatch;
     });
   }, [data, filters]);
+
+  const filteredInventory = React.useMemo(() => {
+    if (!itemSearch) return [];
+    return inventory.filter(item => 
+      item.itemName.toLowerCase().includes(itemSearch.toLowerCase()) &&
+      !watchedItems.some(cartItem => cartItem.itemId === item.id)
+    );
+  }, [itemSearch, watchedItems]);
 
   return (
     <Card>
@@ -310,20 +331,26 @@ export function TransactionsDataTable() {
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-4">
-                           <div>
-                              <Label>Add Item</Label>
-                               <Select onValueChange={handleAddItem}>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Search and select an item..." />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {inventory.map(item => (
-                                      <SelectItem key={item.id} value={item.id} disabled={watchedItems.some(i => i.itemId === item.id)}>
-                                        {item.itemName} (Stock: {item.quantity})
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
+                           <div className="relative">
+                              <FormLabel>Add Item</FormLabel>
+                              <Input
+                                placeholder="Search and select an item..."
+                                value={itemSearch}
+                                onChange={(e) => setItemSearch(e.target.value)}
+                              />
+                               {filteredInventory.length > 0 && (
+                                <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-auto">
+                                  {filteredInventory.map(item => (
+                                    <div 
+                                      key={item.id} 
+                                      onClick={() => handleAddItem(item.id)}
+                                      className="px-3 py-2 text-sm cursor-pointer hover:bg-accent"
+                                    >
+                                      {item.itemName} (Stock: {item.quantity})
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                            </div>
                            <div className="space-y-2">
                             {watchedItems.map((item, index) => (
@@ -349,7 +376,7 @@ export function TransactionsDataTable() {
                               </div>
                             ))}
                            </div>
-                           {form.formState.errors.items && <p className="text-sm font-medium text-destructive">{form.formState.errors.items.message}</p>}
+                           {form.formState.errors.items && <p className="text-sm font-medium text-destructive">{form.formState.errors.items?.message}</p>}
                            <div className="flex justify-end items-center pt-4 border-t">
                              <div className="text-lg font-bold">Total: Rp {form.getValues('totalPrice').toLocaleString('id-ID')}</div>
                            </div>
