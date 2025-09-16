@@ -93,6 +93,23 @@ const inventorySchema = z.object({
 
 type InventoryFormValues = z.infer<typeof inventorySchema>;
 
+// Schema for Excel import validation
+const excelImportSchema = z.array(z.object({
+  inputDate: z.any(),
+  itemName: z.string().min(1),
+  batchNumber: z.string().min(1),
+  itemType: z.enum(['Alkes', 'Obat']),
+  category: z.enum(['Oral', 'Topikal', 'Injeksi', 'Suppositoria', 'Inhalasi/Nasal', 'Vaksin', 'Lainnya']),
+  unit: z.enum(['Tablet', 'Kapsul', 'Vial', 'Amp', 'Pcs', 'Cm', 'Btl']),
+  quantity: z.coerce.number(),
+  purchasePrice: z.coerce.number(),
+  sellingPriceRJ: z.coerce.number(),
+  sellingPriceRI: z.coerce.number(),
+  expiredDate: z.any(),
+  supplier: z.string().min(1),
+}));
+
+
 // Function to convert Excel serial date to JS Date
 const excelSerialDateToJSDate = (serial: number) => {
   const utc_days = Math.floor(serial - 25569);
@@ -206,21 +223,29 @@ export function InventoryDataTable() {
           const worksheet = workbook.Sheets[sheetName];
           const json = XLSX.utils.sheet_to_json(worksheet);
 
-          const parsedData = z.array(inventorySchema.omit({id: true})).parse(json.map((d: any) => ({
-              ...d,
-              inputDate: typeof d.inputDate === 'number' ? excelSerialDateToJSDate(d.inputDate) : new Date(d.inputDate),
-              expiredDate: typeof d.expiredDate === 'number' ? excelSerialDateToJSDate(d.expiredDate) : new Date(d.expiredDate),
-              quantity: Number(d.quantity),
-              purchasePrice: Number(d.purchasePrice),
-              sellingPriceRJ: Number(d.sellingPriceRJ),
-              sellingPriceRI: Number(d.sellingPriceRI),
-          })));
-          
-          const newItems = parsedData.map(item => ({
-            ...item,
-            inputDate: format(item.inputDate, "yyyy-MM-dd"),
-            expiredDate: format(item.expiredDate, "yyyy-MM-dd"),
-          }));
+          // 1. Validate the structure and types first
+          const validatedData = excelImportSchema.parse(json);
+
+          // 2. Convert and format the data for Firestore
+          const newItems = validatedData.map(item => {
+            const parseDate = (dateValue: any): Date => {
+              if (typeof dateValue === 'number') {
+                return excelSerialDateToJSDate(dateValue);
+              }
+              // Attempt to parse string dates, assuming common formats
+              const parsed = new Date(dateValue);
+              if (!isNaN(parsed.getTime())) {
+                  return parsed;
+              }
+              throw new Error(`Invalid date format: ${dateValue}`);
+            };
+
+            return {
+              ...item,
+              inputDate: format(parseDate(item.inputDate), "yyyy-MM-dd"),
+              expiredDate: format(parseDate(item.expiredDate), "yyyy-MM-dd"),
+            };
+          });
 
           await bulkAddInventoryItems(newItems);
           toast({ title: "Upload Successful", description: `${newItems.length} new items have been added.` });
