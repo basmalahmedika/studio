@@ -19,6 +19,8 @@ const firebaseConfig = {
 const getFirebaseApp = (): FirebaseApp => {
   if (getApps().length === 0) {
     if (!firebaseConfig.apiKey) {
+      // This check is important for debugging during build time.
+      console.error("Firebase API key is missing. Check Vercel environment variables.");
       throw new Error("Firebase API key is not set. Check your environment variables.");
     }
     return initializeApp(firebaseConfig);

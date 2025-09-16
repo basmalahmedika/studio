@@ -43,6 +43,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const db = getFirestoreDb();
 
   React.useEffect(() => {
+    if (!db) return;
     setLoading(true);
     const inventoryQuery = query(collection(db, 'inventory'), orderBy('itemName'));
     const transactionsQuery = query(collection(db, 'transactions'), orderBy('date', 'desc'));
@@ -71,19 +72,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // INVENTORY MANAGEMENT
   const addInventoryItem = async (item: Omit<InventoryItem, 'id'>) => {
+    if (!db) return;
     await addDoc(collection(db, 'inventory'), item);
   };
 
   const updateInventoryItem = async (id: string, updatedItem: Partial<Omit<InventoryItem, 'id'>>) => {
+    if (!db) return;
     const itemDoc = doc(db, 'inventory', id);
     await updateDoc(itemDoc, updatedItem);
   };
 
   const deleteInventoryItem = async (id: string) => {
+    if (!db) return;
     await deleteDoc(doc(db, 'inventory', id));
   };
 
   const bulkAddInventoryItems = async (items: Omit<InventoryItem, 'id'>[]) => {
+      if (!db) return;
       const batch = writeBatch(db);
       const inventoryCollection = collection(db, 'inventory');
       
@@ -110,6 +115,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // TRANSACTION MANAGEMENT & STOCK SYNCHRONIZATION
   const addTransaction = async (transaction: Omit<Transaction, 'id'>) => {
+    if (!db) return;
     await runTransaction(db, async (t) => {
       // 1. Decrease stock for each item
       if (transaction.items) {
@@ -134,6 +140,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateTransaction = async (id: string, updatedTransactionData: Omit<Transaction, 'id'>, originalTransaction: Transaction) => {
+    if (!db) return;
     await runTransaction(db, async (t) => {
         // 1. Revert stock from original transaction
         if (originalTransaction.items) {
@@ -171,6 +178,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
 
  const deleteTransaction = async (id: string, transactionToDelete: Transaction) => {
+     if (!db) return;
      await runTransaction(db, async (t) => {
         // 1. Revert stock (add back to inventory)
         if (transactionToDelete.items) {
