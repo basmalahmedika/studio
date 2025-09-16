@@ -117,28 +117,31 @@ export function InventoryDataTable() {
 
   const onSubmit = async (values: InventoryFormValues) => {
     try {
-        const formattedValues = {
-          ...values,
-          inputDate: format(values.inputDate, "yyyy-MM-dd"),
-          expiredDate: format(values.expiredDate, "yyyy-MM-dd"),
-        };
-    
-        if (values.id) {
-          const { id, ...updateData } = formattedValues;
-          await updateInventoryItem(id, updateData);
-          toast({ title: "Success", description: "Item has been updated." });
-        } else {
-          const { id, ...createData } = formattedValues;
-          await addInventoryItem(createData);
-          toast({ title: "Success", description: "New item has been added." });
-        }
-        form.reset();
-        setIsEditDialogOpen(false);
+      const formattedValues = {
+        ...values,
+        inputDate: format(values.inputDate, "yyyy-MM-dd"),
+        expiredDate: format(values.expiredDate, "yyyy-MM-dd"),
+      };
+
+      if (values.id) {
+        // For updates, we pass the id and the rest of the data separately.
+        const { id, ...updateData } = formattedValues;
+        await updateInventoryItem(id, updateData);
+        toast({ title: "Success", description: "Item has been updated." });
+      } else {
+        // For new items, we don't include the id.
+        const { id, ...createData } = formattedValues;
+        await addInventoryItem(createData);
+        toast({ title: "Success", description: "New item has been added." });
+      }
+      form.reset();
+      setIsEditDialogOpen(false);
     } catch(error) {
        console.error("Error submitting form:", error);
        toast({ variant: "destructive", title: "Error", description: "An error occurred while saving the item." });
     }
   };
+
 
   const handleEdit = (item: InventoryItem) => {
     form.reset({
