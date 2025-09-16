@@ -6,6 +6,7 @@ import type { DateRange } from 'react-day-picker';
 import { startOfMonth } from 'date-fns';
 import { AbcAnalysis } from '@/components/abc-analysis';
 import { SalesTrendsChart } from '@/components/sales-trends-chart';
+import { SupplierPriceAnalysis } from '@/components/supplier-price-analysis';
 import { useAppContext } from '@/context/app-context';
 import type { Transaction } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,7 +17,7 @@ type PatientType = 'all' | 'Rawat Jalan' | 'Rawat Inap';
 type PaymentMethod = 'all' | 'UMUM' | 'BPJS';
 
 export default function AnalysisPage() {
-  const { transactions } = useAppContext();
+  const { transactions, inventory } = useAppContext();
   const [date, setDate] = React.useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
     to: new Date(),
@@ -62,9 +63,9 @@ export default function AnalysisPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-3xl font-headline font-bold tracking-tight">Movement Analysis</h1>
+        <h1 className="text-3xl font-headline font-bold tracking-tight">Movement & Price Analysis</h1>
         <p className="text-muted-foreground">
-          ABC analysis to categorize medication movement and view sales trends.
+          Analyze medication movement, sales trends, and supplier pricing.
         </p>
       </div>
       
@@ -99,6 +100,7 @@ export default function AnalysisPage() {
       <div className="grid gap-6">
         <AbcAnalysis transactions={filteredTransactions} />
         <SalesTrendsChart data={salesByMonth} />
+        <SupplierPriceAnalysis inventory={inventory} />
       </div>
     </div>
   );
