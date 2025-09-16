@@ -87,6 +87,7 @@ export function TransactionsDataTable() {
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
     defaultValues: {
+      date: new Date(),
       items: [],
       patientType: 'Rawat Jalan',
       paymentMethod: 'UMUM',
@@ -116,7 +117,7 @@ export function TransactionsDataTable() {
         return cartItem;
     });
     form.setValue('items', updatedItems);
-  }, [paymentMethod, form]); // Only re-run when paymentMethod or form changes
+  }, [paymentMethod, form, watchedItems]);
 
   const onSubmit = (values: TransactionFormValues) => {
     const newOrUpdatedTransaction: Transaction = {
@@ -139,7 +140,7 @@ export function TransactionsDataTable() {
       setData([newOrUpdatedTransaction, ...data]);
       toast({ title: "Success", description: "New transaction has been added." });
     }
-    form.reset({ items: [], patientType: 'Rawat Jalan', paymentMethod: 'UMUM', totalPrice: 0, medicalRecordNumber: '' });
+    form.reset();
     setIsDialogOpen(false);
   };
   
@@ -167,7 +168,7 @@ export function TransactionsDataTable() {
     form.reset({
         id: transaction.id,
         date: new Date(transaction.date),
-        medicalRecordNumber: transaction.medicalRecordNumber || 'N/A',
+        medicalRecordNumber: transaction.medicalRecordNumber || '',
         patientType: transaction.patientType,
         paymentMethod: transaction.paymentMethod,
         items: itemsInTransaction,
@@ -182,7 +183,7 @@ export function TransactionsDataTable() {
   }
 
   const handleOpenAddNew = () => {
-    form.reset({ items: [], patientType: 'Rawat Jalan', paymentMethod: 'UMUM', totalPrice: 0, medicalRecordNumber: '' });
+    form.reset();
     setIsDialogOpen(true);
   }
 
