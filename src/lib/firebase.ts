@@ -3,6 +3,7 @@ import { initializeApp, getApp, getApps, type FirebaseApp } from "firebase/app";
 import { getFirestore, type Firestore } from "firebase/firestore";
 import { getAuth, type Auth } from "firebase/auth";
 
+// These variables are exposed via next.config.js
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -17,6 +18,9 @@ const firebaseConfig = {
 // Singleton pattern to ensure Firebase is initialized only once
 const getFirebaseApp = (): FirebaseApp => {
   if (getApps().length === 0) {
+    if (!firebaseConfig.apiKey) {
+      throw new Error("Firebase API key is not set. Check your environment variables.");
+    }
     return initializeApp(firebaseConfig);
   }
   return getApp();
@@ -30,8 +34,4 @@ const getFirestoreDb = (): Firestore => {
   return getFirestore(getFirebaseApp());
 };
 
-const app = getFirebaseApp();
-const auth = getFirebaseAuth();
-const db = getFirestoreDb();
-
-export { db, auth, app, getFirebaseAuth, getFirestoreDb };
+export { getFirebaseAuth, getFirestoreDb };
