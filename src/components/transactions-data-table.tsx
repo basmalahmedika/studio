@@ -586,5 +586,3 @@ export function TransactionsDataTable() {
     </Card>
   );
 }
-
-    
