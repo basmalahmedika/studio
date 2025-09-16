@@ -1,6 +1,6 @@
-import { AbcAnalysisClient } from '@/components/abc-analysis-client';
 import { SalesTrendsChart } from '@/components/sales-trends-chart';
 import { transactions } from '@/lib/data';
+import { AbcAnalysis } from '@/components/abc-analysis';
 
 export default function AnalysisPage() {
   // Aggregate sales data for the chart
@@ -19,12 +19,12 @@ export default function AnalysisPage() {
       <div className="space-y-2">
         <h1 className="text-3xl font-headline font-bold tracking-tight">Movement Analysis</h1>
         <p className="text-muted-foreground">
-          Generate an AI-powered ABC analysis to categorize medication movement and view sales trends.
+          ABC analysis to categorize medication movement and view sales trends.
         </p>
       </div>
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-1">
-          <AbcAnalysisClient />
+          <AbcAnalysis />
         </div>
         <div className="lg:col-span-2">
            <SalesTrendsChart data={chartData} />

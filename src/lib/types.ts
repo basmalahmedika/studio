@@ -18,11 +18,6 @@ export type Medication = {
   price: number;
 };
 
-export type AbcAnalysisResult = {
-  report: string;
-  summary: string;
-};
-
 export type SalesData = {
   name: string;
   total: number;
