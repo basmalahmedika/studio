@@ -90,6 +90,7 @@ export function TransactionsDataTable() {
       patientType: 'Rawat Jalan',
       paymentMethod: 'UMUM',
       totalPrice: 0,
+      medicalRecordNumber: '',
     },
   });
   
@@ -125,7 +126,7 @@ export function TransactionsDataTable() {
       setData([newOrUpdatedTransaction, ...data]);
       toast({ title: "Success", description: "New transaction has been added." });
     }
-    form.reset({ items: [], patientType: 'Rawat Jalan', paymentMethod: 'UMUM', totalPrice: 0 });
+    form.reset({ items: [], patientType: 'Rawat Jalan', paymentMethod: 'UMUM', totalPrice: 0, medicalRecordNumber: '' });
     setIsDialogOpen(false);
   };
   
@@ -156,7 +157,7 @@ export function TransactionsDataTable() {
   }
 
   const handleOpenAddNew = () => {
-    form.reset({ items: [], patientType: 'Rawat Jalan', paymentMethod: 'UMUM', totalPrice: 0 });
+    form.reset({ items: [], patientType: 'Rawat Jalan', paymentMethod: 'UMUM', totalPrice: 0, medicalRecordNumber: '' });
     setIsDialogOpen(true);
   }
 
