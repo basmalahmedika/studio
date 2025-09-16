@@ -95,70 +95,74 @@ type InventoryFormValues = z.infer<typeof inventorySchema>;
 
 // Schema for Excel import validation
 const excelRowSchema = z.object({
-  inputDate: z.any().refine(val => val !== null && val !== undefined, { message: "inputDate is required" }),
+  inputDate: z.any().refine(val => val, { message: "inputDate is required" }),
   itemName: z.string({ required_error: "itemName is required" }).min(1, "itemName is required"),
   batchNumber: z.any().refine(val => val !== null && val !== undefined, { message: "batchNumber is required" }).transform(val => String(val)),
-  itemType: z.enum(['Alkes', 'Obat'], { required_error: "itemType is required" }),
-  category: z.enum(['Oral', 'Topikal', 'Injeksi', 'Suppositoria', 'Inhalasi/Nasal', 'Vaksin', 'Lainnya'], { required_error: "category is required" }),
-  unit: z.enum(['Tablet', 'Kapsul', 'Vial', 'Amp', 'Pcs', 'Cm', 'Btl'], { required_error: "unit is required" }),
-  quantity: z.coerce.number({ invalid_type_error: "quantity must be a number" }),
-  purchasePrice: z.coerce.number({ invalid_type_error: "purchasePrice must be a number" }),
-  sellingPriceRJ: z.coerce.number({ invalid_type_error: "sellingPriceRJ must be a number" }),
-  sellingPriceRI: z.coerce.number({ invalid_type_error: "sellingPriceRI must be a number" }),
-  expiredDate: z.any().refine(val => val !== null && val !== undefined, { message: "expiredDate is required" }),
+  itemType: z.enum(['Alkes', 'Obat'], { errorMap: () => ({ message: "itemType must be 'Alkes' or 'Obat'" }) }),
+  category: z.enum(['Oral', 'Topikal', 'Injeksi', 'Suppositoria', 'Inhalasi/Nasal', 'Vaksin', 'Lainnya'], { errorMap: () => ({ message: "Invalid category value" }) }),
+  unit: z.enum(['Tablet', 'Kapsul', 'Vial', 'Amp', 'Pcs', 'Cm', 'Btl'], { errorMap: () => ({ message: "Invalid unit value" }) }),
+  quantity: z.any().pipe(z.coerce.number({ invalid_type_error: "quantity must be a number" }).min(0, "quantity must be non-negative")),
+  purchasePrice: z.any().pipe(z.coerce.number({ invalid_type_error: "purchasePrice must be a number" }).min(0, "purchasePrice must be non-negative")),
+  sellingPriceRJ: z.any().pipe(z.coerce.number({ invalid_type_error: "sellingPriceRJ must be a number" }).min(0, "sellingPriceRJ must be non-negative")),
+  sellingPriceRI: z.any().pipe(z.coerce.number({ invalid_type_error: "sellingPriceRI must be a number" }).min(0, "sellingPriceRI must be non-negative")),
+  expiredDate: z.any().refine(val => val, { message: "expiredDate is required" }),
   supplier: z.string({ required_error: "supplier is required" }).min(1, "supplier is required"),
 });
 
 
-// Function to convert Excel serial date to JS Date
 const excelSerialDateToJSDate = (serial: number): Date => {
-    const utc_days = Math.floor(serial - 25569);
-    const utc_value = utc_days * 86400;
-    const date_info = new Date(utc_value * 1000);
+  const utc_days = Math.floor(serial - 25569);
+  const utc_value = utc_days * 86400;
+  const date_info = new Date(utc_value * 1000);
 
-    const fractional_day = serial - Math.floor(serial) + 0.0000001;
+  const fractional_day = serial - Math.floor(serial) + 0.0000001;
 
-    let total_seconds = Math.floor(86400 * fractional_day);
-    const seconds = total_seconds % 60;
-    total_seconds -= seconds;
-    const hours = Math.floor(total_seconds / (60 * 60));
-    const minutes = Math.floor(total_seconds / 60) % 60;
+  let total_seconds = Math.floor(86400 * fractional_day);
+  const seconds = total_seconds % 60;
+  total_seconds -= seconds;
+  const hours = Math.floor(total_seconds / (60 * 60));
+  const minutes = Math.floor(total_seconds / 60) % 60;
 
-    return new Date(date_info.getFullYear(), date_info.getMonth(), date_info.getDate(), hours, minutes, seconds);
+  return new Date(date_info.getFullYear(), date_info.getMonth(), date_info.getDate(), hours, minutes, seconds);
 };
 
 const parseDateFromExcel = (dateValue: any): Date | null => {
-    if (!dateValue) return null;
-    
-    if (dateValue instanceof Date && !isNaN(dateValue.getTime())) {
-        return dateValue;
-    }
-    
-    if (typeof dateValue === 'number') {
-        return excelSerialDateToJSDate(dateValue);
-    }
-    
-    if (typeof dateValue === 'string') {
-        const parts = dateValue.split('/');
-        if (parts.length === 3) {
-            const day = parseInt(parts[0], 10);
-            const month = parseInt(parts[1], 10) - 1; // JS months are 0-indexed
-            const year = parseInt(parts[2], 10);
-            if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
-                const date = new Date(year, month, day);
-                if (date.getFullYear() === year && date.getMonth() === month && date.getDate() === day) {
-                    return date;
-                }
-            }
-        }
-    }
-    
-    const parsedDate = new Date(dateValue);
-    if (!isNaN(parsedDate.getTime())) {
-        return parsedDate;
-    }
+  if (dateValue === null || typeof dateValue === 'undefined') return null;
 
-    return null;
+  // Handle JS Date object
+  if (dateValue instanceof Date && !isNaN(dateValue.getTime())) {
+    return dateValue;
+  }
+  
+  // Handle Excel serial number
+  if (typeof dateValue === 'number') {
+    return excelSerialDateToJSDate(dateValue);
+  }
+  
+  // Handle string 'dd/mm/yyyy'
+  if (typeof dateValue === 'string') {
+    const parts = dateValue.split('/');
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1; // JS months are 0-indexed
+      const year = parseInt(parts[2], 10);
+      if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+        const date = new Date(year, month, day);
+        // Basic validation to check if date is valid
+        if (date.getFullYear() === year && date.getMonth() === month && date.getDate() === day) {
+          return date;
+        }
+      }
+    }
+  }
+
+  // Fallback for other string formats
+  const parsedDate = new Date(dateValue);
+  if (!isNaN(parsedDate.getTime())) {
+    return parsedDate;
+  }
+  
+  return null;
 };
 
 
@@ -193,12 +197,10 @@ export function InventoryDataTable() {
       };
 
       if (values.id) {
-        // For updates, we pass the id and the rest of the data separately.
         const { id, ...updateData } = formattedValues;
         await updateInventoryItem(id, updateData);
         toast({ title: "Success", description: "Item has been updated." });
       } else {
-        // For new items, we don't include the id.
         const { id, ...createData } = formattedValues;
         await addInventoryItem(createData);
         toast({ title: "Success", description: "New item has been added." });
@@ -258,33 +260,36 @@ export function InventoryDataTable() {
           const workbook = XLSX.read(data, { type: 'array', cellDates: true });
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
-          const json = XLSX.utils.sheet_to_json(worksheet);
+          const json = XLSX.utils.sheet_to_json(worksheet, { raw: false }); // Use raw: false to get formatted text
 
           const newItems = [];
 
           for (let i = 0; i < json.length; i++) {
             const row = json[i] as any;
-            const rowIndex = i + 2;
+            const rowIndex = i + 2; // Excel rows are 1-based, plus header
 
             const validationResult = excelRowSchema.safeParse(row);
 
             if (!validationResult.success) {
               const firstError = validationResult.error.issues[0];
-              throw new Error(`Error on row ${rowIndex}: For column '${firstError.path.join('.')}', ${firstError.message}`);
+              const columnName = firstError.path.join('.');
+              throw new Error(`Error on row ${rowIndex}: For column '${columnName}', ${firstError.message}`);
             }
-
-            const inputDate = parseDateFromExcel(validationResult.data.inputDate);
-            const expiredDate = parseDateFromExcel(validationResult.data.expiredDate);
+            
+            const { data: validatedData } = validationResult;
+            
+            const inputDate = parseDateFromExcel(validatedData.inputDate);
+            const expiredDate = parseDateFromExcel(validatedData.expiredDate);
 
             if (!inputDate) {
               throw new Error(`Error on row ${rowIndex}: Invalid or missing inputDate. Please use dd/mm/yyyy format.`);
             }
-             if (!expiredDate) {
+            if (!expiredDate) {
               throw new Error(`Error on row ${rowIndex}: Invalid or missing expiredDate. Please use dd/mm/yyyy format.`);
             }
 
             newItems.push({
-              ...validationResult.data,
+              ...validatedData,
               inputDate: format(inputDate, "yyyy-MM-dd"),
               expiredDate: format(expiredDate, "yyyy-MM-dd"),
             });
@@ -312,56 +317,45 @@ export function InventoryDataTable() {
   
   const handleDownloadTemplate = () => {
     const headers = [
-        'inputDate', 'itemName', 'batchNumber', 'itemType', 'category', 'unit', 
-        'quantity', 'purchasePrice', 'sellingPriceRJ', 'sellingPriceRI', 'expiredDate', 'supplier'
+      'inputDate', 'itemName', 'batchNumber', 'itemType', 'category', 'unit',
+      'quantity', 'purchasePrice', 'sellingPriceRJ', 'sellingPriceRI', 'expiredDate', 'supplier'
     ];
     
-    // Create an empty worksheet
     const ws = XLSX.utils.aoa_to_sheet([headers]);
-
-    // Set column formats
-    const columnFormats = {
+    
+    // Define column formats
+    const columnFormats: { [key: string]: string } = {
       A: 'dd/mm/yyyy', // inputDate
-      B: '@',           // itemName (Text)
-      C: '@',           // batchNumber (Text)
-      D: '@',           // itemType (Text)
-      E: '@',           // category (Text)
-      F: '@',           // unit (Text)
-      G: '0',           // quantity (Number)
-      H: '0',           // purchasePrice (Number)
-      I: '0',           // sellingPriceRJ (Number)
-      J: '0',           // sellingPriceRI (Number)
+      B: '@',          // itemName (Text)
+      C: '@',          // batchNumber (Text)
+      D: '@',          // itemType (Text)
+      E: '@',          // category (Text)
+      F: '@',          // unit (Text)
+      G: '0',          // quantity (Number)
+      H: '0',          // purchasePrice (Number)
+      I: '0',          // sellingPriceRJ (Number)
+      J: '0',          // sellingPriceRI (Number)
       K: 'dd/mm/yyyy', // expiredDate
-      L: '@'            // supplier (Text)
+      L: '@'           // supplier (Text)
     };
     
-    // Apply formats to columns
-    Object.keys(columnFormats).forEach(col => {
-        // This ensures the format is applied to the entire column
-        ws['!cols'] = ws['!cols'] || [];
-        const colIndex = col.charCodeAt(0) - 'A'.charCodeAt(0);
-        ws['!cols'][colIndex] = { wch: headers[colIndex].length + 5 }; // Set width
-        
-        // Applying format to each cell in a column requires iterating, but setting it for the header is a good start.
-        // For a more robust solution, we set a sample row format which Excel usually autofills.
-        // Let's create a sample row with formatted cells.
-        const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
-        for(let R = range.s.r + 1; R < 100; ++R) { // Apply to next 99 rows as an example
-            for(let C = range.s.c; C <= range.e.c; ++C) {
-                const cell_address = {c:C, r:R};
-                const cell_ref = XLSX.utils.encode_cell(cell_address);
-                if(!ws[cell_ref]) ws[cell_ref] = {t:'z', v:undefined}; // Create empty cell
-                const colLetter = XLSX.utils.encode_col(C);
-                if(columnFormats[colLetter as keyof typeof columnFormats]) {
-                  ws[cell_ref].z = columnFormats[colLetter as keyof typeof columnFormats];
-                }
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:L1');
+    for(let C = range.s.c; C <= range.e.c; ++C) {
+        const colLetter = XLSX.utils.encode_col(C);
+        // Apply format to header to hint Excel, but more importantly to cells below
+        for(let R = range.s.r + 1; R <= 100; ++R) { // Apply format for next 100 rows
+            const cellRef = XLSX.utils.encode_cell({c: C, r: R});
+            if (columnFormats[colLetter]) {
+                if(!ws[cellRef]) ws[cellRef] = {t: 'z', v: undefined}; // Create empty cell if it doesn't exist
+                ws[cellRef].z = columnFormats[colLetter];
             }
         }
-    });
-
-     ws['!cols'] = [
-        { wch: 12 }, { wch: 25 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 10 }, 
-        { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 20 }
+    }
+    
+    // Set column widths for better visibility
+    ws['!cols'] = [
+        { wch: 12 }, { wch: 30 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 10 },
+        { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 25 }
     ];
 
     const wb = XLSX.utils.book_new();
@@ -762,5 +756,7 @@ export function InventoryDataTable() {
     </Card>
   );
 }
+
+    
 
     
