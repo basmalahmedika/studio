@@ -218,37 +218,44 @@ export function InventoryDataTable() {
       reader.onload = async (e) => {
         try {
           const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
+          const workbook = XLSX.read(data, { type: 'array', cellDates: true });
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
           const json = XLSX.utils.sheet_to_json(worksheet);
 
           const validatedData = excelImportSchema.parse(json);
 
-          const parseDate = (dateValue: any): Date => {
-            if (typeof dateValue === 'number') {
-              return excelSerialDateToJSDate(dateValue);
-            }
-            if (typeof dateValue === 'string') {
-              const parsed = new Date(dateValue);
-              if (!isNaN(parsed.getTime())) {
-                return parsed;
-              }
-            }
-            throw new Error(`Invalid date format: ${dateValue}`);
-          };
-
           const newItems = validatedData.map(item => {
-            try {
-              return {
-                ...item,
-                inputDate: format(parseDate(item.inputDate), "yyyy-MM-dd"),
-                expiredDate: format(parseDate(item.expiredDate), "yyyy-MM-dd"),
-              };
-            } catch(e) {
-              console.error("Error parsing date for item:", item, e);
-              throw new Error("One of the dates in the Excel file is in an unrecognized format.");
+            // Robust date parsing for both inputDate and expiredDate
+            const parseDate = (dateValue: any): Date | null => {
+              if (!dateValue) return null;
+              if (dateValue instanceof Date && !isNaN(dateValue.getTime())) {
+                return dateValue;
+              }
+              if (typeof dateValue === 'number') {
+                return excelSerialDateToJSDate(dateValue);
+              }
+              if (typeof dateValue === 'string') {
+                const parsed = new Date(dateValue);
+                if (!isNaN(parsed.getTime())) {
+                  return parsed;
+                }
+              }
+              return null; // Return null if parsing fails
+            };
+            
+            const inputDate = parseDate(item.inputDate);
+            const expiredDate = parseDate(item.expiredDate);
+
+            if (!inputDate || !expiredDate) {
+              throw new Error(`Invalid date format for item "${item.itemName}". Please check the date columns.`);
             }
+
+            return {
+              ...item,
+              inputDate: format(inputDate, "yyyy-MM-dd"),
+              expiredDate: format(expiredDate, "yyyy-MM-dd"),
+            };
           });
 
           await bulkAddInventoryItems(newItems);
@@ -666,3 +673,5 @@ export function InventoryDataTable() {
     </Card>
   );
 }
+
+    
