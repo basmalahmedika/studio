@@ -4,7 +4,7 @@ import * as React from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { PlusCircle, MoreHorizontal, Pen, Trash2, Upload } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Pen, Trash2, Upload, Download, FileDown } from 'lucide-react';
 import { format } from "date-fns"
 import { Calendar as CalendarIcon } from "lucide-react"
 import Papa from 'papaparse';
@@ -206,13 +206,43 @@ export function InventoryDataTable() {
     // Reset file input
     event.target.value = '';
   };
+  
+  const handleDownloadTemplate = () => {
+    const headers = [
+      'inputDate', 'itemName', 'batchNumber', 'itemType', 'category', 'unit', 
+      'quantity', 'purchasePrice', 'sellingPrice', 'expiredDate', 'supplier'
+    ];
+    const csv = Papa.unparse([headers]);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'inventory_template.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportData = () => {
+    const csv = Papa.unparse(data);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'inventory_export.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <Card>
       <CardHeader>
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <CardTitle>Inventory List</CardTitle>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <input
               type="file"
               ref={fileInputRef}
@@ -220,14 +250,22 @@ export function InventoryDataTable() {
               className="hidden"
               accept=".csv"
             />
+             <Button variant="outline" onClick={handleDownloadTemplate}>
+              <Download className="mr-2 h-4 w-4" />
+              Download Template
+            </Button>
             <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-              <Upload className="mr-2" />
-              Upload File
+              <Upload className="mr-2 h-4 w-4" />
+              Upload CSV
+            </Button>
+             <Button variant="outline" onClick={handleExportData}>
+              <FileDown className="mr-2 h-4 w-4" />
+              Export CSV
             </Button>
             <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
               <DialogTrigger asChild>
                 <Button onClick={handleOpenAddNew}>
-                  <PlusCircle className="mr-2" />
+                  <PlusCircle className="mr-2 h-4 w-4" />
                   Add New Item
                 </Button>
               </DialogTrigger>
