@@ -8,9 +8,11 @@ import {
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
   signOut, 
-  type User
+  type User,
+  getAuth,
+  type Auth
 } from 'firebase/auth';
-import { auth } from '@/lib/firebase'; // Import the auth instance
+import type { FirebaseApp } from 'firebase/app';
 
 interface AuthContextType {
   user: User | null;
@@ -23,49 +25,50 @@ interface AuthContextType {
 
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children, app }: { children: React.ReactNode, app: FirebaseApp | null }) {
   const [user, setUser] = React.useState<User | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const [authInstance, setAuthInstance] = React.useState<Auth | null>(null);
 
   React.useEffect(() => {
-    // Ensure auth object is available before setting up the listener
-    if (auth) {
+    if (app) {
+      const auth = getAuth(app);
+      setAuthInstance(auth);
       const unsubscribe = onAuthStateChanged(auth, (user) => {
         setUser(user);
         setLoading(false);
       });
       return () => unsubscribe();
     } else {
-      // If auth is not ready, we are still loading
       setLoading(true);
     }
-  }, []);
+  }, [app]);
 
   const ensureAuthReady = () => {
-    if (!auth) {
+    if (!authInstance) {
       return Promise.reject(new Error("Firebase Auth is not initialized yet."));
     }
-    return Promise.resolve(auth);
+    return Promise.resolve(authInstance);
   };
 
   const signIn = async (email: string, pass: string) => {
-    const authInstance = await ensureAuthReady();
-    return signInWithEmailAndPassword(authInstance, email, pass);
+    const auth = await ensureAuthReady();
+    return signInWithEmailAndPassword(auth, email, pass);
   };
   
   const signUp = async (email: string, pass: string) => {
-    const authInstance = await ensureAuthReady();
-    return createUserWithEmailAndPassword(authInstance, email, pass);
+    const auth = await ensureAuthReady();
+    return createUserWithEmailAndPassword(auth, email, pass);
   };
   
   const sendPasswordReset = async (email: string) => {
-    const authInstance = await ensureAuthReady();
-    return sendPasswordResetEmail(authInstance, email);
+    const auth = await ensureAuthReady();
+    return sendPasswordResetEmail(auth, email);
   }
 
   const handleSignOut = async () => {
-    const authInstance = await ensureAuthReady();
-    return signOut(authInstance);
+    const auth = await ensureAuthReady();
+    return signOut(auth);
   };
   
   const value = {

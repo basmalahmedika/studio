@@ -6,15 +6,19 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/context/auth-context';
 import { initializeFirebase } from '@/lib/firebase';
+import type { FirebaseApp } from 'firebase/app';
 
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const [firebaseApp, setFirebaseApp] = React.useState<FirebaseApp | null>(null);
+
   // Initialize Firebase on the client side when the app loads.
   React.useEffect(() => {
-    initializeFirebase();
+    const app = initializeFirebase();
+    setFirebaseApp(app);
   }, []);
 
   return (
@@ -27,7 +31,7 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=PT+Sans:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
-        <AuthProvider>
+        <AuthProvider app={firebaseApp}>
           {children}
         </AuthProvider>
         <Toaster />
