@@ -45,7 +45,6 @@ function DashboardContent({ children }: { children: ReactNode }) {
 }
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
-  // Theme management logic remains here as it's client-side and specific to the dashboard's appearance.
   React.useEffect(() => {
     const applySavedTheme = () => {
       const savedTheme = localStorage.getItem('appTheme');
