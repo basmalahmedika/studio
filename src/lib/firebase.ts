@@ -14,32 +14,26 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
-function getFirebaseApp(): FirebaseApp {
+let app: FirebaseApp;
+let auth: Auth;
+let db: Firestore;
+
+// This function initializes Firebase and should be called once in a top-level client component.
+function initializeFirebase() {
   if (typeof window !== "undefined") {
-    // Ensure this runs only on the client
-    if (getApps().length === 0) {
+    if (!getApps().length) {
       if (!firebaseConfig.apiKey) {
-        console.error("Firebase API key is missing. Check Vercel environment variables.");
-        // This will be caught by the app, but helps in debugging.
-        throw new Error("Firebase API key is not set. Check your Vercel environment variables.");
+        throw new Error("Firebase API key is not set. Please check your environment variables.");
       }
-      return initializeApp(firebaseConfig);
+      app = initializeApp(firebaseConfig);
+    } else {
+      app = getApp();
     }
-    return getApp();
+    auth = getAuth(app);
+    db = getFirestore(app);
   }
-  // On the server, return a placeholder or handle as needed.
-  // For this app, Firebase is only used client-side.
-  return null as any;
-};
+}
 
-// Functions to get auth and firestore instances
-const getFirebaseAuth = (): Auth => {
-  return getAuth(getFirebaseApp());
-};
-
-const getFirestoreDb = (): Firestore => {
-  return getFirestore(getFirebaseApp());
-};
-
-
-export { getFirebaseAuth, getFirestoreDb };
+// Export the instances directly. They will be undefined on the server
+// and populated on the client after initialization.
+export { initializeFirebase, auth, db };

@@ -8,10 +8,9 @@ import {
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
   signOut, 
-  type User,
-  type Auth,
+  type User
 } from 'firebase/auth';
-import { getFirebaseAuth } from '@/lib/firebase';
+import { auth } from '@/lib/firebase'; // Import the auth instance
 
 interface AuthContextType {
   user: User | null;
@@ -27,40 +26,45 @@ const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = React.useState<User | null>(null);
   const [loading, setLoading] = React.useState(true);
-  const [authInstance, setAuthInstance] = React.useState<Auth | null>(null);
 
   React.useEffect(() => {
-    try {
-      const auth = getFirebaseAuth();
-      setAuthInstance(auth);
+    // Ensure auth object is available before setting up the listener
+    if (auth) {
       const unsubscribe = onAuthStateChanged(auth, (user) => {
         setUser(user);
         setLoading(false);
       });
       return () => unsubscribe();
-    } catch (error) {
-      console.error("Failed to initialize Firebase Auth:", error);
-      setLoading(false);
+    } else {
+      // If auth is not ready, we are still loading
+      setLoading(true);
     }
   }, []);
 
-  const signIn = (email: string, pass: string) => {
-    if (!authInstance) return Promise.reject(new Error("Firebase Auth not initialized"));
+  const ensureAuthReady = () => {
+    if (!auth) {
+      return Promise.reject(new Error("Firebase Auth is not initialized yet."));
+    }
+    return Promise.resolve(auth);
+  };
+
+  const signIn = async (email: string, pass: string) => {
+    const authInstance = await ensureAuthReady();
     return signInWithEmailAndPassword(authInstance, email, pass);
   };
   
-  const signUp = (email: string, pass: string) => {
-    if (!authInstance) return Promise.reject(new Error("Firebase Auth not initialized"));
+  const signUp = async (email: string, pass: string) => {
+    const authInstance = await ensureAuthReady();
     return createUserWithEmailAndPassword(authInstance, email, pass);
   };
   
-  const sendPasswordReset = (email: string) => {
-    if (!authInstance) return Promise.reject(new Error("Firebase Auth not initialized"));
+  const sendPasswordReset = async (email: string) => {
+    const authInstance = await ensureAuthReady();
     return sendPasswordResetEmail(authInstance, email);
   }
 
-  const handleSignOut = () => {
-    if (!authInstance) return Promise.reject(new Error("Firebase Auth not initialized"));
+  const handleSignOut = async () => {
+    const authInstance = await ensureAuthReady();
     return signOut(authInstance);
   };
   

@@ -2,7 +2,7 @@
 'use client';
 
 import * as React from 'react';
-import { getFirestoreDb } from '@/lib/firebase';
+import { db } from '@/lib/firebase'; // Import the db instance
 import {
   collection,
   onSnapshot,
@@ -16,7 +16,6 @@ import {
   runTransaction,
   getDocs,
   where,
-  Firestore,
 } from 'firebase/firestore';
 import type { InventoryItem, Transaction } from '@/lib/types';
 
@@ -39,24 +38,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [inventory, setInventory] = React.useState<InventoryItem[]>([]);
   const [transactions, setTransactions] = React.useState<Transaction[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [dbInstance, setDbInstance] = React.useState<Firestore | null>(null);
 
   React.useEffect(() => {
-    try {
-      const db = getFirestoreDb();
-      setDbInstance(db);
-    } catch (error) {
-      console.error("Failed to initialize Firestore:", error);
-      setLoading(false);
-    }
-  }, []);
-
-  React.useEffect(() => {
-    if (!dbInstance) return;
+    // Only set up listeners if db instance is available
+    if (!db) {
+      setLoading(true);
+      return;
+    };
 
     setLoading(true);
-    const inventoryQuery = query(collection(dbInstance, 'inventory'), orderBy('itemName'));
-    const transactionsQuery = query(collection(dbInstance, 'transactions'), orderBy('date', 'desc'));
+    const inventoryQuery = query(collection(db, 'inventory'), orderBy('itemName'));
+    const transactionsQuery = query(collection(db, 'transactions'), orderBy('date', 'desc'));
 
     const unsubInventory = onSnapshot(inventoryQuery, (snapshot) => {
       const inventoryData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem));
@@ -78,34 +70,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       unsubInventory();
       unsubTransactions();
     };
-  }, [dbInstance]);
+  }, []);
 
-  const getDb = () => {
-    if (!dbInstance) throw new Error("Firestore is not initialized.");
-    return dbInstance;
+  const ensureDbReady = () => {
+    if (!db) throw new Error("Firestore is not initialized yet.");
+    return db;
   }
 
   // INVENTORY MANAGEMENT
   const addInventoryItem = async (item: Omit<InventoryItem, 'id'>) => {
-    const db = getDb();
-    await addDoc(collection(db, 'inventory'), item);
+    const dbInstance = ensureDbReady();
+    await addDoc(collection(dbInstance, 'inventory'), item);
   };
 
   const updateInventoryItem = async (id: string, updatedItem: Partial<Omit<InventoryItem, 'id'>>) => {
-    const db = getDb();
-    const itemDoc = doc(db, 'inventory', id);
+    const dbInstance = ensureDbReady();
+    const itemDoc = doc(dbInstance, 'inventory', id);
     await updateDoc(itemDoc, updatedItem);
   };
 
   const deleteInventoryItem = async (id: string) => {
-    const db = getDb();
-    await deleteDoc(doc(db, 'inventory', id));
+    const dbInstance = ensureDbReady();
+    await deleteDoc(doc(dbInstance, 'inventory', id));
   };
 
   const bulkAddInventoryItems = async (items: Omit<InventoryItem, 'id'>[]) => {
-      const db = getDb();
-      const batch = writeBatch(db);
-      const inventoryCollection = collection(db, 'inventory');
+      const dbInstance = ensureDbReady();
+      const batch = writeBatch(dbInstance);
+      const inventoryCollection = collection(dbInstance, 'inventory');
       
       for (const item of items) {
           const q = query(inventoryCollection, where("itemName", "==", item.itemName), where("batchNumber", "==", item.batchNumber));
@@ -113,7 +105,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           
           if (!querySnapshot.empty) {
               const existingDoc = querySnapshot.docs[0];
-              const docRef = doc(db, 'inventory', existingDoc.id);
+              const docRef = doc(dbInstance, 'inventory', existingDoc.id);
               const newQuantity = (existingDoc.data().quantity || 0) + item.quantity;
               batch.update(docRef, { ...item, quantity: newQuantity });
           } else {
@@ -127,11 +119,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // TRANSACTION MANAGEMENT & STOCK SYNCHRONIZATION
   const addTransaction = async (transaction: Omit<Transaction, 'id'>) => {
-    const db = getDb();
-    await runTransaction(db, async (t) => {
+    const dbInstance = ensureDbReady();
+    await runTransaction(dbInstance, async (t) => {
       if (transaction.items) {
         for (const soldItem of transaction.items) {
-          const itemDocRef = doc(db, 'inventory', soldItem.itemId);
+          const itemDocRef = doc(dbInstance, 'inventory', soldItem.itemId);
           const itemDoc = await t.get(itemDocRef);
           if (!itemDoc.exists()) {
             throw new Error(`Item with id ${soldItem.itemId} does not exist!`);
@@ -143,17 +135,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           t.update(itemDocRef, { quantity: currentQuantity - soldItem.quantity });
         }
       }
-      const transactionCollection = collection(db, 'transactions');
+      const transactionCollection = collection(dbInstance, 'transactions');
       t.set(doc(transactionCollection), transaction);
     });
   };
 
   const updateTransaction = async (id: string, updatedTransactionData: Omit<Transaction, 'id'>, originalTransaction: Transaction) => {
-    const db = getDb();
-    await runTransaction(db, async (t) => {
+    const dbInstance = ensureDbReady();
+    await runTransaction(dbInstance, async (t) => {
         if (originalTransaction.items) {
             for (const soldItem of originalTransaction.items) {
-                const itemDocRef = doc(db, 'inventory', soldItem.itemId);
+                const itemDocRef = doc(dbInstance, 'inventory', soldItem.itemId);
                 const itemDoc = await t.get(itemDocRef);
                 if (itemDoc.exists()) {
                     const newQuantity = (itemDoc.data().quantity || 0) + soldItem.quantity;
@@ -163,7 +155,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
         if (updatedTransactionData.items) {
             for (const soldItem of updatedTransactionData.items) {
-                const itemDocRef = doc(db, 'inventory', soldItem.itemId);
+                const itemDocRef = doc(dbInstance, 'inventory', soldItem.itemId);
                 const itemDoc = await t.get(itemDocRef);
                 if (!itemDoc.exists()) {
                    throw new Error(`Item with id ${soldItem.itemId} does not exist!`);
@@ -175,18 +167,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 t.update(itemDocRef, { quantity: currentQuantity - soldItem.quantity });
             }
         }
-        const transactionDocRef = doc(db, 'transactions', id);
+        const transactionDocRef = doc(dbInstance, 'transactions', id);
         t.update(transactionDocRef, updatedTransactionData);
     });
   };
 
 
  const deleteTransaction = async (id: string, transactionToDelete: Transaction) => {
-     const db = getDb();
-     await runTransaction(db, async (t) => {
+     const dbInstance = ensureDbReady();
+     await runTransaction(dbInstance, async (t) => {
         if (transactionToDelete.items) {
             for (const soldItem of transactionToDelete.items) {
-                const itemDocRef = doc(db, 'inventory', soldItem.itemId);
+                const itemDocRef = doc(dbInstance, 'inventory', soldItem.itemId);
                 const itemDoc = await t.get(itemDocRef);
                 if (itemDoc.exists()) {
                      const newQuantity = (itemDoc.data().quantity || 0) + soldItem.quantity;
@@ -194,7 +186,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 }
             }
         }
-        const transactionDocRef = doc(db, 'transactions', id);
+        const transactionDocRef = doc(dbInstance, 'transactions', id);
         t.delete(transactionDocRef);
     });
   };
