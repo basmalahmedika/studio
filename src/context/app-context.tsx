@@ -81,9 +81,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [dbInstance]);
 
   const getDb = () => {
-    const db = getFirestoreDb();
-    if (!db) throw new Error("Firestore is not initialized.");
-    return db;
+    if (!dbInstance) throw new Error("Firestore is not initialized.");
+    return dbInstance;
   }
 
   // INVENTORY MANAGEMENT
