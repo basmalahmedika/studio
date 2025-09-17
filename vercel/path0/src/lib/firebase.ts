@@ -14,14 +14,24 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
-// Singleton pattern to ensure Firebase is initialized only once
-const getFirebaseApp = (): FirebaseApp => {
-  if (getApps().length === 0) {
-    return initializeApp(firebaseConfig);
+function getFirebaseApp(): FirebaseApp {
+  // This function ensures that we initialize Firebase only once, and only on the client-side.
+  if (typeof window !== "undefined") {
+    if (getApps().length === 0) {
+      if (!firebaseConfig.apiKey) {
+        // This error will be caught by the app, but helps in debugging.
+        throw new Error("Firebase API key is not set. Please add it to your Vercel environment variables.");
+      }
+      return initializeApp(firebaseConfig);
+    }
+    return getApp();
   }
-  return getApp();
+  // On the server, we return a null object to avoid initialization errors during build.
+  // The actual Firebase services will only be called on the client.
+  return null as any;
 };
 
+// Functions to get auth and firestore instances safely
 const getFirebaseAuth = (): Auth => {
   return getAuth(getFirebaseApp());
 };
@@ -30,8 +40,5 @@ const getFirestoreDb = (): Firestore => {
   return getFirestore(getFirebaseApp());
 };
 
-const app = getFirebaseApp();
-const auth = getFirebaseAuth();
-const db = getFirestoreDb();
 
-export { db, auth, app, getFirebaseAuth, getFirestoreDb };
+export { getFirebaseAuth, getFirestoreDb };
