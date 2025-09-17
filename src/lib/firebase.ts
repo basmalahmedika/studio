@@ -32,6 +32,7 @@ function initializeFirebase() {
     auth = getAuth(app);
     db = getFirestore(app);
   }
+  return app;
 }
 
 // Export the instances directly. They will be undefined on the server
