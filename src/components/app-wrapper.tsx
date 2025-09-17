@@ -59,16 +59,21 @@ export function AppWrapper({
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <p className="text-red-500">{error}</p>
+        <div className="text-center p-4 rounded-md bg-destructive/10 border border-destructive/50">
+           <h2 className="text-lg font-semibold text-destructive">Connection Error</h2>
+           <p className="text-destructive/90">{error}</p>
+        </div>
       </div>
     );
   }
 
   if (!firebaseApp) {
-    // This case should ideally not be reached if error handling is correct.
     return (
         <div className="flex items-center justify-center min-h-screen">
-          <p className="text-red-500">Firebase App could not be initialized.</p>
+           <div className="text-center p-4 rounded-md bg-destructive/10 border border-destructive/50">
+             <h2 className="text-lg font-semibold text-destructive">Initialization Failed</h2>
+             <p className="text-destructive/90">Firebase App could not be initialized. The app cannot load.</p>
+           </div>
         </div>
       );
   }

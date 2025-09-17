@@ -13,17 +13,13 @@ const firebaseConfig = {
 };
 
 function initializeFirebase(): FirebaseApp {
-  if (typeof window !== "undefined") {
-    if (getApps().length === 0) {
-      if (!firebaseConfig.apiKey) {
-        throw new Error("Firebase configuration is missing or incomplete.");
-      }
-      return initializeApp(firebaseConfig);
+  if (getApps().length === 0) {
+    if (!firebaseConfig.apiKey) {
+      throw new Error("Firebase configuration is missing or incomplete.");
     }
-    return getApp();
+    return initializeApp(firebaseConfig);
   }
-  // This is a placeholder for server-side rendering, should not be used for actual Firebase operations.
-  return null as any;
+  return getApp();
 }
 
 export { initializeFirebase };
