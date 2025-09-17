@@ -2,8 +2,9 @@
 'use client';
 
 import * as React from 'react';
-import { initializeFirebase } from '@/lib/firebase';
+import type { FirebaseApp } from 'firebase/app';
 import {
+  getFirestore,
   collection,
   onSnapshot,
   addDoc,
@@ -16,7 +17,6 @@ import {
   runTransaction,
   getDocs,
   where,
-  getFirestore,
   type Firestore,
 } from 'firebase/firestore';
 import type { InventoryItem, Transaction } from '@/lib/types';
@@ -36,76 +36,84 @@ interface AppContextType {
 
 const AppContext = React.createContext<AppContextType | undefined>(undefined);
 
-export function AppProvider({ children }: { children: React.ReactNode }) {
+interface AppProviderProps {
+  children: React.ReactNode;
+  firebaseApp: FirebaseApp;
+}
+
+export function AppProvider({ children, firebaseApp }: AppProviderProps) {
   const [inventory, setInventory] = React.useState<InventoryItem[]>([]);
   const [transactions, setTransactions] = React.useState<Transaction[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [dbInstance, setDbInstance] = React.useState<Firestore | null>(null);
+  const dbInstanceRef = React.useRef<Firestore | null>(null);
 
   React.useEffect(() => {
-    // Initialize Firestore instance only on the client side
-    const app = initializeFirebase();
-    if (app) {
-      setDbInstance(getFirestore(app));
-    }
-  }, []);
-
-  React.useEffect(() => {
-    if (!dbInstance) {
+    if (!firebaseApp) {
       setLoading(true);
       return;
     }
 
-    setLoading(true);
-    const inventoryQuery = query(collection(dbInstance, 'inventory'), orderBy('itemName'));
-    const transactionsQuery = query(collection(dbInstance, 'transactions'), orderBy('date', 'desc'));
+    try {
+      const db = getFirestore(firebaseApp);
+      dbInstanceRef.current = db;
 
-    const unsubInventory = onSnapshot(inventoryQuery, (snapshot) => {
-      const inventoryData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem));
-      setInventory(inventoryData);
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching inventory:", error);
-      setLoading(false);
-    });
+      setLoading(true);
+      const inventoryQuery = query(collection(db, 'inventory'), orderBy('itemName'));
+      const transactionsQuery = query(collection(db, 'transactions'), orderBy('date', 'desc'));
 
-    const unsubTransactions = onSnapshot(transactionsQuery, (snapshot) => {
-      const transactionsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
-      setTransactions(transactionsData);
-    }, (error) => {
-      console.error("Error fetching transactions:", error);
-    });
+      const unsubInventory = onSnapshot(inventoryQuery, (snapshot) => {
+        const inventoryData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem));
+        setInventory(inventoryData);
+        setLoading(false);
+      }, (error) => {
+        console.error("Error fetching inventory:", error);
+        setLoading(false);
+      });
 
-    return () => {
-      unsubInventory();
-      unsubTransactions();
-    };
-  }, [dbInstance]);
+      const unsubTransactions = onSnapshot(transactionsQuery, (snapshot) => {
+        const transactionsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
+        setTransactions(transactionsData);
+        // Do not set loading to false here, inventory is the primary data source for initial load
+      }, (error) => {
+        console.error("Error fetching transactions:", error);
+      });
 
-  const ensureDbReady = () => {
-    if (!dbInstance) throw new Error("Firestore is not initialized yet.");
-    return dbInstance;
+      return () => {
+        unsubInventory();
+        unsubTransactions();
+      };
+    } catch (error) {
+        console.error("Failed to initialize Firestore or fetch data:", error);
+        setLoading(false);
+    }
+  }, [firebaseApp]);
+
+  const getDb = () => {
+    if (!dbInstanceRef.current) {
+      throw new Error("Firestore is not initialized yet.");
+    }
+    return dbInstanceRef.current;
   }
 
   // INVENTORY MANAGEMENT
   const addInventoryItem = async (item: Omit<InventoryItem, 'id'>) => {
-    const db = ensureDbReady();
+    const db = getDb();
     await addDoc(collection(db, 'inventory'), item);
   };
 
   const updateInventoryItem = async (id: string, updatedItem: Partial<Omit<InventoryItem, 'id'>>) => {
-    const db = ensureDbReady();
+    const db = getDb();
     const itemDoc = doc(db, 'inventory', id);
     await updateDoc(itemDoc, updatedItem);
   };
 
   const deleteInventoryItem = async (id: string) => {
-    const db = ensureDbReady();
+    const db = getDb();
     await deleteDoc(doc(db, 'inventory', id));
   };
 
   const bulkAddInventoryItems = async (items: Omit<InventoryItem, 'id'>[]) => {
-      const db = ensureDbReady();
+      const db = getDb();
       const batch = writeBatch(db);
       const inventoryCollection = collection(db, 'inventory');
       
@@ -129,7 +137,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // TRANSACTION MANAGEMENT & STOCK SYNCHRONIZATION
   const addTransaction = async (transaction: Omit<Transaction, 'id'>) => {
-    const db = ensureDbReady();
+    const db = getDb();
     await runTransaction(db, async (t) => {
       if (transaction.items) {
         for (const soldItem of transaction.items) {
@@ -151,7 +159,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateTransaction = async (id: string, updatedTransactionData: Omit<Transaction, 'id'>, originalTransaction: Transaction) => {
-    const db = ensureDbReady();
+    const db = getDb();
     await runTransaction(db, async (t) => {
         if (originalTransaction.items) {
             for (const soldItem of originalTransaction.items) {
@@ -184,7 +192,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
 
  const deleteTransaction = async (id: string, transactionToDelete: Transaction) => {
-     const db = ensureDbReady();
+     const db = getDb();
      await runTransaction(db, async (t) => {
         if (transactionToDelete.items) {
             for (const soldItem of transactionToDelete.items) {

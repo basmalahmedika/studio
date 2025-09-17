@@ -1,7 +1,6 @@
 
 import { initializeApp, getApp, getApps, type FirebaseApp } from "firebase/app";
 import { getFirestore, type Firestore } from "firebase/firestore";
-import { getAuth, type Auth } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -14,22 +13,15 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
-// This function initializes Firebase and should be called once in a top-level client component.
+// This function must only be called on the client side.
 function initializeFirebase(): FirebaseApp {
-  if (typeof window !== "undefined") {
-    if (!getApps().length) {
-      if (!firebaseConfig.apiKey) {
-        throw new Error("Firebase API key is not set. Please check your environment variables.");
-      }
-      return initializeApp(firebaseConfig);
+  if (getApps().length === 0) {
+    if (!firebaseConfig.apiKey) {
+      throw new Error("Firebase API key is not set. Please check your environment variables.");
     }
-    return getApp();
+    return initializeApp(firebaseConfig);
   }
-  // This should ideally not be reached if called correctly inside a useEffect.
-  // We'll throw an error to make it clear if it's used incorrectly.
-  throw new Error("Firebase can only be initialized on the client side.");
+  return getApp();
 }
 
-// Export the instances directly. They will be undefined on the server
-// and populated on the client after initialization.
 export { initializeFirebase };

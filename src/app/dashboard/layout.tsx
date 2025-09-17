@@ -9,6 +9,8 @@ import Header from '@/components/layout/header';
 import { AppProvider } from '@/context/app-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAppContext } from '@/context/app-context';
+import { initializeFirebase } from '@/lib/firebase';
+import type { FirebaseApp } from 'firebase/app';
 
 
 function DashboardContent({ children }: { children: ReactNode }) {
@@ -46,8 +48,18 @@ function DashboardContent({ children }: { children: ReactNode }) {
 }
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
-   // Effect to apply theme from localStorage on initial load
+  const [firebaseApp, setFirebaseApp] = React.useState<FirebaseApp | null>(null);
+
   React.useEffect(() => {
+    // Initialize Firebase only on the client side
+    try {
+      const app = initializeFirebase();
+      setFirebaseApp(app);
+    } catch (error) {
+      console.error("Firebase initialization failed:", error);
+    }
+
+    // Effect to apply theme from localStorage on initial load
     const applySavedTheme = () => {
       const savedTheme = localStorage.getItem('appTheme');
       if (savedTheme) {
@@ -85,14 +97,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           l = Math.round(l * 100);
 
           return `${h} ${s}% ${l}%`;
-      };
+        };
 
         document.documentElement.style.setProperty('--primary', hexToHslString(theme.primaryColor));
         document.documentElement.style.setProperty('--background', hexToHslString(theme.backgroundColor));
         document.documentElement.style.setProperty('--accent', hexToHslString(theme.accentColor));
         document.documentElement.style.setProperty('--sidebar-primary', hexToHslString(theme.primaryColor));
         
-        // Dispatch event to notify components about theme update
         window.dispatchEvent(new CustomEvent('theme-updated', { detail: theme }));
       }
     }
@@ -105,10 +116,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         }
     };
     
-    // Listen for changes from other tabs
     window.addEventListener('storage', handleStorageChange);
-    
-    // Custom event listener for same-tab updates
     window.addEventListener('theme-updated', applySavedTheme as EventListener);
 
 
@@ -119,17 +127,25 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   }, []);
 
+  if (!firebaseApp) {
+    // Render a loading state or nothing while Firebase is initializing
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p>Loading application...</p>
+      </div>
+    );
+  }
 
   return (
-    <AppProvider>
-        <SidebarProvider>
+    <AppProvider firebaseApp={firebaseApp}>
+      <SidebarProvider>
         <Sidebar>
             <SidebarNav />
         </Sidebar>
         <SidebarInset>
             <DashboardContent>{children}</DashboardContent>
         </SidebarInset>
-        </SidebarProvider>
+      </SidebarProvider>
     </AppProvider>
   );
 }
