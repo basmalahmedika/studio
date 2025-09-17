@@ -15,7 +15,6 @@ const firebaseConfig = {
 function initializeFirebase(): FirebaseApp {
   if (typeof window !== "undefined") {
     if (getApps().length === 0) {
-      // Check if the config object is populated
       if (!firebaseConfig.apiKey) {
         throw new Error("Firebase configuration is missing or incomplete.");
       }
@@ -23,7 +22,7 @@ function initializeFirebase(): FirebaseApp {
     }
     return getApp();
   }
-  // On the server, we return a null object to avoid initialization errors during build.
+  // This is a placeholder for server-side rendering, should not be used for actual Firebase operations.
   return null as any;
 }
 
