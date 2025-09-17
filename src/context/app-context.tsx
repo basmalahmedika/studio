@@ -20,7 +20,6 @@ import {
   type Firestore,
 } from 'firebase/firestore';
 import type { InventoryItem, Transaction } from '@/lib/types';
-import { useAuth } from '@/context/auth-context';
 
 interface AppContextType {
   inventory: InventoryItem[];
@@ -38,7 +37,6 @@ interface AppContextType {
 const AppContext = React.createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
   const [inventory, setInventory] = React.useState<InventoryItem[]>([]);
   const [transactions, setTransactions] = React.useState<Transaction[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -53,11 +51,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   React.useEffect(() => {
-    // Set up listeners only if dbInstance and user are available
-    if (!dbInstance || !user) {
-      setLoading(!user); // If no user, we might not be "loading" data, but we are not ready.
-      setInventory([]);
-      setTransactions([]);
+    if (!dbInstance) {
+      setLoading(true);
       return;
     }
 
@@ -85,7 +80,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       unsubInventory();
       unsubTransactions();
     };
-  }, [dbInstance, user]);
+  }, [dbInstance]);
 
   const ensureDbReady = () => {
     if (!dbInstance) throw new Error("Firestore is not initialized yet.");

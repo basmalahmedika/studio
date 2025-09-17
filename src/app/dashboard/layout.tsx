@@ -9,7 +9,6 @@ import Header from '@/components/layout/header';
 import { AppProvider } from '@/context/app-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAppContext } from '@/context/app-context';
-import PrivateRoute from '@/components/auth/private-route';
 
 
 function DashboardContent({ children }: { children: ReactNode }) {
@@ -122,17 +121,15 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
 
   return (
-    <PrivateRoute>
-        <AppProvider>
-            <SidebarProvider>
-            <Sidebar>
-                <SidebarNav />
-            </Sidebar>
-            <SidebarInset>
-                <DashboardContent>{children}</DashboardContent>
-            </SidebarInset>
-            </SidebarProvider>
-        </AppProvider>
-    </PrivateRoute>
+    <AppProvider>
+        <SidebarProvider>
+        <Sidebar>
+            <SidebarNav />
+        </Sidebar>
+        <SidebarInset>
+            <DashboardContent>{children}</DashboardContent>
+        </SidebarInset>
+        </SidebarProvider>
+    </AppProvider>
   );
 }
