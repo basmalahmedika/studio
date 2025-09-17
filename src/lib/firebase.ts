@@ -1,6 +1,5 @@
 
 import { initializeApp, getApp, getApps, type FirebaseApp } from "firebase/app";
-import { getFirestore, type Firestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -13,15 +12,19 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
-// This function must only be called on the client side.
 function initializeFirebase(): FirebaseApp {
-  if (getApps().length === 0) {
-    if (!firebaseConfig.apiKey) {
-      throw new Error("Firebase API key is not set. Please check your environment variables.");
+  if (typeof window !== "undefined") {
+    if (getApps().length === 0) {
+      if (!firebaseConfig.apiKey) {
+        throw new Error("Firebase API key is not set. Please check your environment variables.");
+      }
+      return initializeApp(firebaseConfig);
     }
-    return initializeApp(firebaseConfig);
+    return getApp();
   }
-  return getApp();
+  // This is a server-side check, return a mock or handle as needed
+  // For this app, we'll rely on the client-side initialization guard.
+  return null as any;
 }
 
 export { initializeFirebase };
