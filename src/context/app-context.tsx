@@ -2,7 +2,7 @@
 'use client';
 
 import * as React from 'react';
-import { db, initializeFirebase } from '@/lib/firebase';
+import { initializeFirebase } from '@/lib/firebase';
 import {
   collection,
   onSnapshot,

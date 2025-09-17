@@ -40,6 +40,7 @@ export function AuthProvider({ children, app }: { children: React.ReactNode, app
       });
       return () => unsubscribe();
     } else {
+      // If app is null, we are still waiting for initialization.
       setLoading(true);
     }
   }, [app]);

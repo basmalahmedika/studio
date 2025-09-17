@@ -14,27 +14,22 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
-let app: FirebaseApp;
-let auth: Auth;
-let db: Firestore;
-
 // This function initializes Firebase and should be called once in a top-level client component.
-function initializeFirebase() {
+function initializeFirebase(): FirebaseApp {
   if (typeof window !== "undefined") {
     if (!getApps().length) {
       if (!firebaseConfig.apiKey) {
         throw new Error("Firebase API key is not set. Please check your environment variables.");
       }
-      app = initializeApp(firebaseConfig);
-    } else {
-      app = getApp();
+      return initializeApp(firebaseConfig);
     }
-    auth = getAuth(app);
-    db = getFirestore(app);
+    return getApp();
   }
-  return app;
+  // This should ideally not be reached if called correctly inside a useEffect.
+  // We'll throw an error to make it clear if it's used incorrectly.
+  throw new Error("Firebase can only be initialized on the client side.");
 }
 
 // Export the instances directly. They will be undefined on the server
 // and populated on the client after initialization.
-export { initializeFirebase, auth, db };
+export { initializeFirebase };
