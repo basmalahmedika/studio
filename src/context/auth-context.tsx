@@ -27,32 +27,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = React.useState<User | null>(null);
   const [loading, setLoading] = React.useState(true);
   
-  // Lazily get auth instance
-  const auth = getFirebaseAuth();
-
+  // Lazily get auth instance inside useEffect
   React.useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [auth]);
+    try {
+      const auth = getFirebaseAuth();
+      const unsubscribe = onAuthStateChanged(auth, (user) => {
+        setUser(user);
+        setLoading(false);
+      });
+      return () => unsubscribe();
+    } catch (error) {
+      console.error("Failed to initialize Firebase Auth:", error);
+      setLoading(false); // Stop loading on error
+    }
+  }, []);
 
   const signIn = (email: string, pass: string) => {
-    return signInWithEmailAndPassword(auth, email, pass);
+    return signInWithEmailAndPassword(getFirebaseAuth(), email, pass);
   };
   
   const signUp = (email: string, pass: string) => {
-    return createUserWithEmailAndPassword(auth, email, pass);
+    return createUserWithEmailAndPassword(getFirebaseAuth(), email, pass);
   };
   
   const sendPasswordReset = (email: string) => {
-    return sendPasswordResetEmail(auth, email);
+    return sendPasswordResetEmail(getFirebaseAuth(), email);
   }
 
   const handleSignOut = () => {
-    return signOut(auth);
+    return signOut(getFirebaseAuth());
   };
   
   const value = {
@@ -64,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signOut: handleSignOut,
   };
 
-  return <AuthContext.Provider value={value}>{!loading && children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
