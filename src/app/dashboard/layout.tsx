@@ -6,11 +6,8 @@ import * as React from 'react';
 import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar';
 import SidebarNav from '@/components/layout/sidebar-nav';
 import Header from '@/components/layout/header';
-import { AppProvider } from '@/context/app-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAppContext } from '@/context/app-context';
-import { initializeFirebase } from '@/lib/firebase';
-import type { FirebaseApp } from 'firebase/app';
 
 
 function DashboardContent({ children }: { children: ReactNode }) {
@@ -48,18 +45,8 @@ function DashboardContent({ children }: { children: ReactNode }) {
 }
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
-  const [firebaseApp, setFirebaseApp] = React.useState<FirebaseApp | null>(null);
-
+  // Theme management logic remains here as it's client-side and specific to the dashboard's appearance.
   React.useEffect(() => {
-    // Initialize Firebase only on the client side
-    try {
-      const app = initializeFirebase();
-      setFirebaseApp(app);
-    } catch (error) {
-      console.error("Firebase initialization failed:", error);
-    }
-
-    // Effect to apply theme from localStorage on initial load
     const applySavedTheme = () => {
       const savedTheme = localStorage.getItem('appTheme');
       if (savedTheme) {
@@ -127,25 +114,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   }, []);
 
-  if (!firebaseApp) {
-    // Render a loading state or nothing while Firebase is initializing
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p>Loading application...</p>
-      </div>
-    );
-  }
-
   return (
-    <AppProvider firebaseApp={firebaseApp}>
-      <SidebarProvider>
-        <Sidebar>
-            <SidebarNav />
-        </Sidebar>
-        <SidebarInset>
-            <DashboardContent>{children}</DashboardContent>
-        </SidebarInset>
-      </SidebarProvider>
-    </AppProvider>
+    <SidebarProvider>
+      <Sidebar>
+          <SidebarNav />
+      </Sidebar>
+      <SidebarInset>
+          <DashboardContent>{children}</DashboardContent>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
