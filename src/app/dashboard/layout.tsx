@@ -51,6 +51,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       const theme = JSON.parse(savedTheme);
       
       const hexToHslString = (hex: string): string => {
+        if (!hex || !/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(hex)) {
+            return '';
+        }
+        
         let r = 0, g = 0, b = 0;
         if (hex.length === 4) {
             r = parseInt(hex[1] + hex[1], 16);
@@ -84,11 +88,48 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         return `${h} ${s}% ${l}%`;
       };
 
-      if (theme.primaryColor) document.documentElement.style.setProperty('--primary', hexToHslString(theme.primaryColor));
-      if (theme.backgroundColor) document.documentElement.style.setProperty('--background', hexToHslString(theme.backgroundColor));
-      if (theme.accentColor) document.documentElement.style.setProperty('--accent', hexToHslString(theme.accentColor));
-      if (theme.primaryColor) document.documentElement.style.setProperty('--sidebar-primary', hexToHslString(theme.primaryColor));
+      const root = document.documentElement;
       
+      const setCssVar = (name: string, value: string | undefined) => {
+        const hsl = value ? hexToHslString(value) : null;
+        if (hsl) {
+            root.style.setProperty(name, hsl);
+        }
+      };
+      
+      // Main colors
+      setCssVar('--primary', theme.primaryColor);
+      setCssVar('--background', theme.backgroundColor);
+      setCssVar('--accent', theme.accentColor);
+      setCssVar('--foreground', theme.foregroundColor);
+      
+      // Sidebar colors - derived from sidebar-specific settings
+      setCssVar('--sidebar-background', theme.sidebarBackgroundColor);
+      setCssVar('--sidebar-accent', theme.sidebarAccentColor);
+
+      // Sidebar primary is the same as main primary
+      setCssVar('--sidebar-primary', theme.primaryColor);
+
+      // Determine sidebar foreground based on its background color for readability
+      if (theme.sidebarBackgroundColor) {
+        const sbBg = theme.sidebarBackgroundColor;
+        const r = parseInt(sbBg.slice(1, 3), 16);
+        const g = parseInt(sbBg.slice(3, 5), 16);
+        const b = parseInt(sbBg.slice(5, 7), 16);
+        const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+        
+        // If sidebar background is dark, use a light foreground, otherwise use the main foreground
+        if (brightness < 128) {
+           root.style.setProperty('--sidebar-foreground', '210 20% 98%'); // Light gray
+           root.style.setProperty('--sidebar-accent-foreground', '210 20% 98%');
+           root.style.setProperty('--sidebar-primary-foreground', '210 20% 98%');
+        } else {
+           setCssVar('--sidebar-foreground', theme.foregroundColor);
+           setCssVar('--sidebar-accent-foreground', theme.foregroundColor);
+           setCssVar('--sidebar-primary-foreground', theme.primaryColorForeground || '210 20% 98%');
+        }
+      }
+
       window.dispatchEvent(new CustomEvent('theme-updated', { detail: theme }));
     }
   }, []);

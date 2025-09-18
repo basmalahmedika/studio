@@ -10,33 +10,86 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import { Paintbrush } from 'lucide-react';
+import { Paintbrush, Palette } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Separator } from './ui/separator';
 
 const themeSchema = z.object({
   appName: z.string().min(1, 'Application name is required'),
   logo: z.any(),
+  // Main Colors
   primaryColor: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, 'Invalid hex color'),
   backgroundColor: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, 'Invalid hex color'),
   accentColor: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, 'Invalid hex color'),
+  foregroundColor: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, 'Invalid hex color'),
+  // Sidebar Colors
+  sidebarBackgroundColor: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, 'Invalid hex color'),
+  sidebarAccentColor: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, 'Invalid hex color'),
 });
 
 type ThemeFormValues = z.infer<typeof themeSchema>;
 
+const colorPresets = [
+  {
+    name: 'Default',
+    colors: {
+      primaryColor: '#2563eb',
+      backgroundColor: '#f8fafc',
+      accentColor: '#f59e0b',
+      foregroundColor: '#1e293b',
+      sidebarBackgroundColor: '#ffffff',
+      sidebarAccentColor: '#f8fafc',
+    },
+  },
+  {
+    name: 'Oceanic',
+    colors: {
+      primaryColor: '#0e7490',
+      backgroundColor: '#f0f9ff',
+      accentColor: '#22d3ee',
+      foregroundColor: '#083344',
+      sidebarBackgroundColor: '#083344',
+      sidebarAccentColor: '#072e3b',
+    },
+  },
+  {
+    name: 'Forest',
+    colors: {
+      primaryColor: '#166534',
+      backgroundColor: '#f0fdf4',
+      accentColor: '#4ade80',
+      foregroundColor: '#14532d',
+      sidebarBackgroundColor: '#14532d',
+      sidebarAccentColor: '#114727',
+    },
+  },
+   {
+    name: 'Sunset',
+    colors: {
+      primaryColor: '#ea580c',
+      backgroundColor: '#fff7ed',
+      accentColor: '#f97316',
+      foregroundColor: '#422006',
+      sidebarBackgroundColor: '#422006',
+      sidebarAccentColor: '#351a05',
+    },
+  },
+];
+
+
 export function ThemeCustomizer() {
   const { toast } = useToast();
   const [logoPreview, setLogoPreview] = React.useState<string | null>(null);
+  const [activePreset, setActivePreset] = React.useState('Default');
 
   const form = useForm<ThemeFormValues>({
     resolver: zodResolver(themeSchema),
     defaultValues: {
       appName: 'PharmaFlow',
-      primaryColor: '#4a90e2',
-      backgroundColor: '#f7f9fb',
-      accentColor: '#f5a623',
+      ...colorPresets[0].colors,
     },
   });
 
-  // Load saved theme from localStorage on component mount
   React.useEffect(() => {
     const savedTheme = localStorage.getItem('appTheme');
     if (savedTheme) {
@@ -62,12 +115,21 @@ export function ThemeCustomizer() {
     }
   };
 
+  const applyPreset = (preset: typeof colorPresets[0]) => {
+    form.setValue('primaryColor', preset.colors.primaryColor);
+    form.setValue('backgroundColor', preset.colors.backgroundColor);
+    form.setValue('accentColor', preset.colors.accentColor);
+    form.setValue('foregroundColor', preset.colors.foregroundColor);
+    form.setValue('sidebarBackgroundColor', preset.colors.sidebarBackgroundColor);
+    form.setValue('sidebarAccentColor', preset.colors.sidebarAccentColor);
+    setActivePreset(preset.name);
+  };
+
 
   const onSubmit = (values: ThemeFormValues) => {
     try {
         const themeToSave = { ...values, logo: values.logo || logoPreview };
         localStorage.setItem('appTheme', JSON.stringify(themeToSave));
-        // Dispatch custom event to notify other components of the theme change
         window.dispatchEvent(new CustomEvent('theme-updated', { detail: themeToSave }));
         toast({ title: 'Success', description: 'Theme updated successfully.' });
     } catch (error) {
@@ -84,48 +146,73 @@ export function ThemeCustomizer() {
             Theme Customizer
         </CardTitle>
         <CardDescription>
-          Customize the application's name, logo, and color scheme.
+          Choose a preset or customize the application's appearance manually.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-4">
-                    <FormField
-                    control={form.control}
-                    name="appName"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Application Name</FormLabel>
-                        <FormControl>
-                            <Input placeholder="e.g., PharmaFlow" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                    />
-                    <FormField
-                    control={form.control}
-                    name="logo"
-                    render={() => (
-                        <FormItem>
-                            <FormLabel>Logo</FormLabel>
+
+            <div className="space-y-4">
+                 <FormLabel>Color Presets</FormLabel>
+                 <div className="flex flex-wrap gap-2">
+                    {colorPresets.map((preset) => (
+                        <Button
+                         type="button"
+                         key={preset.name}
+                         variant={activePreset === preset.name ? 'default' : 'outline'}
+                         onClick={() => applyPreset(preset)}
+                        >
+                          <Palette className="mr-2 h-4 w-4" />
+                          {preset.name}
+                        </Button>
+                    ))}
+                 </div>
+            </div>
+
+            <Separator />
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div className="space-y-4 col-span-1 lg:col-span-3">
+                    <CardTitle className="text-xl">Branding</CardTitle>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                       <FormField
+                        control={form.control}
+                        name="appName"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Application Name</FormLabel>
                             <FormControl>
-                                <Input type="file" accept="image/*" onChange={handleLogoChange} />
+                                <Input placeholder="e.g., PharmaFlow" {...field} />
                             </FormControl>
-                            {logoPreview && (
-                                <div className="mt-4">
-                                <img src={logoPreview} alt="Logo Preview" className="h-16 w-16 object-contain border p-1 rounded-md" />
-                                </div>
-                            )}
                             <FormMessage />
-                        </FormItem>
-                    )}
-                    />
+                            </FormItem>
+                        )}
+                        />
+                        <FormField
+                        control={form.control}
+                        name="logo"
+                        render={() => (
+                            <FormItem>
+                                <FormLabel>Logo</FormLabel>
+                                <FormControl>
+                                    <Input type="file" accept="image/*" onChange={handleLogoChange} />
+                                </FormControl>
+                                {logoPreview && (
+                                    <div className="mt-4">
+                                    <img src={logoPreview} alt="Logo Preview" className="h-16 w-16 object-contain border p-1 rounded-md" />
+                                    </div>
+                                )}
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                    </div>
                 </div>
-                 <div className="space-y-4">
-                    <FormField
+
+                <div className="space-y-4">
+                    <CardTitle className="text-xl">Main Colors</CardTitle>
+                     <FormField
                         control={form.control}
                         name="primaryColor"
                         render={({ field }) => (
@@ -134,7 +221,7 @@ export function ThemeCustomizer() {
                             <FormControl>
                                 <div className='flex items-center gap-2'>
                                     <Input type="color" {...field} className="p-1 h-10 w-14" />
-                                    <Input type="text" {...field} placeholder="#4a90e2" />
+                                    <Input type="text" {...field} />
                                 </div>
                             </FormControl>
                             <FormMessage />
@@ -150,7 +237,7 @@ export function ThemeCustomizer() {
                             <FormControl>
                                 <div className='flex items-center gap-2'>
                                     <Input type="color" {...field} className="p-1 h-10 w-14" />
-                                    <Input type="text" {...field} placeholder="#f7f9fb" />
+                                    <Input type="text" {...field} />
                                 </div>
                             </FormControl>
                             <FormMessage />
@@ -166,17 +253,70 @@ export function ThemeCustomizer() {
                             <FormControl>
                                 <div className='flex items-center gap-2'>
                                     <Input type="color" {...field} className="p-1 h-10 w-14" />
-                                    <Input type="text" {...field} placeholder="#f5a623" />
+                                    <Input type="text" {...field} />
                                 </div>
                             </FormControl>
                             <FormMessage />
                             </FormItem>
                         )}
                         />
-                 </div>
+                     <FormField
+                        control={form.control}
+                        name="foregroundColor"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Font / Foreground</FormLabel>
+                            <FormControl>
+                                <div className='flex items-center gap-2'>
+                                    <Input type="color" {...field} className="p-1 h-10 w-14" />
+                                    <Input type="text" {...field} />
+                                </div>
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                </div>
+
+                <div className="space-y-4">
+                    <CardTitle className="text-xl">Sidebar Colors</CardTitle>
+                    <FormField
+                        control={form.control}
+                        name="sidebarBackgroundColor"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Sidebar Background</FormLabel>
+                            <FormControl>
+                                <div className='flex items-center gap-2'>
+                                    <Input type="color" {...field} className="p-1 h-10 w-14" />
+                                    <Input type="text" {...field} />
+                                </div>
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                     <FormField
+                        control={form.control}
+                        name="sidebarAccentColor"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Sidebar Accent</FormLabel>
+                            <FormControl>
+                                <div className='flex items-center gap-2'>
+                                    <Input type="color" {...field} className="p-1 h-10 w-14" />
+                                    <Input type="text" {...field} />
+                                </div>
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                </div>
+
             </div>
             
-            <div className="flex justify-end">
+            <div className="flex justify-end pt-4">
               <Button type="submit">Save Changes</Button>
             </div>
           </form>
