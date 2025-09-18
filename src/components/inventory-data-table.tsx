@@ -65,6 +65,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Input } from '@/components/ui/input';
 import { Calendar } from "@/components/ui/calendar"
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useAppContext } from '@/context/app-context';
 import type { InventoryItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -173,8 +174,9 @@ const parseDateFromExcel = (dateValue: any): Date | null => {
 
 
 export function InventoryDataTable() {
-  const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem, bulkAddInventoryItems } = useAppContext();
+  const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem, bulkAddInventoryItems, bulkDeleteInventoryItems } = useAppContext();
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
+  const [selectedRows, setSelectedRows] = React.useState<string[]>([]);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -237,6 +239,16 @@ export function InventoryDataTable() {
         toast({ variant: "destructive", title: "Error", description: "Failed to delete item." });
     }
   }
+  
+  const handleBulkDelete = async () => {
+    try {
+      await bulkDeleteInventoryItems(selectedRows);
+      toast({ title: 'Success', description: `${selectedRows.length} item(s) have been deleted.` });
+      setSelectedRows([]);
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete selected items.' });
+    }
+  };
 
   const handleOpenAddNew = () => {
     form.reset({
@@ -388,13 +400,53 @@ export function InventoryDataTable() {
     XLSX.utils.book_append_sheet(wb, ws, 'Inventory');
     XLSX.writeFile(wb, 'inventory_export.xlsx');
   };
+  
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedRows(inventory.map(item => item.id));
+    } else {
+      setSelectedRows([]);
+    }
+  };
+
+  const handleRowSelect = (id: string, checked: boolean) => {
+    if (checked) {
+      setSelectedRows(prev => [...prev, id]);
+    } else {
+      setSelectedRows(prev => prev.filter(rowId => rowId !== id));
+    }
+  };
 
   return (
     <Card>
       <CardHeader>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <CardTitle>Inventory List</CardTitle>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 items-center">
+             {selectedRows.length > 0 && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Selected ({selectedRows.length})
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete {selectedRows.length} item(s) from your inventory.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive hover:bg-destructive/90">
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
             <input
               type="file"
               ref={fileInputRef}
@@ -699,6 +751,13 @@ export function InventoryDataTable() {
           <Table>
             <TableHeader>
               <TableRow>
+                 <TableHead className="w-[40px]">
+                  <Checkbox
+                    checked={selectedRows.length === inventory.length && inventory.length > 0}
+                    onCheckedChange={(value) => handleSelectAll(!!value)}
+                    aria-label="Select all"
+                  />
+                </TableHead>
                 <TableHead>Item Name</TableHead>
                 <TableHead>No. Batch</TableHead>
                 <TableHead>Type</TableHead>
@@ -715,7 +774,14 @@ export function InventoryDataTable() {
             </TableHeader>
             <TableBody>
               {inventory.map((item) => (
-                <TableRow key={item.id}>
+                <TableRow key={item.id} data-state={selectedRows.includes(item.id) && "selected"}>
+                   <TableCell>
+                    <Checkbox
+                      checked={selectedRows.includes(item.id)}
+                      onCheckedChange={(value) => handleRowSelect(item.id, !!value)}
+                      aria-label="Select row"
+                    />
+                  </TableCell>
                   <TableCell className="font-medium">{item.itemName}</TableCell>
                   <TableCell>{item.batchNumber}</TableCell>
                   <TableCell>{item.itemType}</TableCell>

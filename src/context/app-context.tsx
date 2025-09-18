@@ -31,6 +31,7 @@ interface AppContextType {
   updateInventoryItem: (id: string, updatedItem: Partial<Omit<InventoryItem, 'id'>>) => Promise<void>;
   deleteInventoryItem: (id: string) => Promise<void>;
   bulkAddInventoryItems: (items: Omit<InventoryItem, 'id'>[]) => Promise<void>;
+  bulkDeleteInventoryItems: (ids: string[]) => Promise<void>;
   addTransaction: (transaction: Omit<Transaction, 'id'>) => Promise<void>;
   updateTransaction: (id: string, updatedTransactionData: Omit<Transaction, 'id'>, originalTransaction: Transaction) => Promise<void>;
   deleteTransaction: (id: string, transactionToDelete: Transaction) => Promise<void>;
@@ -135,6 +136,16 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
       }
       
       await batch.commit();
+  };
+  
+  const bulkDeleteInventoryItems = async (ids: string[]) => {
+    const db = getDb();
+    const batch = writeBatch(db);
+    ids.forEach(id => {
+      const docRef = doc(db, 'inventory', id);
+      batch.delete(docRef);
+    });
+    await batch.commit();
   };
 
   // TRANSACTION MANAGEMENT & STOCK SYNCHRONIZATION
@@ -274,6 +285,7 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
     updateInventoryItem,
     deleteInventoryItem,
     bulkAddInventoryItems,
+    bulkDeleteInventoryItems,
     addTransaction,
     updateTransaction,
     deleteTransaction,
