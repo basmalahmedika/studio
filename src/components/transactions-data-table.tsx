@@ -5,7 +5,7 @@ import * as React from 'react';
 import { z } from 'zod';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { PlusCircle, MoreHorizontal, Pen, Trash2, CalendarIcon, X, FileDown, ChevronDown, ChevronRight } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Pen, Trash2, CalendarIcon, X, FileDown } from 'lucide-react';
 import { format } from "date-fns";
 import * as XLSX from 'xlsx';
 import {
@@ -61,7 +61,6 @@ import { useAppContext } from '@/context/app-context';
 import type { Transaction, InventoryItem, TransactionItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 const transactionSchema = z.object({
   id: z.string().optional(),
@@ -81,127 +80,12 @@ const transactionSchema = z.object({
 
 type TransactionFormValues = z.infer<typeof transactionSchema>;
 
-const TransactionRow = ({ transaction, inventory, onEdit, onDelete }: { transaction: Transaction, inventory: InventoryItem[], onEdit: (t: Transaction) => void, onDelete: (id: string) => void }) => {
-  const [isOpen, setIsOpen] = React.useState(false);
-
-  const transactionDetails = React.useMemo(() => {
-    if (!transaction.items) return [];
-
-    return transaction.items.map(item => {
-      const inventoryItem = inventory.find(inv => inv.id === item.itemId);
-      const purchasePrice = inventoryItem?.purchasePrice || 0;
-      const margin = item.price - purchasePrice;
-      return {
-        ...item,
-        itemName: inventoryItem?.itemName || 'Unknown Item',
-        purchasePrice,
-        margin,
-      };
-    });
-  }, [transaction, inventory]);
-  
-  const formatCurrency = (value: number) => `Rp ${value.toLocaleString('id-ID')}`;
-
-  return (
-    <Collapsible asChild open={isOpen} onOpenChange={setIsOpen}>
-      <>
-        <TableRow className="cursor-pointer">
-          <TableCell>
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" className="-ml-4">
-                {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                <span className="sr-only">Toggle details</span>
-              </Button>
-            </CollapsibleTrigger>
-          </TableCell>
-          <TableCell>{transaction.date}</TableCell>
-          <TableCell>{transaction.medicalRecordNumber}</TableCell>
-          <TableCell className="font-medium max-w-xs truncate">{transaction.medicationName}</TableCell>
-          <TableCell>{transaction.quantity}</TableCell>
-          <TableCell>{transaction.patientType}</TableCell>
-          <TableCell>
-            <Badge variant={transaction.paymentMethod === 'BPJS' ? 'secondary' : 'outline'}>
-              {transaction.paymentMethod}
-            </Badge>
-          </TableCell>
-          <TableCell className="text-right">
-            {formatCurrency(transaction.totalPrice)}
-          </TableCell>
-          <TableCell className="text-right">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-8 w-8 p-0">
-                  <span className="sr-only">Open menu</span>
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => onEdit(transaction)}>
-                  <Pen className="mr-2 h-4 w-4" />
-                  Edit
-                </DropdownMenuItem>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="ghost" className="w-full justify-start text-sm text-red-500 hover:text-red-500 hover:bg-red-50 p-2 font-normal">
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete the transaction.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => onDelete(transaction.id)} className="bg-destructive hover:bg-destructive/90">
-                        Delete
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </TableCell>
-        </TableRow>
-        <CollapsibleContent asChild>
-          <TableRow>
-            <TableCell colSpan={9} className="p-0">
-              <div className="p-4 bg-muted/50">
-                <h4 className="font-semibold mb-2">Transaction Items</h4>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Item Name</TableHead>
-                      <TableHead className="text-right">Qty</TableHead>
-                      <TableHead className="text-right">Purchase Price</TableHead>
-                      <TableHead className="text-right">Selling Price</TableHead>
-                      <TableHead className="text-right">Margin</TableHead>
-                      <TableHead className="text-right">Subtotal</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {transactionDetails.map((item, index) => (
-                      <TableRow key={index}>
-                        <TableCell className="font-medium">{item.itemName}</TableCell>
-                        <TableCell className="text-right">{item.quantity}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.purchasePrice)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.price)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.margin)}</TableCell>
-                        <TableCell className="text-right font-semibold">{formatCurrency(item.price * item.quantity)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </TableCell>
-          </TableRow>
-        </CollapsibleContent>
-      </>
-    </Collapsible>
-  );
+type FlattenedTransaction = Transaction & TransactionItem & {
+  itemName: string;
+  purchasePrice: number;
+  margin: number;
+  subtotal: number;
+  isFirstItem: boolean;
 };
 
 
@@ -293,7 +177,10 @@ export function TransactionsDataTable() {
     }
   };
   
-  const handleEdit = (transaction: Transaction) => {
+  const handleEdit = (transactionId: string) => {
+     const transaction = transactions.find(t => t.id === transactionId);
+     if (!transaction) return;
+
      const itemsInTransaction = (transaction.items || []).map(item => {
         const inventoryItem = inventory.find(i => i.id === item.itemId);
         return {
@@ -315,11 +202,11 @@ export function TransactionsDataTable() {
     setIsDialogOpen(true);
 };
   
-  const handleDelete = async (id: string) => {
-    const transactionToDelete = transactions.find(t => t.id === id);
+  const handleDelete = async (transactionId: string) => {
+    const transactionToDelete = transactions.find(t => t.id === transactionId);
     if (transactionToDelete) {
         try {
-            await deleteTransaction(id, transactionToDelete);
+            await deleteTransaction(transactionId, transactionToDelete);
             toast({ title: "Success", description: "Transaction has been deleted." });
         } catch(error) {
             toast({ variant: "destructive", title: "Error", description: "Failed to delete transaction." });
@@ -360,18 +247,6 @@ export function TransactionsDataTable() {
     }
     setItemSearch(''); 
   }
-  
-  const handleExportData = () => {
-    const dataToExport = filteredData.map(t => {
-      const { items, ...rest } = t;
-      return rest;
-    });
-
-    const ws = XLSX.utils.json_to_sheet(dataToExport);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Transactions');
-    XLSX.writeFile(wb, 'transactions_export.xlsx');
-  };
 
   const [filters, setFilters] = React.useState({
     medicationName: '',
@@ -386,8 +261,8 @@ export function TransactionsDataTable() {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
   
-  const filteredData = React.useMemo(() => {
-    return transactions.filter((transaction) => {
+  const flattenedData = React.useMemo(() => {
+    const filteredTransactions = transactions.filter((transaction) => {
       const nameMatch = transaction.medicationName
         .toLowerCase()
         .includes(filters.medicationName.toLowerCase());
@@ -397,7 +272,48 @@ export function TransactionsDataTable() {
         filters.paymentMethod === 'all' || transaction.paymentMethod === filters.paymentMethod;
       return nameMatch && patientTypeMatch && paymentMethodMatch;
     });
-  }, [transactions, filters]);
+
+    return filteredTransactions.flatMap((t, transactionIndex) => {
+        if (!t.items || t.items.length === 0) {
+            return []; // Skip transactions with no items
+        }
+        return t.items.map((item, itemIndex) => {
+            const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+            const purchasePrice = inventoryItem?.purchasePrice || 0;
+            const margin = item.price - purchasePrice;
+            const subtotal = item.price * item.quantity;
+            return {
+                ...t,
+                ...item,
+                itemName: inventoryItem?.itemName || 'Unknown Item',
+                purchasePrice,
+                margin,
+                subtotal,
+                isFirstItem: itemIndex === 0,
+            };
+        });
+    });
+  }, [transactions, inventory, filters]);
+
+  const handleExportData = () => {
+    const dataToExport = flattenedData.map(d => ({
+        'Date': d.date,
+        'Medical Record': d.medicalRecordNumber,
+        'Patient Type': d.patientType,
+        'Payment Method': d.paymentMethod,
+        'Item Name': d.itemName,
+        'Quantity': d.quantity,
+        'Purchase Price': d.purchasePrice,
+        'Selling Price': d.price,
+        'Margin': d.margin,
+        'Subtotal': d.subtotal,
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Transactions');
+    XLSX.writeFile(wb, 'transactions_export.xlsx');
+  };
 
   const filteredInventory = React.useMemo(() => {
     if (!itemSearch) return [];
@@ -406,6 +322,8 @@ export function TransactionsDataTable() {
       !watchedItems.some(cartItem => cartItem.itemId === item.id)
     );
   }, [itemSearch, watchedItems, inventory]);
+  
+  const formatCurrency = (value: number) => `Rp ${value.toLocaleString('id-ID')}`;
 
   return (
     <div className="space-y-6">
@@ -636,31 +554,85 @@ export function TransactionsDataTable() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-12"></TableHead>
                 <TableHead>Date</TableHead>
-                <TableHead>No. Medical Record</TableHead>
-                <TableHead>Medication/Item</TableHead>
-                <TableHead>Qty</TableHead>
-                <TableHead>Patient Type</TableHead>
-                <TableHead>Payment Method</TableHead>
-                <TableHead className="text-right">Total Price</TableHead>
+                <TableHead>No. RM</TableHead>
+                <TableHead>Patient/Payment</TableHead>
+                <TableHead>Item Name</TableHead>
+                <TableHead className="text-right">Qty</TableHead>
+                <TableHead className="text-right">Purchase Price</TableHead>
+                <TableHead className="text-right">Selling Price</TableHead>
+                <TableHead className="text-right">Margin</TableHead>
+                <TableHead className="text-right">Subtotal</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredData.length > 0 ? (
-                filteredData.map((transaction) => (
-                  <TransactionRow 
-                    key={transaction.id}
-                    transaction={transaction}
-                    inventory={inventory}
-                    onEdit={handleEdit}
-                    onDelete={handleDelete}
-                  />
+              {flattenedData.length > 0 ? (
+                flattenedData.map((d, index) => (
+                  <TableRow key={`${d.id}-${d.itemId}-${index}`} className={!d.isFirstItem ? 'bg-muted/50' : ''}>
+                     {d.isFirstItem ? (
+                      <>
+                        <TableCell rowSpan={d.items?.length}>{d.date}</TableCell>
+                        <TableCell rowSpan={d.items?.length}>{d.medicalRecordNumber}</TableCell>
+                        <TableCell rowSpan={d.items?.length}>
+                            <div>{d.patientType}</div>
+                            <Badge variant={d.paymentMethod === 'BPJS' ? 'secondary' : 'outline'}>
+                                {d.paymentMethod}
+                            </Badge>
+                        </TableCell>
+                      </>
+                    ) : null}
+                    <TableCell className="font-medium">{d.itemName}</TableCell>
+                    <TableCell className="text-right">{d.quantity}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(d.purchasePrice)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(d.price)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(d.margin)}</TableCell>
+                    <TableCell className="text-right font-semibold">{formatCurrency(d.subtotal)}</TableCell>
+                    {d.isFirstItem ? (
+                        <TableCell className="text-right" rowSpan={d.items?.length}>
+                           <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                  <span className="sr-only">Open menu</span>
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleEdit(d.id)}>
+                                  <Pen className="mr-2 h-4 w-4" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" className="w-full justify-start text-sm text-red-500 hover:text-red-500 hover:bg-red-50 p-2 font-normal">
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      Delete
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This action cannot be undone. This will permanently delete the transaction.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleDelete(d.id)} className="bg-destructive hover:bg-destructive/90">
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                        </TableCell>
+                    ) : null}
+                  </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={9} className="h-24 text-center">
+                  <TableCell colSpan={10} className="h-24 text-center">
                     No results found.
                   </TableCell>
                 </TableRow>
