@@ -653,8 +653,8 @@ export function TransactionsDataTable() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {transactionDetails.map((item) => (
-                            <TableRow key={item.itemId}>
+                        {transactionDetails.map((item, index) => (
+                            <TableRow key={index}>
                                 <TableCell className="font-medium">{item.itemName}</TableCell>
                                 <TableCell className="text-right">{item.quantity}</TableCell>
                                 <TableCell className="text-right">{formatCurrency(item.purchasePrice)}</TableCell>
@@ -681,5 +681,3 @@ export function TransactionsDataTable() {
     </div>
   );
 }
-
-    
