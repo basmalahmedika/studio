@@ -27,26 +27,23 @@ export default function SidebarNav() {
   const [logo, setLogo] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    const applyTheme = () => {
-      const savedTheme = localStorage.getItem('appTheme');
-      if (savedTheme) {
-        const theme = JSON.parse(savedTheme);
-        setAppName(theme.appName || 'PharmaFlow');
-        setLogo(theme.logo || null);
-      }
-    };
-    
-    applyTheme();
-    
-    // Listen for custom event when theme is updated in settings
+    // This listener now correctly waits for DashboardLayout to load the theme
     const handleThemeUpdate = (event: Event) => {
         const theme = (event as CustomEvent).detail;
-        setAppName(theme.appName || 'PharmaFlow');
-        setLogo(theme.logo || null);
+        if (theme) {
+          setAppName(theme.appName || 'PharmaFlow');
+          setLogo(theme.logo || null);
+        }
     };
 
     window.addEventListener('theme-updated', handleThemeUpdate);
     
+    // Also, trigger a manual check in case the event fired before this component mounted
+    const savedTheme = localStorage.getItem('appTheme');
+    if (savedTheme) {
+        handleThemeUpdate(new CustomEvent('theme-updated', { detail: JSON.parse(savedTheme) }));
+    }
+
     return () => {
       window.removeEventListener('theme-updated', handleThemeUpdate);
     };
