@@ -17,7 +17,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -61,6 +61,7 @@ import { useAppContext } from '@/context/app-context';
 import type { Transaction, InventoryItem, TransactionItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { Separator } from './ui/separator';
 
 const transactionSchema = z.object({
   id: z.string().optional(),
@@ -89,7 +90,6 @@ interface TransactionDetailItem extends TransactionItem {
 export function TransactionsDataTable() {
   const { transactions, inventory, addTransaction, updateTransaction, deleteTransaction } = useAppContext();
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
-  const [isDetailOpen, setIsDetailOpen] = React.useState(false);
   const [selectedTransaction, setSelectedTransaction] = React.useState<Transaction | null>(null);
   const [itemSearch, setItemSearch] = React.useState('');
   const { toast } = useToast();
@@ -204,6 +204,9 @@ export function TransactionsDataTable() {
         try {
             await deleteTransaction(id, transactionToDelete);
             toast({ title: "Success", description: "Transaction has been deleted." });
+            if (selectedTransaction?.id === id) {
+              setSelectedTransaction(null); // Clear details if the deleted one was selected
+            }
         } catch(error) {
             toast({ variant: "destructive", title: "Error", description: "Failed to delete transaction." });
         }
@@ -254,11 +257,6 @@ export function TransactionsDataTable() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Transactions');
     XLSX.writeFile(wb, 'transactions_export.xlsx');
-  };
-
-  const handleViewDetails = (transaction: Transaction) => {
-    setSelectedTransaction(transaction);
-    setIsDetailOpen(true);
   };
 
   const transactionDetails = React.useMemo(() => {
@@ -314,6 +312,7 @@ export function TransactionsDataTable() {
   const formatCurrency = (value: number) => `Rp ${value.toLocaleString('id-ID')}`;
 
   return (
+    <div className="space-y-6">
     <Card>
       <CardHeader>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -499,52 +498,6 @@ export function TransactionsDataTable() {
                 </Form>
               </DialogContent>
             </Dialog>
-            <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-                <DialogContent className="sm:max-w-3xl">
-                    <DialogHeader>
-                        <DialogTitle>Transaction Details</DialogTitle>
-                        {selectedTransaction && (
-                            <DialogDescription>
-                                Details for transaction on {selectedTransaction.date} for MRN: {selectedTransaction.medicalRecordNumber}
-                            </DialogDescription>
-                        )}
-                    </DialogHeader>
-                    <div className="max-h-[60vh] overflow-y-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Item Name</TableHead>
-                                    <TableHead className="text-right">Qty</TableHead>
-                                    <TableHead className="text-right">Purchase Price</TableHead>
-                                    <TableHead className="text-right">Selling Price</TableHead>
-                                    <TableHead className="text-right">Margin</TableHead>
-                                    <TableHead className="text-right">Subtotal</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {transactionDetails.map((item) => (
-                                    <TableRow key={item.itemId}>
-                                        <TableCell className="font-medium">{item.itemName}</TableCell>
-                                        <TableCell className="text-right">{item.quantity}</TableCell>
-                                        <TableCell className="text-right">{formatCurrency(item.purchasePrice)}</TableCell>
-                                        <TableCell className="text-right">{formatCurrency(item.price)}</TableCell>
-                                        <TableCell className="text-right">{formatCurrency(item.margin)}</TableCell>
-                                        <TableCell className="text-right font-semibold">{formatCurrency(item.price * item.quantity)}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                     <DialogFooter className="sm:justify-between items-center pt-4 border-t">
-                        <div className="text-sm text-muted-foreground">
-                            Patient: {selectedTransaction?.patientType} ({selectedTransaction?.paymentMethod})
-                        </div>
-                        <div className="text-lg font-bold">
-                            Total: {formatCurrency(selectedTransaction?.totalPrice || 0)}
-                        </div>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
           </div>
         </div>
         <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-center">
@@ -600,7 +553,7 @@ export function TransactionsDataTable() {
             <TableBody>
               {filteredData.length > 0 ? (
                 filteredData.map((transaction) => (
-                  <TableRow key={transaction.id}>
+                  <TableRow key={transaction.id} className={cn(selectedTransaction?.id === transaction.id && "bg-muted/50")}>
                     <TableCell>{transaction.date}</TableCell>
                     <TableCell>{transaction.medicalRecordNumber}</TableCell>
                     <TableCell className="font-medium max-w-xs truncate">{transaction.medicationName}</TableCell>
@@ -623,7 +576,7 @@ export function TransactionsDataTable() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                           <DropdownMenuItem onClick={() => handleViewDetails(transaction)}>
+                           <DropdownMenuItem onClick={() => setSelectedTransaction(transaction)}>
                              <Eye className="mr-2 h-4 w-4" />
                             View Details
                           </DropdownMenuItem>
@@ -670,5 +623,63 @@ export function TransactionsDataTable() {
         </div>
       </CardContent>
     </Card>
+
+    {selectedTransaction && (
+       <Card>
+        <CardHeader>
+            <div className="flex justify-between items-center">
+                <div>
+                    <CardTitle>Transaction Details</CardTitle>
+                    <CardDescription>
+                        Showing items for transaction on {selectedTransaction.date} for MRN: {selectedTransaction.medicalRecordNumber}
+                    </CardDescription>
+                </div>
+                 <Button variant="ghost" size="icon" onClick={() => setSelectedTransaction(null)}>
+                    <X className="h-4 w-4" />
+                </Button>
+            </div>
+        </CardHeader>
+        <CardContent>
+             <div className="overflow-x-auto">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Item Name</TableHead>
+                            <TableHead className="text-right">Qty</TableHead>
+                            <TableHead className="text-right">Purchase Price</TableHead>
+                            <TableHead className="text-right">Selling Price</TableHead>
+                            <TableHead className="text-right">Margin</TableHead>
+                            <TableHead className="text-right">Subtotal</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {transactionDetails.map((item) => (
+                            <TableRow key={item.itemId}>
+                                <TableCell className="font-medium">{item.itemName}</TableCell>
+                                <TableCell className="text-right">{item.quantity}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(item.purchasePrice)}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(item.price)}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(item.margin)}</TableCell>
+                                <TableCell className="text-right font-semibold">{formatCurrency(item.price * item.quantity)}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </div>
+             <Separator className="my-4" />
+             <div className="flex justify-between items-center font-medium">
+                <div className="text-sm text-muted-foreground">
+                    Patient: {selectedTransaction?.patientType} ({selectedTransaction?.paymentMethod})
+                </div>
+                <div className="text-lg">
+                    Total: {formatCurrency(selectedTransaction?.totalPrice || 0)}
+                </div>
+            </div>
+        </CardContent>
+       </Card>
+    )}
+    </div>
   );
 }
+
+    
