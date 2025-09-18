@@ -5,7 +5,7 @@ import * as React from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { PlusCircle, MoreHorizontal, Pen, Trash2, Upload, Download, FileDown } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Pen, Trash2, Upload, Download, FileDown, Search } from 'lucide-react';
 import { format } from "date-fns"
 import { Calendar as CalendarIcon } from "lucide-react"
 import * as XLSX from 'xlsx';
@@ -177,6 +177,7 @@ export function InventoryDataTable() {
   const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem, bulkAddInventoryItems, bulkDeleteInventoryItems } = useAppContext();
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
   const [selectedRows, setSelectedRows] = React.useState<string[]>([]);
+  const [searchTerm, setSearchTerm] = React.useState('');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -403,7 +404,7 @@ export function InventoryDataTable() {
   
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedRows(inventory.map(item => item.id));
+      setSelectedRows(filteredInventory.map(item => item.id));
     } else {
       setSelectedRows([]);
     }
@@ -416,6 +417,12 @@ export function InventoryDataTable() {
       setSelectedRows(prev => prev.filter(rowId => rowId !== id));
     }
   };
+
+  const filteredInventory = React.useMemo(() => {
+    return inventory.filter(item =>
+      item.itemName.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [inventory, searchTerm]);
 
   return (
     <Card>
@@ -745,6 +752,18 @@ export function InventoryDataTable() {
             </Dialog>
           </div>
         </div>
+        <div className="mt-4">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search items..."
+              className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
@@ -753,7 +772,7 @@ export function InventoryDataTable() {
               <TableRow>
                  <TableHead className="w-[40px]">
                   <Checkbox
-                    checked={selectedRows.length === inventory.length && inventory.length > 0}
+                    checked={selectedRows.length === filteredInventory.length && filteredInventory.length > 0}
                     onCheckedChange={(value) => handleSelectAll(!!value)}
                     aria-label="Select all"
                   />
@@ -773,7 +792,7 @@ export function InventoryDataTable() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {inventory.map((item) => (
+              {filteredInventory.map((item) => (
                 <TableRow key={item.id} data-state={selectedRows.includes(item.id) && "selected"}>
                    <TableCell>
                     <Checkbox
