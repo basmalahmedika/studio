@@ -235,16 +235,32 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
  const deleteTransaction = async (id: string, transactionToDelete: Transaction) => {
      const db = getDb();
      await runTransaction(db, async (t) => {
-        if (transactionToDelete.items) {
-            for (const soldItem of transactionToDelete.items) {
-                const itemDocRef = doc(db, 'inventory', soldItem.itemId);
-                const itemDoc = await t.get(itemDocRef);
-                if (itemDoc.exists()) {
-                     const newQuantity = (itemDoc.data().quantity || 0) + soldItem.quantity;
-                    t.update(itemDocRef, { quantity: newQuantity });
-                }
-            }
+        const itemsToRestore = transactionToDelete.items || [];
+        if (itemsToRestore.length === 0) {
+             const transactionDocRef = doc(db, 'transactions', id);
+             t.delete(transactionDocRef);
+             return;
         }
+
+        // 1. READ PHASE
+        const itemRefs = itemsToRestore.map(item => doc(db, 'inventory', item.itemId));
+        const itemDocs = await Promise.all(itemRefs.map(ref => t.get(ref)));
+
+        // 2. WRITE PHASE
+        for (let i = 0; i < itemsToRestore.length; i++) {
+          const itemToRestore = itemsToRestore[i];
+          const itemDoc = itemDocs[i];
+          
+          if (itemDoc.exists()) {
+              const currentQuantity = itemDoc.data().quantity || 0;
+              const newQuantity = currentQuantity + itemToRestore.quantity;
+              t.update(itemRefs[i], { quantity: newQuantity });
+          } else {
+              // Optionally handle case where item was deleted from inventory
+              console.warn(`Inventory item with ID ${itemToRestore.itemId} not found. Cannot restore stock.`);
+          }
+        }
+        
         const transactionDocRef = doc(db, 'transactions', id);
         t.delete(transactionDocRef);
     });
