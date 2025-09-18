@@ -148,7 +148,7 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
           }
           const currentQuantity = itemDoc.data().quantity;
           if (currentQuantity < soldItem.quantity) {
-             throw new Error(`Insufficient stock for item ${itemDoc.data().itemName}.`);
+             throw new Error(`Insufficient stock for item ${itemDoc.data().itemName}. Available: ${currentQuantity}, Required: ${soldItem.quantity}`);
           }
           t.update(itemDocRef, { quantity: currentQuantity - soldItem.quantity });
         }
@@ -161,6 +161,7 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
   const updateTransaction = async (id: string, updatedTransactionData: Omit<Transaction, 'id'>, originalTransaction: Transaction) => {
     const db = getDb();
     await runTransaction(db, async (t) => {
+        // Restore stock from original transaction
         if (originalTransaction.items) {
             for (const soldItem of originalTransaction.items) {
                 const itemDocRef = doc(db, 'inventory', soldItem.itemId);
@@ -171,6 +172,7 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
                 }
             }
         }
+        // Deduct stock for updated transaction
         if (updatedTransactionData.items) {
             for (const soldItem of updatedTransactionData.items) {
                 const itemDocRef = doc(db, 'inventory', soldItem.itemId);
@@ -180,7 +182,7 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
                 }
                 const currentQuantity = itemDoc.data().quantity;
                 if (currentQuantity < soldItem.quantity) {
-                    throw new Error(`Insufficient stock for item ${itemDoc.data().itemName}.`);
+                    throw new Error(`Insufficient stock for item ${itemDoc.data().itemName}. Available: ${currentQuantity}, Required: ${soldItem.quantity}`);
                 }
                 t.update(itemDocRef, { quantity: currentQuantity - soldItem.quantity });
             }
