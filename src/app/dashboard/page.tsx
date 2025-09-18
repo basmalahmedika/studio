@@ -48,15 +48,31 @@ export default function DashboardPage() {
       rjBpjs: 0,
       riUmum: 0,
       riBpjs: 0,
+      revenueRjUmum: 0,
+      revenueRjBpjs: 0,
+      revenueRiUmum: 0,
+      revenueRiBpjs: 0,
     };
 
     filteredTransactions.forEach(t => {
       data.totalRevenue += t.totalPrice;
       data.totalTransactions += 1;
-      if (t.patientType === 'Rawat Jalan' && t.paymentMethod === 'UMUM') data.rjUmum += 1;
-      if (t.patientType === 'Rawat Jalan' && t.paymentMethod === 'BPJS') data.rjBpjs += 1;
-      if (t.patientType === 'Rawat Inap' && t.paymentMethod === 'UMUM') data.riUmum += 1;
-      if (t.patientType === 'Rawat Inap' && t.paymentMethod === 'BPJS') data.riBpjs += 1;
+      if (t.patientType === 'Rawat Jalan' && t.paymentMethod === 'UMUM') {
+        data.rjUmum += 1;
+        data.revenueRjUmum += t.totalPrice;
+      }
+      if (t.patientType === 'Rawat Jalan' && t.paymentMethod === 'BPJS') {
+        data.rjBpjs += 1;
+        data.revenueRjBpjs += t.totalPrice;
+      }
+      if (t.patientType === 'Rawat Inap' && t.paymentMethod === 'UMUM') {
+        data.riUmum += 1;
+        data.revenueRiUmum += t.totalPrice;
+      }
+      if (t.patientType === 'Rawat Inap' && t.paymentMethod === 'BPJS') {
+        data.riBpjs += 1;
+        data.revenueRiBpjs += t.totalPrice;
+      }
     });
 
     return data;
@@ -95,6 +111,30 @@ export default function DashboardPage() {
           value={`${stats.riUmum} / ${stats.riBpjs}`}
           icon={Users}
           description="Number of inpatient services"
+        />
+        <StatCard
+          title="Pendapatan RJ Umum"
+          value={`Rp ${stats.revenueRjUmum.toLocaleString('id-ID')}`}
+          icon={DollarSign}
+          description="Total pendapatan dari Rawat Jalan Umum"
+        />
+         <StatCard
+          title="Pendapatan RJ BPJS"
+          value={`Rp ${stats.revenueRjBpjs.toLocaleString('id-ID')}`}
+          icon={DollarSign}
+          description="Total pendapatan dari Rawat Jalan BPJS"
+        />
+         <StatCard
+          title="Pendapatan RI Umum"
+          value={`Rp ${stats.revenueRiUmum.toLocaleString('id-ID')}`}
+          icon={DollarSign}
+          description="Total pendapatan dari Rawat Inap Umum"
+        />
+         <StatCard
+          title="Pendapatan RI BPJS"
+          value={`Rp ${stats.revenueRiBpjs.toLocaleString('id-ID')}`}
+          icon={DollarSign}
+          description="Total pendapatan dari Rawat Inap BPJS"
         />
       </div>
       
