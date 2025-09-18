@@ -30,9 +30,9 @@ export function ThemeCustomizer() {
     resolver: zodResolver(themeSchema),
     defaultValues: {
       appName: 'PharmaFlow',
-      primaryColor: '#88c6f7',
-      backgroundColor: '#eef4f8',
-      accentColor: '#ff9838',
+      primaryColor: '#4a90e2',
+      backgroundColor: '#f7f9fb',
+      accentColor: '#f5a623',
     },
   });
 
@@ -134,7 +134,7 @@ export function ThemeCustomizer() {
                             <FormControl>
                                 <div className='flex items-center gap-2'>
                                     <Input type="color" {...field} className="p-1 h-10 w-14" />
-                                    <Input type="text" {...field} placeholder="#88c6f7" />
+                                    <Input type="text" {...field} placeholder="#4a90e2" />
                                 </div>
                             </FormControl>
                             <FormMessage />
@@ -150,7 +150,7 @@ export function ThemeCustomizer() {
                             <FormControl>
                                 <div className='flex items-center gap-2'>
                                     <Input type="color" {...field} className="p-1 h-10 w-14" />
-                                    <Input type="text" {...field} placeholder="#eef4f8" />
+                                    <Input type="text" {...field} placeholder="#f7f9fb" />
                                 </div>
                             </FormControl>
                             <FormMessage />
@@ -166,7 +166,7 @@ export function ThemeCustomizer() {
                             <FormControl>
                                 <div className='flex items-center gap-2'>
                                     <Input type="color" {...field} className="p-1 h-10 w-14" />
-                                    <Input type="text" {...field} placeholder="#ff9838" />
+                                    <Input type="text" {...field} placeholder="#f5a623" />
                                 </div>
                             </FormControl>
                             <FormMessage />
