@@ -6,7 +6,7 @@ import type { DateRange } from 'react-day-picker';
 import { startOfMonth } from 'date-fns';
 import * as XLSX from 'xlsx';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend } from 'recharts';
-import { DollarSign, FileDown } from 'lucide-react';
+import { DollarSign, FileDown, Printer } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DateRangePicker } from '@/components/date-range-picker';
@@ -15,6 +15,10 @@ import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 import { useAppContext } from '@/context/app-context';
 import type { Transaction } from '@/lib/types';
 import { StatCard } from './stat-card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+type PatientType = 'all' | 'Rawat Jalan' | 'Rawat Inap';
+type PaymentMethod = 'all' | 'UMUM' | 'BPJS';
 
 const chartConfig = {
   revenue: { label: 'Revenue', color: 'hsl(var(--chart-2))' },
@@ -28,7 +32,11 @@ export function ProfitAnalysisReport() {
     from: startOfMonth(new Date()),
     to: new Date(),
   });
+  const [patientType, setPatientType] = React.useState<PatientType>('all');
+  const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethod>('all');
   const [filteredTransactions, setFilteredTransactions] = React.useState<Transaction[]>([]);
+  const reportRef = React.useRef<HTMLDivElement>(null);
+
 
   React.useEffect(() => {
     const filtered = transactions.filter(t => {
@@ -41,12 +49,17 @@ export function ProfitAnalysisReport() {
       const toDate = date?.to ? new Date(date.to) : null;
       if (toDate) toDate.setHours(0, 0, 0, 0);
 
-      return fromDate && toDate 
+      const isDateInRange = fromDate && toDate 
         ? transactionDate >= fromDate && transactionDate <= toDate 
         : true;
+        
+      const isPatientTypeMatch = patientType === 'all' || t.patientType === patientType;
+      const isPaymentMethodMatch = paymentMethod === 'all' || t.paymentMethod === paymentMethod;
+
+      return isDateInRange && isPatientTypeMatch && isPaymentMethodMatch;
     });
     setFilteredTransactions(filtered);
-  }, [date, transactions]);
+  }, [date, transactions, patientType, paymentMethod]);
   
   const analysisData = React.useMemo(() => {
     const data = {
@@ -106,6 +119,46 @@ export function ProfitAnalysisReport() {
     XLSX.writeFile(wb, 'profit_analysis_report.xlsx');
   };
 
+  const handlePrint = () => {
+    const printContents = reportRef.current?.innerHTML;
+    const originalContents = document.body.innerHTML;
+    
+    if (printContents) {
+      const printWindow = window.open('', '', 'height=600,width=800');
+      if (printWindow) {
+        printWindow.document.write('<html><head><title>Print Report</title>');
+        // Simple styling for print
+        printWindow.document.write(`
+          <style>
+            body { font-family: Arial, sans-serif; }
+            .card { border: 1px solid #ccc; border-radius: 8px; margin-bottom: 20px; }
+            .card-header { padding: 16px; border-bottom: 1px solid #ccc; }
+            .card-title { font-size: 1.5rem; font-weight: bold; }
+            .card-description { color: #555; }
+            .card-content { padding: 16px; }
+            .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+            .stat-card { border: 1px solid #eee; padding: 12px; border-radius: 6px; }
+            h4 { font-size: 1.2rem; font-weight: bold; }
+            dl { display: grid; grid-template-columns: 1fr 2fr; gap: 4px; }
+            dt { color: #777; }
+            dd { font-weight: bold; }
+            /* Hide chart for printing as it might not render well */
+            .chart-container { display: none; }
+          </style>
+        `);
+        printWindow.document.write('</head><body>');
+        printWindow.document.write(printContents);
+        printWindow.document.write('</body></html>');
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => { // Timeout needed for some browsers to load content
+          printWindow.print();
+          printWindow.close();
+        }, 500);
+      }
+    }
+  };
+
   const formatCurrency = (value: number) => `Rp ${value.toLocaleString('id-ID')}`;
 
   return (
@@ -118,26 +171,52 @@ export function ProfitAnalysisReport() {
               Profit & Cost Analysis
             </CardTitle>
             <CardDescription>
-              Analyze revenue, cost, and profit from sales based on the selected date range.
+              Analyze revenue, cost, and profit from sales based on the selected filters.
             </CardDescription>
           </div>
-          <div className="flex flex-wrap gap-2">
-             <DateRangePicker date={date} onDateChange={setDate} align="end" />
+          <div className="flex flex-wrap gap-2 print-hide">
+             <Button variant="outline" size="sm" onClick={handlePrint}>
+                <Printer className="mr-2 h-4 w-4" />
+                Print PDF
+            </Button>
              <Button variant="outline" size="sm" onClick={handleExportData}>
                 <FileDown className="mr-2 h-4 w-4" />
                 Export Excel
             </Button>
           </div>
         </div>
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4 print-hide">
+            <DateRangePicker date={date} onDateChange={setDate} />
+            <Select value={patientType} onValueChange={(value) => setPatientType(value as PatientType)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select Patient Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Patient Types</SelectItem>
+                <SelectItem value="Rawat Jalan">Rawat Jalan</SelectItem>
+                <SelectItem value="Rawat Inap">Rawat Inap</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={paymentMethod} onValueChange={(value) => setPaymentMethod(value as PaymentMethod)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select Payment Method" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Payment Methods</SelectItem>
+                <SelectItem value="UMUM">UMUM</SelectItem>
+                <SelectItem value="BPJS">BPJS</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent ref={reportRef} className="space-y-6">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
            <StatCard title="Total Revenue" value={formatCurrency(analysisData.obat.revenue + analysisData.alkes.revenue)} icon={DollarSign} description="Total income from sales" />
            <StatCard title="Total Cost" value={formatCurrency(analysisData.obat.cost + analysisData.alkes.cost)} icon={DollarSign} description="Total purchase cost of goods sold" />
            <StatCard title="Total Profit" value={formatCurrency(analysisData.obat.profit + analysisData.alkes.profit)} icon={DollarSign} description="Total net profit" />
         </div>
         <div className="grid gap-6 md:grid-cols-2">
-            <Card>
+            <Card className="chart-container print-hide">
                 <CardHeader>
                     <CardTitle>Analysis Chart</CardTitle>
                     <CardDescription>Revenue, Cost, and Profit Visualization</CardDescription>
@@ -200,3 +279,5 @@ export function ProfitAnalysisReport() {
     </Card>
   );
 }
+
+    
