@@ -5,7 +5,7 @@ import * as React from 'react';
 import { z } from 'zod';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { PlusCircle, MoreHorizontal, Pen, Trash2, CalendarIcon, X, FileDown } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Pen, Trash2, CalendarIcon, X, FileDown, Eye } from 'lucide-react';
 import { format } from "date-fns";
 import * as XLSX from 'xlsx';
 import {
@@ -58,7 +58,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { useAppContext } from '@/context/app-context';
-import type { Transaction, InventoryItem } from '@/lib/types';
+import type { Transaction, InventoryItem, TransactionItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
@@ -80,9 +80,17 @@ const transactionSchema = z.object({
 
 type TransactionFormValues = z.infer<typeof transactionSchema>;
 
+interface TransactionDetailItem extends TransactionItem {
+    itemName: string;
+    purchasePrice: number;
+    margin: number;
+}
+
 export function TransactionsDataTable() {
   const { transactions, inventory, addTransaction, updateTransaction, deleteTransaction } = useAppContext();
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const [isDetailOpen, setIsDetailOpen] = React.useState(false);
+  const [selectedTransaction, setSelectedTransaction] = React.useState<Transaction | null>(null);
   const [itemSearch, setItemSearch] = React.useState('');
   const { toast } = useToast();
 
@@ -237,7 +245,6 @@ export function TransactionsDataTable() {
   }
   
   const handleExportData = () => {
-    // We remove the nested 'items' array for a cleaner export
     const dataToExport = filteredData.map(t => {
       const { items, ...rest } = t;
       return rest;
@@ -249,6 +256,26 @@ export function TransactionsDataTable() {
     XLSX.writeFile(wb, 'transactions_export.xlsx');
   };
 
+  const handleViewDetails = (transaction: Transaction) => {
+    setSelectedTransaction(transaction);
+    setIsDetailOpen(true);
+  };
+
+  const transactionDetails = React.useMemo(() => {
+    if (!selectedTransaction || !selectedTransaction.items) return [];
+
+    return selectedTransaction.items.map(item => {
+      const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+      const purchasePrice = inventoryItem?.purchasePrice || 0;
+      const margin = item.price - purchasePrice;
+      return {
+        ...item,
+        itemName: inventoryItem?.itemName || 'Unknown Item',
+        purchasePrice,
+        margin,
+      };
+    });
+  }, [selectedTransaction, inventory]);
 
   const [filters, setFilters] = React.useState({
     medicationName: '',
@@ -283,6 +310,8 @@ export function TransactionsDataTable() {
       !watchedItems.some(cartItem => cartItem.itemId === item.id)
     );
   }, [itemSearch, watchedItems, inventory]);
+  
+  const formatCurrency = (value: number) => `Rp ${value.toLocaleString('id-ID')}`;
 
   return (
     <Card>
@@ -470,6 +499,52 @@ export function TransactionsDataTable() {
                 </Form>
               </DialogContent>
             </Dialog>
+            <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
+                <DialogContent className="sm:max-w-3xl">
+                    <DialogHeader>
+                        <DialogTitle>Transaction Details</DialogTitle>
+                        {selectedTransaction && (
+                            <DialogDescription>
+                                Details for transaction on {selectedTransaction.date} for MRN: {selectedTransaction.medicalRecordNumber}
+                            </DialogDescription>
+                        )}
+                    </DialogHeader>
+                    <div className="max-h-[60vh] overflow-y-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Item Name</TableHead>
+                                    <TableHead className="text-right">Qty</TableHead>
+                                    <TableHead className="text-right">Purchase Price</TableHead>
+                                    <TableHead className="text-right">Selling Price</TableHead>
+                                    <TableHead className="text-right">Margin</TableHead>
+                                    <TableHead className="text-right">Subtotal</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {transactionDetails.map((item) => (
+                                    <TableRow key={item.itemId}>
+                                        <TableCell className="font-medium">{item.itemName}</TableCell>
+                                        <TableCell className="text-right">{item.quantity}</TableCell>
+                                        <TableCell className="text-right">{formatCurrency(item.purchasePrice)}</TableCell>
+                                        <TableCell className="text-right">{formatCurrency(item.price)}</TableCell>
+                                        <TableCell className="text-right">{formatCurrency(item.margin)}</TableCell>
+                                        <TableCell className="text-right font-semibold">{formatCurrency(item.price * item.quantity)}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                     <DialogFooter className="sm:justify-between items-center pt-4 border-t">
+                        <div className="text-sm text-muted-foreground">
+                            Patient: {selectedTransaction?.patientType} ({selectedTransaction?.paymentMethod})
+                        </div>
+                        <div className="text-lg font-bold">
+                            Total: {formatCurrency(selectedTransaction?.totalPrice || 0)}
+                        </div>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
           </div>
         </div>
         <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-center">
@@ -548,6 +623,10 @@ export function TransactionsDataTable() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                           <DropdownMenuItem onClick={() => handleViewDetails(transaction)}>
+                             <Eye className="mr-2 h-4 w-4" />
+                            View Details
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleEdit(transaction)}>
                              <Pen className="mr-2 h-4 w-4" />
                             Edit
