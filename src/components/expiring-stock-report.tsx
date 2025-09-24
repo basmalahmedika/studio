@@ -1,7 +1,8 @@
+
 'use client';
 
 import * as React from 'react';
-import { differenceInMonths, parseISO, formatDistanceToNowStrict } from 'date-fns';
+import { differenceInMonths, parseISO, formatDistanceToNowStrict, isPast } from 'date-fns';
 import { id } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 import {
@@ -19,7 +20,7 @@ import { useAppContext } from '@/context/app-context';
 import type { InventoryItem } from '@/lib/types';
 import { Clock, FileDown } from 'lucide-react';
 
-type ExpiryZone = 'Aman' | 'Waspada' | 'Kritis';
+type ExpiryZone = 'Aman' | 'Waspada' | 'Kritis' | 'Expired';
 
 interface ExpiringItem extends InventoryItem {
   zone: ExpiryZone;
@@ -30,6 +31,11 @@ interface ExpiringItem extends InventoryItem {
 const getExpiryZone = (expiredDate: string): { zone: ExpiryZone, monthsLeft: number, timeLeft: string } => {
   const now = new Date();
   const expiry = parseISO(expiredDate);
+  
+  if (isPast(expiry)) {
+    return { zone: 'Expired', monthsLeft: -1, timeLeft: 'Sudah kadaluarsa' };
+  }
+
   const monthsLeft = differenceInMonths(expiry, now);
   const timeLeft = formatDistanceToNowStrict(expiry, { addSuffix: true, locale: id });
 
@@ -57,6 +63,8 @@ export function ExpiringStockReport() {
 
   const getBadgeClass = (zone: ExpiryZone) => {
     switch (zone) {
+      case 'Expired':
+        return 'bg-black text-white';
       case 'Kritis':
         return 'bg-destructive text-destructive-foreground';
       case 'Waspada':
