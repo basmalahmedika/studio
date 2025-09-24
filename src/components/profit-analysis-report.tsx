@@ -17,8 +17,8 @@ import type { Transaction } from '@/lib/types';
 import { StatCard } from './stat-card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-type PatientType = 'all' | 'Rawat Jalan' | 'Rawat Inap';
-type PaymentMethod = 'all' | 'UMUM' | 'BPJS';
+type PatientType = 'all' | 'Rawat Jalan' | 'Rawat Inap' | 'Lain-lain';
+type PaymentMethod = 'all' | 'UMUM' | 'BPJS' | 'Lain-lain';
 
 const chartConfig = {
   revenue: { label: 'Revenue', color: 'hsl(var(--chart-2))' },
@@ -195,6 +195,7 @@ export function ProfitAnalysisReport() {
                 <SelectItem value="all">All Patient Types</SelectItem>
                 <SelectItem value="Rawat Jalan">Rawat Jalan</SelectItem>
                 <SelectItem value="Rawat Inap">Rawat Inap</SelectItem>
+                <SelectItem value="Lain-lain">Lain-lain</SelectItem>
               </SelectContent>
             </Select>
             <Select value={paymentMethod} onValueChange={(value) => setPaymentMethod(value as PaymentMethod)}>
@@ -205,6 +206,7 @@ export function ProfitAnalysisReport() {
                 <SelectItem value="all">All Payment Methods</SelectItem>
                 <SelectItem value="UMUM">UMUM</SelectItem>
                 <SelectItem value="BPJS">BPJS</SelectItem>
+                 <SelectItem value="Lain-lain">Lain-lain</SelectItem>
               </SelectContent>
             </Select>
           </div>

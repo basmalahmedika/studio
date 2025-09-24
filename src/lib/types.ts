@@ -11,8 +11,8 @@ export type Transaction = {
   medicationName: string;
   quantity: number;
   type: 'IN' | 'OUT';
-  patientType: 'Rawat Jalan' | 'Rawat Inap';
-  paymentMethod: 'BPJS' | 'UMUM';
+  patientType: 'Rawat Jalan' | 'Rawat Inap' | 'Lain-lain';
+  paymentMethod: 'BPJS' | 'UMUM' | 'Lain-lain';
   context: string;
   totalPrice: number;
   medicalRecordNumber?: string;

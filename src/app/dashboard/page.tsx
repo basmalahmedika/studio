@@ -48,15 +48,22 @@ export default function DashboardPage() {
       rjBpjs: 0,
       riUmum: 0,
       riBpjs: 0,
+      lainUmum: 0,
+      lainBpjs: 0,
+      lainLain: 0,
       revenueRjUmum: 0,
       revenueRjBpjs: 0,
       revenueRiUmum: 0,
       revenueRiBpjs: 0,
+      revenueLainUmum: 0,
+      revenueLainBpjs: 0,
+      revenueLainLain: 0,
     };
 
     filteredTransactions.forEach(t => {
       data.totalRevenue += t.totalPrice;
       data.totalTransactions += 1;
+      
       if (t.patientType === 'Rawat Jalan' && t.paymentMethod === 'UMUM') {
         data.rjUmum += 1;
         data.revenueRjUmum += t.totalPrice;
@@ -72,6 +79,18 @@ export default function DashboardPage() {
       if (t.patientType === 'Rawat Inap' && t.paymentMethod === 'BPJS') {
         data.riBpjs += 1;
         data.revenueRiBpjs += t.totalPrice;
+      }
+      if (t.patientType === 'Lain-lain' && t.paymentMethod === 'UMUM') {
+        data.lainUmum += 1;
+        data.revenueLainUmum += t.totalPrice;
+      }
+      if (t.patientType === 'Lain-lain' && t.paymentMethod === 'BPJS') {
+        data.lainBpjs += 1;
+        data.revenueLainBpjs += t.totalPrice;
+      }
+       if (t.patientType === 'Lain-lain' && t.paymentMethod === 'Lain-lain') {
+        data.lainLain += 1;
+        data.revenueLainLain += t.totalPrice;
       }
     });
 

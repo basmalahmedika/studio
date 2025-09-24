@@ -15,7 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 
-type PatientType = 'all' | 'Rawat Jalan' | 'Rawat Inap';
+type PatientType = 'all' | 'Rawat Jalan' | 'Rawat Inap' | 'Lain-lain';
+type PaymentMethod = 'UMUM' | 'BPJS' | 'Lain-lain';
 
 interface ItemUsageData {
   itemId: string;
@@ -30,7 +31,7 @@ const calculateUsageData = (
   inventory: any[],
   date: DateRange | undefined,
   patientType: PatientType,
-  paymentMethod: 'UMUM' | 'BPJS'
+  paymentMethod: PaymentMethod
 ): ItemUsageData[] => {
   const filteredTransactions = transactions.filter(t => {
     const transactionDate = new Date(t.date);
@@ -99,6 +100,11 @@ export default function ItemUsagePage() {
     [date, patientType, transactions, inventory]
   );
 
+  const itemUsageDataLain = React.useMemo(() => 
+    calculateUsageData(transactions, inventory, date, patientType, 'Lain-lain'),
+    [date, patientType, transactions, inventory]
+  );
+
   const handleExportData = () => {
     const wb = XLSX.utils.book_new();
 
@@ -118,6 +124,10 @@ export default function ItemUsagePage() {
     const wsBpjs = XLSX.utils.json_to_sheet(formatDataForExport(itemUsageDataBpjs));
     wsBpjs['!cols'] = [{ wch: 40 }, { wch: 15 }, { wch: 20 }, { wch: 15 }];
     XLSX.utils.book_append_sheet(wb, wsBpjs, 'Usage Report (BPJS)');
+
+    const wsLain = XLSX.utils.json_to_sheet(formatDataForExport(itemUsageDataLain));
+    wsLain['!cols'] = [{ wch: 40 }, { wch: 15 }, { wch: 20 }, { wch: 15 }];
+    XLSX.utils.book_append_sheet(wb, wsLain, 'Usage Report (Lain-lain)');
 
     XLSX.writeFile(wb, 'item_usage_report.xlsx');
   };
@@ -197,6 +207,7 @@ export default function ItemUsagePage() {
                 <SelectItem value="all">All Patient Types</SelectItem>
                 <SelectItem value="Rawat Jalan">Rawat Jalan</SelectItem>
                 <SelectItem value="Rawat Inap">Rawat Inap</SelectItem>
+                 <SelectItem value="Lain-lain">Lain-lain</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -206,6 +217,9 @@ export default function ItemUsagePage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ItemUsageTable title="Item Usage (UMUM)" data={itemUsageDataUmum} />
         <ItemUsageTable title="Item Usage (BPJS)" data={itemUsageDataBpjs} />
+      </div>
+       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+         <ItemUsageTable title="Item Usage (Lain-lain)" data={itemUsageDataLain} />
       </div>
     </div>
   );

@@ -66,8 +66,8 @@ const transactionSchema = z.object({
   id: z.string().optional(),
   date: z.date(),
   medicalRecordNumber: z.string().min(1, 'Medical record number is required'),
-  patientType: z.enum(['Rawat Jalan', 'Rawat Inap']),
-  paymentMethod: z.enum(['UMUM', 'BPJS']),
+  patientType: z.enum(['Rawat Jalan', 'Rawat Inap', 'Lain-lain']),
+  paymentMethod: z.enum(['UMUM', 'BPJS', 'Lain-lain']),
   items: z.array(z.object({
     itemId: z.string(),
     itemName: z.string(),
@@ -415,6 +415,7 @@ export function TransactionsDataTable() {
                                 <SelectContent>
                                     <SelectItem value="Rawat Jalan">Rawat Jalan</SelectItem>
                                     <SelectItem value="Rawat Inap">Rawat Inap</SelectItem>
+                                    <SelectItem value="Lain-lain">Lain-lain</SelectItem>
                                 </SelectContent>
                                 </Select>
                                 <FormMessage />
@@ -436,6 +437,7 @@ export function TransactionsDataTable() {
                                 <SelectContent>
                                     <SelectItem value="UMUM">UMUM</SelectItem>
                                     <SelectItem value="BPJS">BPJS</SelectItem>
+                                    <SelectItem value="Lain-lain">Lain-lain</SelectItem>
                                 </SelectContent>
                                 </Select>
                                 <FormMessage />
@@ -533,6 +535,7 @@ export function TransactionsDataTable() {
               <SelectItem value="all">All Patient Types</SelectItem>
               <SelectItem value="Rawat Jalan">Rawat Jalan</SelectItem>
               <SelectItem value="Rawat Inap">Rawat Inap</SelectItem>
+              <SelectItem value="Lain-lain">Lain-lain</SelectItem>
             </SelectContent>
           </Select>
           <Select
@@ -546,6 +549,7 @@ export function TransactionsDataTable() {
               <SelectItem value="all">All Payment Methods</SelectItem>
               <SelectItem value="BPJS">BPJS</SelectItem>
               <SelectItem value="UMUM">UMUM</SelectItem>
+              <SelectItem value="Lain-lain">Lain-lain</SelectItem>
             </SelectContent>
           </Select>
         </div>
