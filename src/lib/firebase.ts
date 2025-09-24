@@ -1,6 +1,5 @@
 
 import { initializeApp, getApp, getApps, type FirebaseApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDbiJ8FtbYrM9PECDiixI_GfrpxGrzbIxM",
@@ -13,7 +12,7 @@ const firebaseConfig = {
   measurementId: "G-3CPKM1FLKP"
 };
 
-function initializeFirebase(): FirebaseApp {
+export function initializeFirebase(): FirebaseApp {
   if (getApps().length === 0) {
     if (!firebaseConfig.apiKey) {
       throw new Error("Firebase configuration is missing or incomplete.");
@@ -22,8 +21,3 @@ function initializeFirebase(): FirebaseApp {
   }
   return getApp();
 }
-
-const app = initializeFirebase();
-const auth = getAuth(app);
-
-export { app, auth };
