@@ -72,6 +72,7 @@ export function ExpiringStockReport() {
     const dataToExport = expiringItems.map((item, index) => ({
       'No.': index + 1,
       'Nama Item': item.itemName,
+      'Sisa Stok': item.quantity,
       'Tanggal Kadaluarsa': item.expiredDate,
       'Sisa Waktu': item.timeLeft,
       'Status': item.zone,
@@ -84,6 +85,7 @@ export function ExpiringStockReport() {
     ws['!cols'] = [
         { wch: 5 }, 
         { wch: 30 },
+        { wch: 10 },
         { wch: 15 },
         { wch: 20 },
         { wch: 10 },
@@ -118,6 +120,7 @@ export function ExpiringStockReport() {
                 <TableRow>
                 <TableHead className="w-[50px]">No.</TableHead>
                 <TableHead>Item Name</TableHead>
+                <TableHead className="text-right">Sisa Stok</TableHead>
                 <TableHead>Expired Date</TableHead>
                 <TableHead>Sisa Waktu</TableHead>
                 <TableHead className="text-right">Status</TableHead>
@@ -128,6 +131,7 @@ export function ExpiringStockReport() {
                 <TableRow key={item.id}>
                     <TableCell>{index + 1}</TableCell>
                     <TableCell className="font-medium">{item.itemName}</TableCell>
+                    <TableCell className="text-right font-bold">{item.quantity}</TableCell>
                     <TableCell>{item.expiredDate}</TableCell>
                     <TableCell>{item.timeLeft}</TableCell>
                     <TableCell className="text-right">

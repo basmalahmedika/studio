@@ -134,6 +134,7 @@ export function TransactionsDataTable() {
               }
               
               if (cartItem.price !== newPrice) {
+                // Use `update` from useFieldArray to properly update the field
                 update(index, { ...cartItem, price: newPrice });
               }
           }
@@ -645,5 +646,3 @@ export function TransactionsDataTable() {
     </div>
   );
 }
-
-    
