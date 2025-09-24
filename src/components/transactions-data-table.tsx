@@ -183,8 +183,13 @@ export function TransactionsDataTable() {
 
      const itemsInTransaction = (transaction.items || []).map(item => {
         const inventoryItem = inventory.find(i => i.id === item.itemId);
+        // Correct price for BPJS on edit
+        const correctPrice = transaction.paymentMethod === 'BPJS' && inventoryItem
+          ? inventoryItem.purchasePrice
+          : item.price;
         return {
             ...item,
+            price: correctPrice,
             itemName: inventoryItem?.itemName || 'Unknown Item',
             stock: inventoryItem?.quantity || 0,
         };
@@ -280,11 +285,14 @@ export function TransactionsDataTable() {
         return t.items.map((item, itemIndex) => {
             const inventoryItem = inventory.find(inv => inv.id === item.itemId);
             const purchasePrice = inventoryItem?.purchasePrice || 0;
-            const margin = item.price - purchasePrice;
-            const subtotal = item.price * item.quantity;
+            // CORE FIX: Force selling price to be purchase price for BPJS transactions for display
+            const sellingPrice = t.paymentMethod === 'BPJS' ? purchasePrice : item.price;
+            const margin = sellingPrice - purchasePrice;
+            const subtotal = sellingPrice * item.quantity;
             return {
                 ...t,
                 ...item,
+                price: sellingPrice, // Use the corrected price
                 itemName: inventoryItem?.itemName || 'Unknown Item',
                 purchasePrice,
                 margin,
