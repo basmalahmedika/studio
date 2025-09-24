@@ -1,9 +1,10 @@
+
 'use client';
 
 import { usePathname } from 'next/navigation';
 import * as React from 'react';
 import Link from 'next/link';
-import { LayoutDashboard, ReceiptText, BarChart2, Boxes, Warehouse, FileText, Settings } from 'lucide-react';
+import { LayoutDashboard, ReceiptText, BarChart2, Boxes, Warehouse, FileText, Settings, ArrowRightLeft } from 'lucide-react';
 import {
   SidebarHeader,
   SidebarContent,
@@ -16,6 +17,7 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/transactions', label: 'Transactions', icon: ReceiptText },
   { href: '/dashboard/inventory', label: 'Inventory', icon: Warehouse },
+  { href: '/dashboard/item-usage', label: 'Item Usage', icon: ArrowRightLeft },
   { href: '/dashboard/analysis', label: 'Analysis', icon: BarChart2 },
   { href: '/dashboard/reports', label: 'Reports', icon: FileText },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
