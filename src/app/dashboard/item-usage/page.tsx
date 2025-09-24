@@ -8,7 +8,7 @@ import * as XLSX from 'xlsx';
 import { FileDown } from 'lucide-react';
 
 import { useAppContext } from '@/context/app-context';
-import type { Transaction } from '@/lib/types';
+import type { Transaction, InventoryItem } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DateRangePicker } from '@/components/date-range-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -28,7 +28,7 @@ interface ItemUsageData {
 
 const calculateUsageData = (
   transactions: Transaction[],
-  inventory: any[],
+  inventory: InventoryItem[],
   date: DateRange | undefined,
   patientType: PatientType,
   paymentMethod: PaymentMethod
@@ -57,10 +57,14 @@ const calculateUsageData = (
   filteredTransactions.forEach(t => {
     if (!t.items) return;
     t.items.forEach(item => {
-      const currentUsage = usageMap.get(item.itemId) || { totalStockOut: 0, totalNominal: 0 };
-      currentUsage.totalStockOut += item.quantity;
-      currentUsage.totalNominal += item.price * item.quantity;
-      usageMap.set(item.itemId, currentUsage);
+      const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+      if (inventoryItem) {
+        const currentUsage = usageMap.get(item.itemId) || { totalStockOut: 0, totalNominal: 0 };
+        currentUsage.totalStockOut += item.quantity;
+        // CORRECTED LOGIC: Always use purchasePrice from inventory for nominal calculation
+        currentUsage.totalNominal += inventoryItem.purchasePrice * item.quantity;
+        usageMap.set(item.itemId, currentUsage);
+      }
     });
   });
 
