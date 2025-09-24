@@ -3,27 +3,17 @@
 
 import type { ReactNode } from 'react';
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
 import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar';
 import SidebarNav from '@/components/layout/sidebar-nav';
 import Header from '@/components/layout/header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAppContext } from '@/context/app-context';
-import { useAuth } from '@/context/auth-context';
 
 
 function DashboardContent({ children }: { children: ReactNode }) {
   const { loading: appLoading } = useAppContext();
-  const { user, loading: authLoading } = useAuth();
-  const router = useRouter();
-
-  React.useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/auth/login');
-    }
-  }, [user, authLoading, router]);
-
-  if (appLoading || authLoading || !user) {
+  
+  if (appLoading) {
     return (
       <div className="flex flex-col min-h-screen">
         <Header />
