@@ -1,4 +1,6 @@
 
+'use client';
+
 import { ExpiringStockReport } from '@/components/expiring-stock-report';
 import { LowStockReport } from '@/components/low-stock-report';
 import { ProfitAnalysisReport } from '@/components/profit-analysis-report';
