@@ -33,7 +33,7 @@ const colorPresets = [
   {
     name: 'Default',
     colors: {
-      primaryColor: '#2563eb',
+      primaryColor: '#10b981',
       backgroundColor: '#f8fafc',
       accentColor: '#f59e0b',
       foregroundColor: '#1e293b',

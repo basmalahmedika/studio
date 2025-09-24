@@ -19,6 +19,7 @@ import type { Transaction, TransactionItem } from '@/lib/types';
 import { useAppContext } from '@/context/app-context';
 
 type AnalysisCategory = 'A' | 'B' | 'C';
+type ItemTypeFilter = 'all' | 'Obat' | 'Alkes';
 
 interface AnalyzedItem {
   name: string;
@@ -30,6 +31,7 @@ interface AnalyzedItem {
 
 interface AbcAnalysisProps {
   transactions: Transaction[];
+  itemTypeFilter: ItemTypeFilter;
 }
 
 const getCategory = (cumulativePercent: number): AnalysisCategory => {
@@ -42,7 +44,7 @@ const getCategory = (cumulativePercent: number): AnalysisCategory => {
   }
 };
 
-export function AbcAnalysis({ transactions }: AbcAnalysisProps) {
+export function AbcAnalysis({ transactions, itemTypeFilter }: AbcAnalysisProps) {
   const { inventory } = useAppContext();
   const [analyzedItems, setAnalyzedItems] = React.useState<AnalyzedItem[]>([]);
 
@@ -57,7 +59,7 @@ export function AbcAnalysis({ transactions }: AbcAnalysisProps) {
         if (t.items) {
             t.items.forEach((item: TransactionItem) => {
                 const inventoryItem = inventory.find(inv => inv.id === item.itemId);
-                if (inventoryItem) {
+                if (inventoryItem && (itemTypeFilter === 'all' || inventoryItem.itemType === itemTypeFilter)) {
                     const itemName = inventoryItem.itemName;
                     const itemValue = item.price * item.quantity;
                     acc[itemName] = (acc[itemName] || 0) + itemValue;
@@ -89,7 +91,7 @@ export function AbcAnalysis({ transactions }: AbcAnalysisProps) {
     });
     
     setAnalyzedItems(classifiedItems);
-  }, [transactions, inventory]);
+  }, [transactions, inventory, itemTypeFilter]);
 
   const getBadgeClass = (category: AnalysisCategory) => {
     switch (category) {

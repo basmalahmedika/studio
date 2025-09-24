@@ -3,13 +3,14 @@
 
 import * as React from 'react';
 import * as XLSX from 'xlsx';
-import { DollarSign, FileDown } from 'lucide-react';
+import { DollarSign, FileDown, Search } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { InventoryItem } from '@/lib/types';
+import { Input } from '@/components/ui/input';
 
 type ItemType = 'Obat' | 'Alkes';
 
@@ -24,12 +25,16 @@ interface PriceAnalysisItem {
 
 export function SupplierPriceAnalysis({ inventory }: { inventory: InventoryItem[] }) {
   const [activeTab, setActiveTab] = React.useState<ItemType>('Obat');
+  const [searchTerm, setSearchTerm] = React.useState('');
 
   const analysisData = React.useMemo(() => {
     const itemMap = new Map<string, { supplier: string; price: number }[]>();
     
     inventory
-      .filter(item => item.itemType === activeTab)
+      .filter(item => 
+        item.itemType === activeTab &&
+        item.itemName.toLowerCase().includes(searchTerm.toLowerCase())
+      )
       .forEach(item => {
         if (!itemMap.has(item.itemName)) {
           itemMap.set(item.itemName, []);
@@ -47,7 +52,7 @@ export function SupplierPriceAnalysis({ inventory }: { inventory: InventoryItem[
     });
 
     return result.sort((a, b) => a.itemName.localeCompare(b.itemName));
-  }, [inventory, activeTab]);
+  }, [inventory, activeTab, searchTerm]);
 
   const handleExportData = () => {
     const dataToExport = analysisData.flatMap(item => 
@@ -91,6 +96,18 @@ export function SupplierPriceAnalysis({ inventory }: { inventory: InventoryItem[
                 <FileDown className="mr-2 h-4 w-4" />
                 Export Excel
             </Button>
+        </div>
+        <div className="mt-4">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search by item name..."
+              className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         </div>
       </CardHeader>
       <CardContent>
