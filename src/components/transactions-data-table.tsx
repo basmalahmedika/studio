@@ -127,7 +127,7 @@ export function TransactionsDataTable() {
           const inventoryItem = inventory.find(i => i.id === cartItem.itemId);
           if (inventoryItem) {
               let newPrice: number;
-              if (paymentMethod === 'BPJS') {
+              if (paymentMethod === 'BPJS' || paymentMethod === 'Lain-lain') {
                   newPrice = inventoryItem.purchasePrice;
               } else {
                   newPrice = patientType === 'Rawat Inap' ? inventoryItem.sellingPriceRI : inventoryItem.sellingPriceRJ;
@@ -183,8 +183,7 @@ export function TransactionsDataTable() {
 
      const itemsInTransaction = (transaction.items || []).map(item => {
         const inventoryItem = inventory.find(i => i.id === item.itemId);
-        // Correct price for BPJS on edit
-        const correctPrice = transaction.paymentMethod === 'BPJS' && inventoryItem
+        const correctPrice = (transaction.paymentMethod === 'BPJS' || transaction.paymentMethod === 'Lain-lain') && inventoryItem
           ? inventoryItem.purchasePrice
           : item.price;
         return {
@@ -237,7 +236,7 @@ export function TransactionsDataTable() {
     
     if (item && !watchedItems.some(i => i.itemId === item.id)) {
        let price;
-       if (paymentMethodValue === 'BPJS') {
+       if (paymentMethodValue === 'BPJS' || paymentMethodValue === 'Lain-lain') {
            price = item.purchasePrice;
        } else {
            price = patientTypeValue === 'Rawat Inap' ? item.sellingPriceRI : item.sellingPriceRJ;
@@ -285,8 +284,7 @@ export function TransactionsDataTable() {
         return t.items.map((item, itemIndex) => {
             const inventoryItem = inventory.find(inv => inv.id === item.itemId);
             const purchasePrice = inventoryItem?.purchasePrice || 0;
-            // CORE FIX: Force selling price to be purchase price for BPJS transactions for display
-            const sellingPrice = t.paymentMethod === 'BPJS' ? purchasePrice : item.price;
+            const sellingPrice = (t.paymentMethod === 'BPJS' || t.paymentMethod === 'Lain-lain') ? purchasePrice : item.price;
             const margin = sellingPrice - purchasePrice;
             const subtotal = sellingPrice * item.quantity;
             return {
@@ -588,7 +586,7 @@ export function TransactionsDataTable() {
                         <TableCell rowSpan={d.items?.length}>{d.medicalRecordNumber}</TableCell>
                         <TableCell rowSpan={d.items?.length}>
                             <div>{d.patientType}</div>
-                            <Badge variant={d.paymentMethod === 'BPJS' ? 'secondary' : 'outline'}>
+                            <Badge variant={(d.paymentMethod === 'BPJS' || d.paymentMethod === 'Lain-lain') ? 'secondary' : 'outline'}>
                                 {d.paymentMethod}
                             </Badge>
                         </TableCell>

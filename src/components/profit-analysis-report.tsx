@@ -74,8 +74,8 @@ export function ProfitAnalysisReport() {
       t.items.forEach(item => {
         const inventoryItem = inventory.find(inv => inv.id === item.itemId);
         if (inventoryItem) {
-          // BUG FIX: For BPJS, revenue must be calculated from purchase price, not stored price.
-          const itemRevenue = t.paymentMethod === 'BPJS'
+          // For BPJS or Lain-lain, revenue must be calculated from purchase price.
+          const itemRevenue = (t.paymentMethod === 'BPJS' || t.paymentMethod === 'Lain-lain')
             ? inventoryItem.purchasePrice * item.quantity
             : item.price * item.quantity;
 
