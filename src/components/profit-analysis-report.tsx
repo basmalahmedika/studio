@@ -74,7 +74,11 @@ export function ProfitAnalysisReport() {
       t.items.forEach(item => {
         const inventoryItem = inventory.find(inv => inv.id === item.itemId);
         if (inventoryItem) {
-          const itemRevenue = item.price * item.quantity;
+          // BUG FIX: For BPJS, revenue must be calculated from purchase price, not stored price.
+          const itemRevenue = t.paymentMethod === 'BPJS'
+            ? inventoryItem.purchasePrice * item.quantity
+            : item.price * item.quantity;
+
           const itemCost = inventoryItem.purchasePrice * item.quantity;
           const itemProfit = itemRevenue - itemCost;
           
@@ -281,5 +285,3 @@ export function ProfitAnalysisReport() {
     </Card>
   );
 }
-
-    
