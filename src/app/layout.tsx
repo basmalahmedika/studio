@@ -2,6 +2,7 @@
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { AppWrapper } from '@/components/app-wrapper';
+import { AuthProvider } from '@/context/auth-context';
 
 export default function RootLayout({
   children,
@@ -19,7 +20,9 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased">
         <AppWrapper>
-          {children}
+          <AuthProvider>
+            {children}
+          </AuthProvider>
         </AppWrapper>
         <Toaster />
       </body>
