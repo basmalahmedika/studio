@@ -134,7 +134,6 @@ export function TransactionsDataTable() {
               }
               
               if (cartItem.price !== newPrice) {
-                // Use `update` from useFieldArray to properly update the field
                 update(index, { ...cartItem, price: newPrice });
               }
           }
@@ -274,7 +273,7 @@ export function TransactionsDataTable() {
       return nameMatch && patientTypeMatch && paymentMethodMatch;
     });
 
-    return filteredTransactions.flatMap((t, transactionIndex) => {
+    return filteredTransactions.flatMap((t) => {
         if (!t.items || t.items.length === 0) {
             return []; // Skip transactions with no items
         }
