@@ -1,3 +1,6 @@
+
+'use client';
+
 import { TransactionsDataTable } from "@/components/transactions-data-table";
 
 export default function TransactionsPage() {
