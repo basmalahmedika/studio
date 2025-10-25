@@ -3,12 +3,12 @@
 
 import * as React from 'react';
 import type { DateRange } from 'react-day-picker';
-import { startOfMonth } from 'date-fns';
+import { startOfMonth, differenceInDays, subDays } from 'date-fns';
 import { AbcAnalysis } from '@/components/abc-analysis';
 import { SalesTrendsChart } from '@/components/sales-trends-chart';
 import { SupplierPriceAnalysis } from '@/components/supplier-price-analysis';
 import { useAppContext } from '@/context/app-context';
-import type { Transaction, InventoryItem } from '@/lib/types';
+import type { Transaction, InventoryItem, SalesData } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { DateRangePicker } from '@/components/date-range-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -16,6 +16,42 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 type PatientType = 'all' | 'Rawat Jalan' | 'Rawat Inap' | 'Lain-lain';
 type PaymentMethod = 'all' | 'UMUM' | 'BPJS' | 'Lain-lain';
 type ItemTypeFilter = 'all' | 'Obat' | 'Alkes';
+
+const filterTransactionsByDate = (transactions: Transaction[], dateRange: DateRange | undefined) => {
+  if (!dateRange || !dateRange.from || !dateRange.to) return transactions;
+  
+  return transactions.filter(t => {
+      const transactionDate = new Date(t.date);
+      transactionDate.setHours(0, 0, 0, 0);
+      const fromDate = new Date(dateRange.from!);
+      fromDate.setHours(0, 0, 0, 0);
+      const toDate = new Date(dateRange.to!);
+      toDate.setHours(0, 0, 0, 0);
+      return transactionDate >= fromDate && transactionDate <= toDate;
+  });
+};
+
+const calculateMonthlySales = (
+    transactions: Transaction[], 
+    inventory: InventoryItem[], 
+    itemType: ItemTypeFilter
+): Record<string, number> => {
+    const sales: Record<string, number> = {};
+    transactions.forEach(t => {
+      const month = new Date(t.date).toLocaleString('default', { month: 'short', year: 'numeric' });
+      let monthTotal = 0;
+      
+      t.items?.forEach(item => {
+        const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+        if (itemType === 'all' || (inventoryItem && inventoryItem.itemType === itemType)) {
+          monthTotal += t.totalPrice;
+        }
+      });
+      sales[month] = (sales[month] || 0) + monthTotal;
+    });
+    return sales;
+};
+
 
 export default function AnalysisPage() {
   const { transactions, inventory } = useAppContext();
@@ -29,21 +65,8 @@ export default function AnalysisPage() {
   const [filteredTransactions, setFilteredTransactions] = React.useState<Transaction[]>([]);
 
   React.useEffect(() => {
-    const filtered = transactions.filter(t => {
-      const transactionDate = new Date(t.date);
-      // Set time to 0 to compare dates only
-      transactionDate.setHours(0, 0, 0, 0);
-
-      const fromDate = date?.from ? new Date(date.from) : null;
-      if (fromDate) fromDate.setHours(0, 0, 0, 0);
-      
-      const toDate = date?.to ? new Date(date.to) : null;
-      if (toDate) toDate.setHours(0, 0, 0, 0);
-
-      const isDateInRange = fromDate && toDate 
-        ? transactionDate >= fromDate && transactionDate <= toDate 
-        : true;
-      
+    const dateFiltered = filterTransactionsByDate(transactions, date);
+    const finalFiltered = dateFiltered.filter(t => {
       const isPatientTypeMatch = patientType === 'all' || t.patientType === patientType;
       const isPaymentMethodMatch = paymentMethod === 'all' || t.paymentMethod === paymentMethod;
       
@@ -52,32 +75,46 @@ export default function AnalysisPage() {
           const inventoryItem = inventory.find(inv => inv.id === item.itemId);
           return inventoryItem?.itemType === itemType;
         });
-        return isDateInRange && isPatientTypeMatch && isPaymentMethodMatch && hasMatchingItem;
+        return isPatientTypeMatch && isPaymentMethodMatch && hasMatchingItem;
       }
       
-      return isDateInRange && isPatientTypeMatch && isPaymentMethodMatch;
+      return isPatientTypeMatch && isPaymentMethodMatch;
     });
-    setFilteredTransactions(filtered);
+    setFilteredTransactions(finalFiltered);
   }, [date, patientType, paymentMethod, itemType, transactions, inventory]);
+  
+  const salesComparisonData = React.useMemo(() => {
+    if (!date?.from || !date.to) return [];
 
-  const salesByMonth = React.useMemo(() => {
-    const sales: Record<string, number> = {};
-    filteredTransactions.forEach(t => {
-      const month = new Date(t.date).toLocaleString('default', { month: 'short', year: 'numeric' });
-      let monthTotal = 0;
-      
-      t.items?.forEach(item => {
-        const inventoryItem = inventory.find(inv => inv.id === item.itemId);
-        if (itemType === 'all' || (inventoryItem && inventoryItem.itemType === itemType)) {
-          monthTotal += t.totalPrice;
-        }
+    // Calculate previous period
+    const duration = differenceInDays(date.to, date.from);
+    const prevDate = {
+      from: subDays(date.from, duration + 1),
+      to: subDays(date.to, duration + 1),
+    };
+
+    const currentPeriodTransactions = filterTransactionsByDate(filteredTransactions, date);
+    const previousPeriodTransactions = filterTransactionsByDate(transactions, prevDate)
+      .filter(t => {
+        const isPatientTypeMatch = patientType === 'all' || t.patientType === patientType;
+        const isPaymentMethodMatch = paymentMethod === 'all' || t.paymentMethod === paymentMethod;
+        return isPatientTypeMatch && isPaymentMethodMatch;
       });
-      sales[month] = (sales[month] || 0) + monthTotal;
-    });
 
-    const sortedMonths = Object.keys(sales).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-    return sortedMonths.map(month => ({ name: month, total: sales[month] }));
-  }, [filteredTransactions, inventory, itemType]);
+    const currentSales = calculateMonthlySales(currentPeriodTransactions, inventory, itemType);
+    const previousSales = calculateMonthlySales(previousPeriodTransactions, inventory, itemType);
+    
+    const allMonths = new Set([...Object.keys(currentSales), ...Object.keys(previousSales)]);
+    
+    const sortedMonths = Array.from(allMonths).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+
+    return sortedMonths.map(month => ({
+      name: month,
+      current: currentSales[month] || 0,
+      previous: previousSales[month] || 0,
+    }));
+  }, [date, filteredTransactions, transactions, inventory, itemType, patientType, paymentMethod]);
+
 
   return (
     <div className="space-y-6">
@@ -130,7 +167,7 @@ export default function AnalysisPage() {
 
       <div className="grid gap-6">
         <AbcAnalysis transactions={filteredTransactions} itemTypeFilter={itemType} />
-        <SalesTrendsChart data={salesByMonth} />
+        <SalesTrendsChart data={salesComparisonData} />
         <SupplierPriceAnalysis inventory={inventory} />
       </div>
     </div>

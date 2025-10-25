@@ -1,22 +1,31 @@
 
 'use client';
 
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   ChartContainer,
   ChartTooltipContent,
 } from '@/components/ui/chart';
-import type { SalesData } from '@/lib/types';
+
+interface SalesComparisonData {
+  name: string;
+  current: number;
+  previous: number;
+}
 
 interface SalesTrendsChartProps {
-  data: SalesData[];
+  data: SalesComparisonData[];
 }
 
 const chartConfig = {
-  total: {
-    label: 'Penjualan',
+  current: {
+    label: 'Periode Ini',
     color: 'hsl(var(--primary))',
+  },
+  previous: {
+    label: 'Periode Sebelumnya',
+    color: 'hsl(var(--secondary))',
   },
 };
 
@@ -25,7 +34,7 @@ export function SalesTrendsChart({ data }: SalesTrendsChartProps) {
     <Card>
       <CardHeader>
         <CardTitle>Tren Penjualan</CardTitle>
-        <CardDescription>Kinerja penjualan bulanan</CardDescription>
+        <CardDescription>Perbandingan kinerja penjualan dengan periode sebelumnya.</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
@@ -44,11 +53,21 @@ export function SalesTrendsChart({ data }: SalesTrendsChartProps) {
               <Tooltip
                 cursor={false}
                 content={<ChartTooltipContent 
-                  formatter={(value) => `Rp ${Number(value).toLocaleString('id-ID')}`} 
+                  formatter={(value, name) => {
+                    const label = name === 'current' ? 'Periode Ini' : 'Periode Sebelumnya';
+                    return (
+                        <div className="flex flex-col">
+                            <span>{label}</span>
+                            <span className="font-bold">Rp {Number(value).toLocaleString('id-ID')}</span>
+                        </div>
+                    )
+                  }}
                   indicator="dot" 
                  />}
               />
-              <Bar dataKey="total" fill="var(--color-total)" radius={4} />
+              <Legend />
+              <Bar dataKey="previous" fill="var(--color-previous)" radius={4} />
+              <Bar dataKey="current" fill="var(--color-current)" radius={4} />
             </BarChart>
         </ChartContainer>
       </CardContent>

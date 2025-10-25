@@ -46,5 +46,4 @@ export type InventoryItem = {
   expiredDate: string;
   supplier: string;
 };
-
     
