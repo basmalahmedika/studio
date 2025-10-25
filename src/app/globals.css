@@ -27,11 +27,11 @@ body {
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 142.1 76.2% 36.3%;
-    --chart-1: 142 71% 47%;
-    --chart-2: 38 92% 50%;
-    --chart-3: 200 80% 50%;
-    --chart-4: 30 80% 55%;
-    --chart-5: 280 65% 60%;
+    --chart-1: 142 71% 47%; /* green */
+    --chart-2: 221 83% 53%; /* blue */
+    --chart-3: 0 84% 60%; /* red */
+    --chart-4: 48 96% 50%; /* yellow */
+    --chart-5: 330 80% 55%; /* pink/purple */
     --radius: 0.5rem;
     --sidebar-background: 222 47% 11%;
     --sidebar-foreground: 210 40% 98%;
@@ -44,30 +44,30 @@ body {
   }
 
   .dark {
-    --background: 222 47% 11%;
+    --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
-    --card: 224 71% 4%;
+    --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;
-    --popover: 224 71% 4%;
+    --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
-    --primary: 142 71% 47%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 217 33% 17%;
+    --primary: 142.1 76.2% 36.3%;
+    --primary-foreground: 355.7 100% 97.3%;
+    --secondary: 217 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 21% 51%;
-    --accent: 217 33% 17%;
+    --muted: 217 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217 32.6% 17.5%;
     --accent-foreground: 210 40% 98%;
-    --destructive: 0 63% 31%;
+    --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 142 71% 47%;
+    --border: 217 32.6% 17.5%;
+    --input: 217 32.6% 17.5%;
+    --ring: 142.1 76.2% 36.3%;
     --chart-1: 142 71% 47%;
-    --chart-2: 38 92% 50%;
-    --chart-3: 200 80% 50%;
-    --chart-4: 30 80% 55%;
-    --chart-5: 280 65% 60%;
+    --chart-2: 221 83% 53%;
+    --chart-3: 0 84% 60%;
+    --chart-4: 48 96% 50%;
+    --chart-5: 330 80% 55%;
     --sidebar-background: 222 47% 11%;
     --sidebar-foreground: 210 40% 98%;
     --sidebar-primary: 142 71% 47%;

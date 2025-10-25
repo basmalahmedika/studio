@@ -56,8 +56,13 @@ const calculateStats = (transactions: Transaction[], inventory: InventoryItem[])
       }
     };
 
+    const uniqueTransactionIds = new Set<string>();
+
     transactions.forEach(t => {
-      stats.totalTransactions += 1;
+      if (!uniqueTransactionIds.has(t.id)) {
+        stats.totalTransactions += 1;
+        uniqueTransactionIds.add(t.id);
+      }
       
       const isRJ = t.patientType === 'Rawat Jalan';
       const isRI = t.patientType === 'Rawat Inap';
@@ -111,22 +116,26 @@ export default function DashboardPage() {
     expenditureChartData,
     categoryChartDataRJ,
     categoryChartDataRI,
+    totalCurrentRevenue,
+    totalPreviousRevenue,
+    totalCurrentExpenditure,
+    totalPreviousExpenditure
   } = React.useMemo(() => {
     const filterTransactions = (range: DateRange | undefined): Transaction[] => {
+        if (!range || !range.from || !range.to) return [];
         return transactions.filter(t => {
             const transactionDate = new Date(t.date);
             transactionDate.setHours(0, 0, 0, 0);
-            const fromDate = range?.from ? new Date(range.from) : null;
-            if (fromDate) fromDate.setHours(0, 0, 0, 0);
-            const toDate = range?.to ? new Date(range.to) : null;
-            if (toDate) toDate.setHours(0, 0, 0, 0);
-            return fromDate && toDate ? transactionDate >= fromDate && transactionDate <= toDate : true;
+            const fromDate = new Date(range.from!);
+            fromDate.setHours(0, 0, 0, 0);
+            const toDate = new Date(range.to!);
+            toDate.setHours(0, 0, 0, 0);
+            return transactionDate >= fromDate && transactionDate <= toDate;
         });
     };
 
     const currentFiltered = filterTransactions(date);
     
-    // Calculate previous period
     const duration = date?.from && date.to ? differenceInDays(date.to, date.from) : 30;
     const prevDate = {
       from: date?.from ? subDays(date.from, duration + 1) : subDays(new Date(), (duration * 2) + 1),
@@ -137,33 +146,26 @@ export default function DashboardPage() {
     const currentStats = calculateStats(currentFiltered, inventory);
     const previousStats = calculateStats(previousFiltered, inventory);
 
-    // Monthly Trend Chart Data
-    const monthlyRevenue: Record<string, number> = {};
-    const monthlyExpenditure: Record<string, number> = {};
-    
-    currentFiltered.forEach(t => {
+    const calculateMonthlyData = (trans: Transaction[], type: 'revenue' | 'expenditure') => {
+      const monthlyData: Record<string, number> = {};
+      trans.forEach(t => {
         const month = new Date(t.date).toLocaleString('default', { month: 'short', year: 'numeric' });
-        if (t.paymentMethod === 'UMUM') {
-            monthlyRevenue[month] = (monthlyRevenue[month] || 0) + t.totalPrice;
-        } else {
-             let transactionCost = 0;
-            t.items?.forEach(item => {
-              const inventoryItem = inventory.find(inv => inv.id === item.itemId);
-              transactionCost += (inventoryItem?.purchasePrice || 0) * item.quantity;
-            });
-            monthlyExpenditure[month] = (monthlyExpenditure[month] || 0) + transactionCost;
+        if (type === 'revenue' && t.paymentMethod === 'UMUM') {
+          monthlyData[month] = (monthlyData[month] || 0) + t.totalPrice;
+        } else if (type === 'expenditure' && t.paymentMethod !== 'UMUM') {
+          let transactionCost = 0;
+          t.items?.forEach(item => {
+            const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+            transactionCost += (inventoryItem?.purchasePrice || 0) * item.quantity;
+          });
+          monthlyData[month] = (monthlyData[month] || 0) + transactionCost;
         }
-    });
-    
-    const revenueData = Object.entries(monthlyRevenue)
-      .map(([name, total]) => ({ name, total }))
-      .sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime());
+      });
+      return Object.entries(monthlyData)
+        .map(([name, total]) => ({ name, total }))
+        .sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime());
+    }
 
-    const expenditureData = Object.entries(monthlyExpenditure)
-      .map(([name, total]) => ({ name, total }))
-      .sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime());
-
-    // Category Breakdown Chart Data
     const rjData = [
         { name: 'Periode Ini', umum: currentStats.categoryBreakdown.rjUmum, bpjs: currentStats.categoryBreakdown.rjBpjs },
         { name: 'Periode Lalu', umum: previousStats.categoryBreakdown.rjUmum, bpjs: previousStats.categoryBreakdown.rjBpjs }
@@ -175,10 +177,14 @@ export default function DashboardPage() {
       
     return {
         filteredTransactions: currentFiltered,
-        revenueChartData: revenueData,
-        expenditureChartData: expenditureData,
+        revenueChartData: calculateMonthlyData(currentFiltered, 'revenue'),
+        expenditureChartData: calculateMonthlyData(currentFiltered, 'expenditure'),
         categoryChartDataRJ: rjData,
-        categoryChartDataRI: riData
+        categoryChartDataRI: riData,
+        totalCurrentRevenue: currentStats.totalRevenue,
+        totalPreviousRevenue: previousStats.totalRevenue,
+        totalCurrentExpenditure: currentStats.totalExpenditure,
+        totalPreviousExpenditure: previousStats.totalExpenditure,
     };
 
   }, [date, transactions, inventory]);
@@ -249,6 +255,8 @@ export default function DashboardPage() {
             data={revenueChartData}
             dataKey="total"
             chartColor="hsl(var(--chart-1))"
+            totalCurrent={totalCurrentRevenue}
+            totalPrevious={totalPreviousRevenue}
         />
         <MonthlyTrendChart 
             title="Grafik Pengeluaran"
@@ -256,6 +264,8 @@ export default function DashboardPage() {
             data={expenditureChartData}
             dataKey="total"
             chartColor="hsl(var(--chart-2))"
+            totalCurrent={totalCurrentExpenditure}
+            totalPrevious={totalPreviousExpenditure}
         />
       </div>
 

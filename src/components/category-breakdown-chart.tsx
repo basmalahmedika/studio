@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 
 interface BreakdownData {
-  name: string; // 'Periode Ini' | 'Periode Lalu'
+  name: string; 
   umum: number;
   bpjs: number;
 }
@@ -19,16 +19,21 @@ interface CategoryBreakdownChartProps {
 
 const chartConfig = {
   umum: {
-    label: 'Pendapatan (UMUM)',
+    label: 'UMUM',
     color: 'hsl(var(--chart-1))',
   },
   bpjs: {
-    label: 'Pengeluaran (BPJS)',
+    label: 'BPJS',
     color: 'hsl(var(--chart-2))',
   },
 };
 
 export function CategoryBreakdownChart({ title, description, data }: CategoryBreakdownChartProps) {
+  const customData = data.map(item => ({
+    ...item,
+    name: item.name === 'Periode Ini' ? 'Bulan Ini' : 'Bulan Lalu'
+  }))
+
   return (
     <Card>
       <CardHeader>
@@ -37,7 +42,7 @@ export function CategoryBreakdownChart({ title, description, data }: CategoryBre
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
-          <BarChart data={data} accessibilityLayer>
+          <BarChart data={customData} accessibilityLayer>
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey="name"
