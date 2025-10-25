@@ -31,10 +31,16 @@ interface CategoryBreakdown {
   riBpjs: number;
 }
 
+interface TransactionCounts {
+  rjUmum: number;
+  rjBpjs: number;
+  riUmum: number;
+  riBpjs: number;
+}
+
 interface AllStats {
   totalRevenue: number;
-  totalTransactionsRJ: number;
-  totalTransactionsRI: number;
+  transactionCounts: TransactionCounts;
   details: DetailedStats;
   categoryBreakdown: CategoryBreakdown;
   totalExpenditure: number; 
@@ -43,8 +49,12 @@ interface AllStats {
 const calculateStats = (transactions: Transaction[], inventory: InventoryItem[]): AllStats => {
     const stats: AllStats = {
       totalRevenue: 0,
-      totalTransactionsRJ: 0,
-      totalTransactionsRI: 0,
+      transactionCounts: {
+        rjUmum: 0,
+        rjBpjs: 0,
+        riUmum: 0,
+        riBpjs: 0,
+      },
       details: {
         revenueRJ: 0,
         revenueRI: 0,
@@ -63,11 +73,14 @@ const calculateStats = (transactions: Transaction[], inventory: InventoryItem[])
     const uniqueTransactionIds = new Set<string>();
 
     transactions.forEach(t => {
+      // Count transactions based on type and payment method
       if (!uniqueTransactionIds.has(t.id)) {
          if (t.patientType === 'Rawat Jalan') {
-            stats.totalTransactionsRJ += 1;
+            if (t.paymentMethod === 'UMUM') stats.transactionCounts.rjUmum += 1;
+            else if (t.paymentMethod === 'BPJS') stats.transactionCounts.rjBpjs += 1;
          } else if (t.patientType === 'Rawat Inap') {
-            stats.totalTransactionsRI += 1;
+            if (t.paymentMethod === 'UMUM') stats.transactionCounts.riUmum += 1;
+            else if (t.paymentMethod === 'BPJS') stats.transactionCounts.riBpjs += 1;
          }
         uniqueTransactionIds.add(t.id);
       }
@@ -245,36 +258,12 @@ export default function DashboardPage() {
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Total Pendapatan"
+          title="Total Pendapatan (UMUM)"
           value={formatCurrency(currentPeriodStats.totalRevenue)}
           icon={DollarSign}
-          description="Total dari penjualan UMUM"
+          description="Total dari semua penjualan UMUM"
           className="bg-green-600/90 text-white"
         />
-        <StatCard
-          title="Total Transaksi RJ"
-          value={currentPeriodStats.totalTransactionsRJ.toString()}
-          icon={ReceiptText}
-          description="Jml. transaksi Rawat Jalan (UMUM & BPJS)"
-          className="bg-blue-600/90 text-white"
-        />
-        <StatCard
-          title="Total Transaksi RI"
-          value={currentPeriodStats.totalTransactionsRI.toString()}
-          icon={ReceiptText}
-          description="Jml. transaksi Rawat Inap (UMUM & BPJS)"
-          className="bg-blue-600/90 text-white"
-        />
-         <StatCard
-          title="Total Pengeluaran"
-          value={formatCurrency(currentPeriodStats.totalExpenditure)}
-          icon={Stethoscope}
-          description="Pengeluaran untuk pasien BPJS & Lain-lain"
-          className="bg-orange-500/90 text-white"
-        />
-      </div>
-
-       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Pendapatan RJ (UMUM)"
           value={formatCurrency(currentPeriodStats.details.revenueRJ)}
@@ -290,18 +279,42 @@ export default function DashboardPage() {
           className="bg-green-600/90 text-white"
         />
          <StatCard
-          title="Pengeluaran RJ (BPJS)"
-          value={formatCurrency(currentPeriodStats.details.expenditureRJ)}
+          title="Total Pengeluaran (Non-UMUM)"
+          value={formatCurrency(currentPeriodStats.totalExpenditure)}
           icon={Stethoscope}
-          description="Pengeluaran untuk pasien Rawat Jalan BPJS"
+          description="Pengeluaran untuk pasien BPJS & Lain-lain"
           className="bg-orange-500/90 text-white"
         />
+      </div>
+
+       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="Transaksi RJ (UMUM)"
+          value={currentPeriodStats.transactionCounts.rjUmum.toString()}
+          icon={ReceiptText}
+          description="Jml. transaksi Rawat Jalan UMUM"
+          className="bg-blue-600/90 text-white"
+        />
          <StatCard
-          title="Pengeluaran RI (BPJS)"
-          value={formatCurrency(currentPeriodStats.details.expenditureRI)}
-          icon={Stethoscope}
-          description="Pengeluaran untuk pasien Rawat Inap BPJS"
-          className="bg-orange-500/90 text-white"
+          title="Transaksi RJ (BPJS)"
+          value={currentPeriodStats.transactionCounts.rjBpjs.toString()}
+          icon={ReceiptText}
+          description="Jml. transaksi Rawat Jalan BPJS"
+          className="bg-blue-600/90 text-white"
+        />
+        <StatCard
+          title="Transaksi RI (UMUM)"
+          value={currentPeriodStats.transactionCounts.riUmum.toString()}
+          icon={ReceiptText}
+          description="Jml. transaksi Rawat Inap UMUM"
+          className="bg-blue-600/90 text-white"
+        />
+         <StatCard
+          title="Transaksi RI (BPJS)"
+          value={currentPeriodStats.transactionCounts.riBpjs.toString()}
+          icon={ReceiptText}
+          description="Jml. transaksi Rawat Inap BPJS"
+          className="bg-blue-600/90 text-white"
         />
       </div>
 
@@ -363,4 +376,5 @@ export default function DashboardPage() {
       </div>
     </div>
   );
-}
+
+    
