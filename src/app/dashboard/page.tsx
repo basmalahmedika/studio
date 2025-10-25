@@ -4,20 +4,21 @@
 import * as React from 'react';
 import type { DateRange } from 'react-day-picker';
 import { startOfMonth, subDays, differenceInDays } from 'date-fns';
-import { DollarSign, ReceiptText, Users, Pill, Stethoscope, ArrowUp, ArrowDown } from 'lucide-react';
+import { DollarSign, ReceiptText, Users, Pill, Stethoscope } from 'lucide-react';
+
 import { StatCard } from '@/components/stat-card';
 import { RecentTransactions } from '@/components/recent-transactions';
 import { TopSellingItems } from '@/components/top-selling-items';
 import { DateRangePicker } from '@/components/date-range-picker';
 import { useAppContext } from '@/context/app-context';
 import type { Transaction } from '@/lib/types';
-import { MonthlyRevenueChart } from '@/components/monthly-revenue-chart';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
+import { MonthlyTrendChart } from '@/components/monthly-trend-chart';
+import { CategoryAnalysisChart } from '@/components/category-analysis-chart';
+import { TopBpjsExpenditures } from '@/components/top-bpjs-expenditures';
 
 interface DetailedStats {
   revenue: number;
+  expenditure: number;
   transactions: number;
 }
 
@@ -34,31 +35,26 @@ const calculateStats = (transactions: Transaction[]): AllStats => {
       totalExpenditure: 0,
       totalTransactions: 0,
       details: {
-        'Rawat Jalan-UMUM': { revenue: 0, transactions: 0 },
-        'Rawat Jalan-BPJS': { revenue: 0, transactions: 0 },
-        'Rawat Jalan-Lain-lain': { revenue: 0, transactions: 0 },
-        'Rawat Inap-UMUM': { revenue: 0, transactions: 0 },
-        'Rawat Inap-BPJS': { revenue: 0, transactions: 0 },
-        'Rawat Inap-Lain-lain': { revenue: 0, transactions: 0 },
-        'Lain-lain-UMUM': { revenue: 0, transactions: 0 },
-        'Lain-lain-BPJS': { revenue: 0, transactions: 0 },
-        'Lain-lain-Lain-lain': { revenue: 0, transactions: 0 },
+        'Rawat Jalan': { revenue: 0, expenditure: 0, transactions: 0 },
+        'Rawat Inap': { revenue: 0, expenditure: 0, transactions: 0 },
+        'Lain-lain': { revenue: 0, expenditure: 0, transactions: 0 },
       },
     };
 
     transactions.forEach(t => {
       stats.totalTransactions += 1;
-      const key = `${t.patientType}-${t.paymentMethod}`;
+      const key = t.patientType;
       
       if (stats.details[key]) {
         stats.details[key].transactions += 1;
-        stats.details[key].revenue += t.totalPrice;
       }
       
       if (t.paymentMethod === 'UMUM') {
         stats.totalRevenue += t.totalPrice;
+        if(stats.details[key]) stats.details[key].revenue += t.totalPrice;
       } else {
         stats.totalExpenditure += t.totalPrice;
+        if(stats.details[key]) stats.details[key].expenditure += t.totalPrice;
       }
     });
 
@@ -67,24 +63,6 @@ const calculateStats = (transactions: Transaction[]): AllStats => {
 
 const formatCurrency = (value: number) => `Rp ${value.toLocaleString('id-ID')}`;
 
-const PercentageChange = ({ change }: { change: number }) => {
-  if (isNaN(change) || !isFinite(change)) {
-    return <span className="text-xs text-muted-foreground">N/A</span>;
-  }
-  const isIncrease = change > 0;
-  const isDecrease = change < 0;
-  const color = isIncrease ? 'text-green-600' : isDecrease ? 'text-red-600' : 'text-muted-foreground';
-  const Icon = isIncrease ? ArrowUp : ArrowDown;
-
-  return (
-    <span className={`flex items-center text-xs font-semibold ${color}`}>
-      {isIncrease || isDecrease ? <Icon className="h-3 w-3 mr-1" /> : null}
-      {Math.abs(change).toFixed(1)}%
-    </span>
-  );
-};
-
-
 export default function DashboardPage() {
   const { transactions, inventory } = useAppContext();
 
@@ -92,10 +70,10 @@ export default function DashboardPage() {
     from: startOfMonth(new Date()),
     to: new Date(),
   });
-
-  const { currentPeriodStats, previousPeriodStats, chartData, topBpjsExpenditures } = React.useMemo(() => {
-    const filterAndCalcStats = (range: DateRange | undefined): { stats: AllStats; filtered: Transaction[] } => {
-        const filtered = transactions.filter(t => {
+  
+  const { filteredTransactions, currentPeriodStats, revenueChartData, expenditureChartData, categoryChartData } = React.useMemo(() => {
+    const filterTransactions = (range: DateRange | undefined): Transaction[] => {
+        return transactions.filter(t => {
             const transactionDate = new Date(t.date);
             transactionDate.setHours(0, 0, 0, 0);
             const fromDate = range?.from ? new Date(range.from) : null;
@@ -104,67 +82,48 @@ export default function DashboardPage() {
             if (toDate) toDate.setHours(0, 0, 0, 0);
             return fromDate && toDate ? transactionDate >= fromDate && transactionDate <= toDate : true;
         });
-        return { stats: calculateStats(filtered), filtered };
     };
 
-    const current = filterAndCalcStats(date);
+    const currentFiltered = filterTransactions(date);
+    const currentStats = calculateStats(currentFiltered);
 
-    const prevDate = date?.from && date.to ? {
-        from: subDays(date.from, differenceInDays(date.to, date.from) + 1),
-        to: subDays(date.from, 1),
-    } : undefined;
-    const previous = filterAndCalcStats(prevDate);
-    
     // Chart data calculation
-    const monthlyData: Record<string, { revenue: number, expenditure: number }> = {};
-    current.filtered.forEach(t => {
+    const monthlyRevenue: Record<string, number> = {};
+    const monthlyExpenditure: Record<string, number> = {};
+    
+    currentFiltered.forEach(t => {
         const month = new Date(t.date).toLocaleString('default', { month: 'short', year: 'numeric' });
-        if (!monthlyData[month]) {
-            monthlyData[month] = { revenue: 0, expenditure: 0 };
-        }
         if (t.paymentMethod === 'UMUM') {
-            monthlyData[month].revenue += t.totalPrice;
+            monthlyRevenue[month] = (monthlyRevenue[month] || 0) + t.totalPrice;
         } else {
-            monthlyData[month].expenditure += t.totalPrice;
+            monthlyExpenditure[month] = (monthlyExpenditure[month] || 0) + t.totalPrice;
         }
     });
     
-    const chartData = Object.entries(monthlyData)
-      .map(([name, values]) => ({ name, ...values }))
+    const revenueData = Object.entries(monthlyRevenue)
+      .map(([name, total]) => ({ name, total }))
       .sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime());
-      
-    // Top BPJS expenditures
-    const bpjsRjTransactions = current.filtered
-      .filter(t => t.patientType === 'Rawat Jalan' && t.paymentMethod === 'BPJS')
-      .sort((a,b) => b.totalPrice - a.totalPrice)
-      .slice(0, 5);
 
+    const expenditureData = Object.entries(monthlyExpenditure)
+      .map(([name, total]) => ({ name, total }))
+      .sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime());
+
+    const categoryData = [
+      { name: 'Rawat Jalan', revenue: currentStats.details['Rawat Jalan'].revenue, expenditure: currentStats.details['Rawat Jalan'].expenditure },
+      { name: 'Rawat Inap', revenue: currentStats.details['Rawat Inap'].revenue, expenditure: currentStats.details['Rawat Inap'].expenditure },
+      { name: 'Lain-lain', revenue: currentStats.details['Lain-lain'].revenue, expenditure: currentStats.details['Lain-lain'].expenditure },
+    ];
+      
     return {
-        currentPeriodStats: current.stats,
-        previousPeriodStats: previous.stats,
-        chartData,
-        topBpjsExpenditures: bpjsRjTransactions,
+        filteredTransactions: currentFiltered,
+        currentPeriodStats: currentStats,
+        revenueChartData: revenueData,
+        expenditureChartData: expenditureData,
+        categoryChartData: categoryData,
     };
 
   }, [date, transactions]);
-
-  const getPercentageChange = (current: number, previous: number) => {
-    if (previous === 0) {
-      return current > 0 ? Infinity : 0;
-    }
-    return ((current - previous) / previous) * 100;
-  };
   
-  const detailCategories: { key: string; label: string; patientType: string; paymentMethod: string; }[] = [
-    { key: 'Rawat Jalan-UMUM', label: 'Pendapatan RJ Umum', patientType: 'Rawat Jalan', paymentMethod: 'UMUM' },
-    { key: 'Rawat Inap-UMUM', label: 'Pendapatan RI Umum', patientType: 'Rawat Inap', paymentMethod: 'UMUM' },
-    { key: 'Lain-lain-UMUM', label: 'Pendapatan Lain-lain Umum', patientType: 'Lain-lain', paymentMethod: 'UMUM' },
-    { key: 'Rawat Jalan-BPJS', label: 'Pengeluaran RJ BPJS', patientType: 'Rawat Jalan', paymentMethod: 'BPJS' },
-    { key: 'Rawat Inap-BPJS', label: 'Pengeluaran RI BPJS', patientType: 'Rawat Inap', paymentMethod: 'BPJS' },
-    { key: 'Lain-lain-BPJS', label: 'Pengeluaran Lain-lain BPJS', patientType: 'Lain-lain', paymentMethod: 'BPJS' },
-    { key: 'Lain-lain-Lain-lain', label: 'Pengeluaran Lain-lain', patientType: 'Lain-lain', paymentMethod: 'Lain-lain' },
-  ];
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -198,91 +157,34 @@ export default function DashboardPage() {
         />
       </div>
       
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <MonthlyTrendChart 
+            title="Grafik Pendapatan"
+            description="Tren pendapatan dari penjualan UMUM per bulan."
+            data={revenueChartData}
+            dataKey="total"
+            chartColor="hsl(var(--chart-1))"
+        />
+        <MonthlyTrendChart 
+            title="Grafik Pengeluaran"
+            description="Tren pengeluaran dari BPJS & Lain-lain per bulan."
+            data={expenditureChartData}
+            dataKey="total"
+            chartColor="hsl(var(--chart-2))"
+        />
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <div className="lg:col-span-3">
-            <MonthlyRevenueChart data={chartData} />
+           <CategoryAnalysisChart data={categoryChartData} />
         </div>
          <div className="lg:col-span-2">
-           <Card>
-             <CardHeader>
-               <CardTitle>Pengeluaran BPJS RJ Teratas</CardTitle>
-               <CardDescription>5 transaksi pengeluaran terbesar untuk Rawat Jalan BPJS.</CardDescription>
-             </CardHeader>
-             <CardContent>
-               <Table>
-                 <TableHeader>
-                   <TableRow>
-                     <TableHead>Deskripsi</TableHead>
-                     <TableHead className="text-right">Jumlah</TableHead>
-                   </TableRow>
-                 </TableHeader>
-                 <TableBody>
-                  {topBpjsExpenditures.length > 0 ? (
-                    topBpjsExpenditures.map(t => (
-                      <TableRow key={t.id}>
-                        <TableCell>
-                          <div className="font-medium max-w-xs truncate">{t.medicationName}</div>
-                          <div className="text-sm text-muted-foreground">{t.date}</div>
-                        </TableCell>
-                        <TableCell className="text-right font-semibold">{formatCurrency(t.totalPrice)}</TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                       <TableCell colSpan={2} className="h-24 text-center">
-                          Tidak ada data.
-                       </TableCell>
-                    </TableRow>
-                  )}
-                 </TableBody>
-               </Table>
-             </CardContent>
-           </Card>
+           <TopBpjsExpenditures transactions={filteredTransactions} />
         </div>
       </div>
       
-      <Card>
-        <CardHeader>
-            <CardTitle>Analisis Pendapatan & Pengeluaran</CardTitle>
-            <CardDescription>Rincian perbandingan performa berdasarkan kategori.</CardDescription>
-        </CardHeader>
-        <CardContent>
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Kategori</TableHead>
-                        <TableHead className="text-right">Total Nilai</TableHead>
-                        <TableHead className="text-right">Jumlah Transaksi</TableHead>
-                        <TableHead className="text-right">% Perubahan Nilai</TableHead>
-                        <TableHead className="text-right">% Perubahan Transaksi</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {detailCategories.map(({ key, label }) => {
-                    const current = currentPeriodStats.details[key];
-                    const previous = previousPeriodStats.details[key];
-                    if (!current || current.transactions === 0) return null;
-
-                    return (
-                       <TableRow key={key}>
-                          <TableCell className="font-medium">{label}</TableCell>
-                          <TableCell className="text-right font-semibold">{formatCurrency(current.revenue)}</TableCell>
-                          <TableCell className="text-right font-semibold">{current.transactions}</TableCell>
-                          <TableCell className="text-right">
-                              <PercentageChange change={getPercentageChange(current.revenue, previous?.revenue || 0)} />
-                          </TableCell>
-                          <TableCell className="text-right">
-                              <PercentageChange change={getPercentageChange(current.transactions, previous?.transactions || 0)} />
-                          </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-            </Table>
-        </CardContent>
-      </Card>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <RecentTransactions transactions={filteredTransactions} />
         <TopSellingItems 
           title="Obat Terlaris (Penjualan UMUM)"
           transactions={transactions.filter(t => t.paymentMethod === 'UMUM')}

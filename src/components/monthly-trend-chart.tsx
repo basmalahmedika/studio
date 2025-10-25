@@ -7,31 +7,30 @@ import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 
 interface MonthlyData {
   name: string;
-  revenue: number;
-  expenditure: number;
+  total: number;
 }
 
-interface MonthlyRevenueChartProps {
+interface MonthlyTrendChartProps {
+  title: string;
+  description: string;
   data: MonthlyData[];
+  dataKey: string;
+  chartColor: string;
 }
 
-const chartConfig = {
-  revenue: {
-    label: 'Pendapatan (UMUM)',
-    color: 'hsl(var(--chart-1))',
-  },
-  expenditure: {
-    label: 'Pengeluaran (BPJS & Lainnya)',
-    color: 'hsl(var(--chart-2))',
-  },
-};
+export function MonthlyTrendChart({ title, description, data, dataKey, chartColor }: MonthlyTrendChartProps) {
+  const chartConfig = {
+    [dataKey]: {
+      label: title,
+      color: chartColor,
+    },
+  };
 
-export function MonthlyRevenueChart({ data }: MonthlyRevenueChartProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Grafik Pendapatan vs Pengeluaran</CardTitle>
-        <CardDescription>Perbandingan pendapatan dan pengeluaran per bulan.</CardDescription>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
@@ -56,9 +55,7 @@ export function MonthlyRevenueChart({ data }: MonthlyRevenueChartProps) {
                 />
               }
             />
-            <Legend />
-            <Bar dataKey="revenue" fill="var(--color-revenue)" radius={4} />
-            <Bar dataKey="expenditure" fill="var(--color-expenditure)" radius={4} />
+            <Bar dataKey={dataKey} fill={`var(--color-${dataKey})`} radius={4} />
           </BarChart>
         </ChartContainer>
       </CardContent>
