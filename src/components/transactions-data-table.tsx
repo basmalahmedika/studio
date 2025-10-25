@@ -125,31 +125,35 @@ export function TransactionsDataTable() {
   const watchedItems = form.watch('items');
   const patientType = form.watch('patientType');
   const paymentMethod = form.watch('paymentMethod');
-
+  
+  // Update total price whenever items change
   React.useEffect(() => {
     const total = watchedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     form.setValue('totalPrice', total);
   }, [watchedItems, form]);
   
+  // Update item prices when patient type or payment method changes
   React.useEffect(() => {
-    if (watchedItems.length > 0) {
-      watchedItems.forEach((cartItem, index) => {
-          const inventoryItem = inventory.find(i => i.id === cartItem.itemId);
-          if (inventoryItem) {
-              let newPrice: number;
-              if (paymentMethod === 'BPJS' || paymentMethod === 'Lain-lain') {
-                  newPrice = inventoryItem.purchasePrice;
-              } else {
-                  newPrice = patientType === 'Rawat Inap' ? inventoryItem.sellingPriceRI : inventoryItem.sellingPriceRJ;
-              }
-              
-              if (cartItem.price !== newPrice) {
-                update(index, { ...cartItem, price: newPrice });
-              }
+    const currentItems = form.getValues('items');
+    if (currentItems.length > 0) {
+      const updatedItems = currentItems.map(cartItem => {
+        const inventoryItem = inventory.find(i => i.id === cartItem.itemId);
+        if (inventoryItem) {
+          let newPrice;
+          if (paymentMethod === 'BPJS' || paymentMethod === 'Lain-lain') {
+            newPrice = inventoryItem.purchasePrice;
+          } else {
+            newPrice = patientType === 'Rawat Inap' ? inventoryItem.sellingPriceRI : inventoryItem.sellingPriceRJ;
           }
+          return { ...cartItem, price: newPrice };
+        }
+        return cartItem;
       });
+      form.setValue('items', updatedItems);
     }
-  }, [patientType, paymentMethod, inventory, update, watchedItems]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patientType, paymentMethod, inventory, form.setValue]);
+
 
   const onSubmit = async (values: TransactionFormValues) => {
     const transactionData = {
