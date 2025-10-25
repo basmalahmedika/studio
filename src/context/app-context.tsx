@@ -17,6 +17,7 @@ import {
   getDocs,
   where,
   type Firestore,
+  type DocumentReference,
 } from 'firebase/firestore';
 import type { InventoryItem, Transaction } from '@/lib/types';
 
@@ -171,18 +172,17 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
   // TRANSACTION MANAGEMENT & STOCK SYNCHRONIZATION
   const addTransaction = async (transaction: Omit<Transaction, 'id'>) => {
     const db = getDb();
-    const newTransactionRef = doc(collection(db, "transactions"));
-    
+    const transactionItems = transaction.items || [];
+    if (transactionItems.length === 0) {
+      throw new Error("Transaksi harus memiliki setidaknya satu item.");
+    }
+  
+    // Step 1: Run a transaction to update stock quantities.
     await runTransaction(db, async (t) => {
-      const transactionItems = transaction.items || [];
-      if (transactionItems.length === 0) {
-        throw new Error("Transaksi harus memiliki setidaknya satu item.");
-      }
-
       for (const soldItem of transactionItems) {
         const itemRef = doc(db, 'inventory', soldItem.itemId);
         const itemDoc = await t.get(itemRef);
-
+  
         if (!itemDoc.exists()) {
           throw new Error(`Item dengan id ${soldItem.itemId} tidak ada!`);
         }
@@ -195,13 +195,15 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
         const newQuantity = currentQuantity - soldItem.quantity;
         t.update(itemRef, { quantity: newQuantity });
       }
-      
-      t.set(newTransactionRef, transaction);
     });
-
+  
+    // Step 2: If the stock update is successful, add the transaction document.
+    const newTransactionRef = await addDoc(collection(db, "transactions"), transaction);
+  
+    // Step 3: Update local state.
     const newTransaction = { id: newTransactionRef.id, ...transaction } as Transaction;
-    setTransactions(prev => [newTransaction, ...prev]);
-
+    setTransactions(prev => [newTransaction, ...prev].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+  
     setInventory(prevInventory => {
       const newInventory = [...prevInventory];
       (transaction.items || []).forEach(soldItem => {
@@ -219,6 +221,7 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
     return newTransactionRef;
   };
 
+
  const updateTransaction = async (id: string, updatedTransactionData: Omit<Transaction, 'id'>) => {
     const db = getDb();
     await runTransaction(db, async (t) => {
@@ -232,10 +235,12 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
         const originalTransaction = originalTransactionDoc.data() as Transaction;
         const stockAdjustments = new Map<string, number>();
 
+        // Add back the quantities from the original transaction
         (originalTransaction.items || []).forEach(item => {
             stockAdjustments.set(item.itemId, (stockAdjustments.get(item.itemId) || 0) + item.quantity);
         });
 
+        // Subtract the quantities from the new transaction
         (updatedTransactionData.items || []).forEach(item => {
             stockAdjustments.set(item.itemId, (stockAdjustments.get(item.itemId) || 0) - item.quantity);
         });
@@ -254,12 +259,13 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
              const newQuantity = currentQuantity + adjustment;
 
              if (newQuantity < 0) {
-                 throw new Error(`Stok tidak mencukupi untuk item ${itemDoc.data()?.itemName}.`);
+                 throw new Error(`Stok tidak mencukupi untuk item ${itemDoc.data()?.itemName}. Stok saat ini: ${currentQuantity}, Penyesuaian: ${-adjustment}`);
              }
              
              t.update(itemDocRef, { quantity: newQuantity });
         }
         
+        // Finally, update the transaction document itself.
         t.update(transactionDocRef, updatedTransactionData);
     });
 
