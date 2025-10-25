@@ -44,11 +44,15 @@ export function SupplierPriceAnalysis({ inventory }: { inventory: InventoryItem[
 
     const result: PriceAnalysisItem[] = [];
     itemMap.forEach((suppliers, itemName) => {
-      const minPrice = Math.min(...suppliers.map(s => s.price));
-      result.push({
-        itemName,
-        suppliers: suppliers.map(s => ({ ...s, isLowest: s.price === minPrice })),
-      });
+      if (suppliers.length > 0) {
+        const minPrice = Math.min(...suppliers.map(s => s.price));
+        result.push({
+          itemName,
+          suppliers: suppliers
+            .map(s => ({ ...s, isLowest: s.price === minPrice }))
+            .sort((a,b) => a.price - b.price), // Sort by price to show lowest first
+        });
+      }
     });
 
     return result.sort((a, b) => a.itemName.localeCompare(b.itemName));
@@ -132,14 +136,14 @@ export function SupplierPriceAnalysis({ inventory }: { inventory: InventoryItem[
                       item.suppliers.map((supplierInfo, index) => (
                         <TableRow key={`${item.itemName}-${supplierInfo.supplier}`}>
                           {index === 0 && (
-                            <TableCell rowSpan={item.suppliers.length} className="font-medium align-top">
+                            <TableCell rowSpan={item.suppliers.length} className="font-medium align-top pt-6">
                               {item.itemName}
                             </TableCell>
                           )}
                           <TableCell>{supplierInfo.supplier}</TableCell>
                           <TableCell className="text-right">
                             {supplierInfo.isLowest ? (
-                              <Badge className="bg-green-600 text-white hover:bg-green-600/90">
+                              <Badge className="bg-green-600 text-white hover:bg-green-600/90 text-sm">
                                 Rp {supplierInfo.price.toLocaleString('id-ID')}
                               </Badge>
                             ) : (
