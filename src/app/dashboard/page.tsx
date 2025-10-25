@@ -242,14 +242,14 @@ export default function DashboardPage() {
           value={formatCurrency(currentPeriodStats.totalRevenue)}
           icon={DollarSign}
           description="Total dari penjualan UMUM"
-          color="bg-green-100 dark:bg-green-800/50"
+          color="bg-green-100 dark:bg-green-900/50"
         />
         <StatCard
           title="Total Transaksi"
           value={currentPeriodStats.totalTransactions.toString()}
           icon={ReceiptText}
           description="Jumlah total semua penjualan"
-           color="bg-blue-100 dark:bg-blue-800/50"
+           color="bg-blue-100 dark:bg-blue-900/50"
         />
       </div>
 
@@ -259,28 +259,28 @@ export default function DashboardPage() {
           value={formatCurrency(currentPeriodStats.details.revenueRJ)}
           icon={Pill}
           description="Pendapatan dari pasien Rawat Jalan UMUM"
-          color="bg-emerald-100 dark:bg-emerald-800/50"
+          color="bg-green-100 dark:bg-green-900/50"
         />
         <StatCard
           title="Pendapatan RI (UMUM)"
           value={formatCurrency(currentPeriodStats.details.revenueRI)}
           icon={Pill}
           description="Pendapatan dari pasien Rawat Inap UMUM"
-          color="bg-emerald-100 dark:bg-emerald-800/50"
+          color="bg-green-100 dark:bg-green-900/50"
         />
          <StatCard
           title="Pengeluaran RJ (BPJS)"
           value={formatCurrency(currentPeriodStats.details.expenditureRJ)}
           icon={Stethoscope}
           description="Pengeluaran untuk pasien Rawat Jalan BPJS"
-          color="bg-teal-100 dark:bg-teal-800/50"
+          color="bg-amber-100 dark:bg-amber-900/50"
         />
          <StatCard
           title="Pengeluaran RI (BPJS)"
           value={formatCurrency(currentPeriodStats.details.expenditureRI)}
           icon={Stethoscope}
           description="Pengeluaran untuk pasien Rawat Inap BPJS"
-          color="bg-teal-100 dark:bg-teal-800/50"
+          color="bg-amber-100 dark:bg-amber-900/50"
         />
       </div>
       
@@ -344,5 +344,7 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
 
     
