@@ -2,6 +2,7 @@
 'use client';
 import * as React from 'react';
 import * as XLSX from 'xlsx';
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { FileDown, TrendingUp } from 'lucide-react';
 import type { Transaction, InventoryItem, TransactionItem } from '@/lib/types';
 import {
@@ -21,6 +22,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from './ui/button';
+import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
+
 
 interface BpjsExpenditureAnalysisProps {
   transactions: Transaction[];
@@ -40,6 +43,11 @@ interface TopBpjsExpenditureTransaction {
   totalCost: number;
   items: EnrichedTransactionItem[];
 }
+
+const chartConfig = {
+  averageRJ: { label: 'Rata-Rata RJ', color: 'hsl(var(--chart-2))' },
+  averageRI: { label: 'Rata-Rata RI', color: 'hsl(var(--chart-5))' },
+};
 
 const formatCurrency = (value: number) => `Rp ${value.toLocaleString('id-ID')}`;
 
@@ -166,10 +174,13 @@ export function BpjsExpenditureAnalysis({ transactions, inventory }: BpjsExpendi
     XLSX.writeFile(wb, fileName);
   };
 
-  const bpjsAverages = React.useMemo(() => {
-    const rjTransactions = transactions.filter(t => t.patientType === 'Rawat Jalan' && t.paymentMethod === 'BPJS');
-    const riTransactions = transactions.filter(t => t.patientType === 'Rawat Inap' && t.paymentMethod === 'BPJS');
-
+  const { overallAverages, monthlyAveragesChartData } = React.useMemo(() => {
+    const bpjsTransactions = transactions.filter(t => t.paymentMethod === 'BPJS');
+    
+    // --- Overall Average Calculation ---
+    const rjTransactions = bpjsTransactions.filter(t => t.patientType === 'Rawat Jalan');
+    const riTransactions = bpjsTransactions.filter(t => t.patientType === 'Rawat Inap');
+    
     const calculateAverage = (trans: Transaction[]) => {
       const count = trans.length;
       if (count === 0) return { average: 0, count: 0 };
@@ -182,16 +193,43 @@ export function BpjsExpenditureAnalysis({ transactions, inventory }: BpjsExpendi
         return sum + transactionCost;
       }, 0);
       
-      return {
-        average: totalCost / count,
-        count
-      };
-    }
+      return { average: totalCost / count, count };
+    };
     
-    return {
-        averageRJ: calculateAverage(rjTransactions),
-        averageRI: calculateAverage(riTransactions),
-    }
+    const overallAverages = {
+      averageRJ: calculateAverage(rjTransactions),
+      averageRI: calculateAverage(riTransactions),
+    };
+
+    // --- Monthly Average Calculation ---
+    const monthlyData: Record<string, { rjCost: number, rjCount: number, riCost: number, riCount: number }> = {};
+    bpjsTransactions.forEach(t => {
+      const month = new Date(t.date).toLocaleString('default', { month: 'short', year: 'numeric' });
+      if (!monthlyData[month]) {
+        monthlyData[month] = { rjCost: 0, rjCount: 0, riCost: 0, riCount: 0 };
+      }
+
+      const transactionCost = (t.items || []).reduce((itemSum, item) => {
+        const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+        return itemSum + (inventoryItem?.purchasePrice || 0) * item.quantity;
+      }, 0);
+
+      if (t.patientType === 'Rawat Jalan') {
+        monthlyData[month].rjCost += transactionCost;
+        monthlyData[month].rjCount += 1;
+      } else if (t.patientType === 'Rawat Inap') {
+        monthlyData[month].riCost += transactionCost;
+        monthlyData[month].riCount += 1;
+      }
+    });
+
+    const chartData = Object.entries(monthlyData).map(([month, data]) => ({
+      name: month,
+      averageRJ: data.rjCount > 0 ? data.rjCost / data.rjCount : 0,
+      averageRI: data.riCount > 0 ? data.riCost / data.riCount : 0,
+    })).sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime());
+
+    return { overallAverages, monthlyAveragesChartData: chartData };
 
   }, [transactions, inventory]);
 
@@ -219,24 +257,51 @@ export function BpjsExpenditureAnalysis({ transactions, inventory }: BpjsExpendi
                 </CardTitle>
                 <CardDescription>Rata-rata biaya per transaksi untuk layanan BPJS. Data ditampilkan berdasarkan filter tanggal utama di atas.</CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2">
+            <CardContent className="grid gap-6 md:grid-cols-2">
                  <div className="flex flex-row items-center justify-between space-y-0 rounded-lg border p-4">
                     <div className='space-y-0.5'>
                         <p className="text-sm text-muted-foreground">Rata-rata Pengeluaran per Transaksi RJ</p>
-                        <h2 className="text-2xl font-bold">{formatCurrency(bpjsAverages.averageRJ.average)}</h2>
+                        <h2 className="text-2xl font-bold">{formatCurrency(overallAverages.averageRJ.average)}</h2>
                         <p className="text-xs text-muted-foreground">
-                            dari {bpjsAverages.averageRJ.count} transaksi
+                            dari {overallAverages.averageRJ.count} transaksi
                         </p>
                     </div>
                 </div>
                  <div className="flex flex-row items-center justify-between space-y-0 rounded-lg border p-4">
                     <div className='space-y-0.5'>
                         <p className="text-sm text-muted-foreground">Rata-rata Pengeluaran per Transaksi RI</p>
-                        <h2 className="text-2xl font-bold">{formatCurrency(bpjsAverages.averageRI.average)}</h2>
+                        <h2 className="text-2xl font-bold">{formatCurrency(overallAverages.averageRI.average)}</h2>
                          <p className="text-xs text-muted-foreground">
-                            dari {bpjsAverages.averageRI.count} transaksi
+                            dari {overallAverages.averageRI.count} transaksi
                         </p>
                     </div>
+                </div>
+                 <div className="md:col-span-2">
+                  <Card>
+                      <CardHeader>
+                          <CardTitle>Perbandingan Rata-Rata Pengeluaran Bulanan</CardTitle>
+                          <CardDescription>Perbandingan rata-rata biaya per transaksi BPJS antara Rawat Jalan dan Rawat Inap setiap bulan.</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                          <ChartContainer config={chartConfig} className="h-[300px] w-full">
+                              <BarChart data={monthlyAveragesChartData} accessibilityLayer>
+                                <CartesianGrid vertical={false} />
+                                <XAxis dataKey="name" tickLine={false} tickMargin={10} axisLine={false} />
+                                <YAxis tickFormatter={(value) => `Rp ${Number(value) / 1000}k`} />
+                                <Tooltip
+                                    cursor={false}
+                                    content={<ChartTooltipContent 
+                                        formatter={(value) => formatCurrency(Number(value))} 
+                                        indicator="dot" 
+                                    />}
+                                />
+                                <Legend />
+                                <Bar dataKey="averageRJ" fill="var(--color-averageRJ)" radius={4} />
+                                <Bar dataKey="averageRI" fill="var(--color-averageRI)" radius={4} />
+                              </BarChart>
+                          </ChartContainer>
+                      </CardContent>
+                  </Card>
                 </div>
             </CardContent>
             <CardFooter>
