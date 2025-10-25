@@ -4,7 +4,7 @@
 import * as React from 'react';
 import type { DateRange } from 'react-day-picker';
 import { startOfMonth, subDays, differenceInDays } from 'date-fns';
-import { DollarSign, ReceiptText, Pill, Stethoscope, ArrowUp, ArrowDown } from 'lucide-react';
+import { DollarSign, ReceiptText, Pill, Stethoscope } from 'lucide-react';
 
 import { StatCard } from '@/components/stat-card';
 import { TopSellingItems } from '@/components/top-selling-items';
@@ -15,6 +15,8 @@ import { SalesTrendsChart } from '@/components/sales-trends-chart';
 import { CategoryBreakdownChart } from '@/components/category-breakdown-chart';
 import { TopBpjsExpenditures } from '@/components/top-bpjs-expenditures';
 import { CardFooter } from '@/components/ui/card';
+import { BpjsExpenditureAnalysis } from '@/components/bpjs-expenditure-analysis';
+
 
 interface DetailedStats {
   revenueRJ: number;
@@ -32,16 +34,15 @@ interface CategoryBreakdown {
 
 interface AllStats {
   totalRevenue: number;
-  totalExpenditure: number;
   totalTransactions: number;
   details: DetailedStats;
   categoryBreakdown: CategoryBreakdown;
+  totalExpenditure: number; // Re-add for footer analysis
 }
 
 const calculateStats = (transactions: Transaction[], inventory: InventoryItem[]): AllStats => {
     const stats: AllStats = {
       totalRevenue: 0,
-      totalExpenditure: 0,
       totalTransactions: 0,
       details: {
         revenueRJ: 0,
@@ -54,7 +55,8 @@ const calculateStats = (transactions: Transaction[], inventory: InventoryItem[])
         rjBpjs: 0,
         riUmum: 0,
         riBpjs: 0,
-      }
+      },
+      totalExpenditure: 0,
     };
 
     const uniqueTransactionIds = new Set<string>();
@@ -242,14 +244,14 @@ export default function DashboardPage() {
           value={formatCurrency(currentPeriodStats.totalRevenue)}
           icon={DollarSign}
           description="Total dari penjualan UMUM"
-          color="bg-green-100 dark:bg-green-900/50"
+          color="bg-green-900/50"
         />
         <StatCard
           title="Total Transaksi"
           value={currentPeriodStats.totalTransactions.toString()}
           icon={ReceiptText}
           description="Jumlah total semua penjualan"
-           color="bg-blue-100 dark:bg-blue-900/50"
+           color="bg-blue-900/50"
         />
       </div>
 
@@ -259,28 +261,28 @@ export default function DashboardPage() {
           value={formatCurrency(currentPeriodStats.details.revenueRJ)}
           icon={Pill}
           description="Pendapatan dari pasien Rawat Jalan UMUM"
-          color="bg-green-100 dark:bg-green-900/50"
+          color="bg-green-900/50"
         />
         <StatCard
           title="Pendapatan RI (UMUM)"
           value={formatCurrency(currentPeriodStats.details.revenueRI)}
           icon={Pill}
           description="Pendapatan dari pasien Rawat Inap UMUM"
-          color="bg-green-100 dark:bg-green-900/50"
+          color="bg-green-900/50"
         />
          <StatCard
           title="Pengeluaran RJ (BPJS)"
           value={formatCurrency(currentPeriodStats.details.expenditureRJ)}
           icon={Stethoscope}
           description="Pengeluaran untuk pasien Rawat Jalan BPJS"
-          color="bg-amber-100 dark:bg-amber-900/50"
+          color="bg-amber-900/50"
         />
          <StatCard
           title="Pengeluaran RI (BPJS)"
           value={formatCurrency(currentPeriodStats.details.expenditureRI)}
           icon={Stethoscope}
           description="Pengeluaran untuk pasien Rawat Inap BPJS"
-          color="bg-amber-100 dark:bg-amber-900/50"
+          color="bg-amber-900/50"
         />
       </div>
       
@@ -321,9 +323,8 @@ export default function DashboardPage() {
             data={categoryChartDataRI}
          />
       </div>
-       <div className="grid grid-cols-1">
-         <TopBpjsExpenditures transactions={filteredTransactions} inventory={inventory} />
-      </div>
+      
+      <BpjsExpenditureAnalysis transactions={filteredTransactions} inventory={inventory} />
       
        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <TopSellingItems 
@@ -344,7 +345,5 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
 
     
