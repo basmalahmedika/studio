@@ -11,7 +11,7 @@ import { TopSellingItems } from '@/components/top-selling-items';
 import { DateRangePicker } from '@/components/date-range-picker';
 import { useAppContext } from '@/context/app-context';
 import type { Transaction, InventoryItem } from '@/lib/types';
-import { MonthlyTrendChart } from '@/components/monthly-trend-chart';
+import { SalesTrendsChart } from '@/components/sales-trends-chart';
 import { CategoryBreakdownChart } from '@/components/category-breakdown-chart';
 import { TopBpjsExpenditures } from '@/components/top-bpjs-expenditures';
 
@@ -112,14 +112,10 @@ export default function DashboardPage() {
   
   const { 
     filteredTransactions, 
-    revenueChartData, 
-    expenditureChartData,
+    revenueComparisonData,
+    expenditureComparisonData,
     categoryChartDataRJ,
     categoryChartDataRI,
-    totalCurrentRevenue,
-    totalPreviousRevenue,
-    totalCurrentExpenditure,
-    totalPreviousExpenditure
   } = React.useMemo(() => {
     const filterTransactions = (range: DateRange | undefined): Transaction[] => {
         if (!range || !range.from || !range.to) return [];
@@ -146,25 +142,41 @@ export default function DashboardPage() {
     const currentStats = calculateStats(currentFiltered, inventory);
     const previousStats = calculateStats(previousFiltered, inventory);
 
-    const calculateMonthlyData = (trans: Transaction[], type: 'revenue' | 'expenditure') => {
-      const monthlyData: Record<string, number> = {};
-      trans.forEach(t => {
-        const month = new Date(t.date).toLocaleString('default', { month: 'short', year: 'numeric' });
-        if (type === 'revenue' && t.paymentMethod === 'UMUM') {
-          monthlyData[month] = (monthlyData[month] || 0) + t.totalPrice;
-        } else if (type === 'expenditure' && t.paymentMethod !== 'UMUM') {
-          let transactionCost = 0;
-          t.items?.forEach(item => {
-            const inventoryItem = inventory.find(inv => inv.id === item.itemId);
-            transactionCost += (inventoryItem?.purchasePrice || 0) * item.quantity;
-          });
-          monthlyData[month] = (monthlyData[month] || 0) + transactionCost;
-        }
-      });
-      return Object.entries(monthlyData)
-        .map(([name, total]) => ({ name, total }))
-        .sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime());
-    }
+    const calculateMonthlyComparison = (currentTrans: Transaction[], previousTrans: Transaction[], type: 'revenue' | 'expenditure') => {
+        const currentSales: Record<string, number> = {};
+        const previousSales: Record<string, number> = {};
+
+        const processTransactions = (trans: Transaction[], salesMap: Record<string, number>) => {
+            trans.forEach(t => {
+                const month = new Date(t.date).toLocaleString('default', { month: 'short', year: 'numeric' });
+                let monthTotal = 0;
+                
+                if (type === 'revenue' && t.paymentMethod === 'UMUM') {
+                    monthTotal = t.totalPrice;
+                } else if (type === 'expenditure' && t.paymentMethod !== 'UMUM') {
+                    let transactionCost = 0;
+                    t.items?.forEach(item => {
+                        const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+                        transactionCost += (inventoryItem?.purchasePrice || 0) * item.quantity;
+                    });
+                    monthTotal = transactionCost;
+                }
+                salesMap[month] = (salesMap[month] || 0) + monthTotal;
+            });
+        };
+
+        processTransactions(currentTrans, currentSales);
+        processTransactions(previousTrans, previousSales);
+        
+        const allMonths = new Set([...Object.keys(currentSales), ...Object.keys(previousSales)]);
+        const sortedMonths = Array.from(allMonths).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+
+        return sortedMonths.map(month => ({
+            name: month,
+            current: currentSales[month] || 0,
+            previous: previousSales[month] || 0,
+        }));
+    };
 
     const rjData = [
         { name: 'Periode Ini', umum: currentStats.categoryBreakdown.rjUmum, bpjs: currentStats.categoryBreakdown.rjBpjs },
@@ -177,14 +189,10 @@ export default function DashboardPage() {
       
     return {
         filteredTransactions: currentFiltered,
-        revenueChartData: calculateMonthlyData(currentFiltered, 'revenue'),
-        expenditureChartData: calculateMonthlyData(currentFiltered, 'expenditure'),
+        revenueComparisonData: calculateMonthlyComparison(currentFiltered, previousFiltered, 'revenue'),
+        expenditureComparisonData: calculateMonthlyComparison(currentFiltered, previousFiltered, 'expenditure'),
         categoryChartDataRJ: rjData,
         categoryChartDataRI: riData,
-        totalCurrentRevenue: currentStats.totalRevenue,
-        totalPreviousRevenue: previousStats.totalRevenue,
-        totalCurrentExpenditure: currentStats.totalExpenditure,
-        totalPreviousExpenditure: previousStats.totalExpenditure,
     };
 
   }, [date, transactions, inventory]);
@@ -249,24 +257,8 @@ export default function DashboardPage() {
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <MonthlyTrendChart 
-            title="Grafik Pendapatan"
-            description="Tren pendapatan dari penjualan UMUM per bulan."
-            data={revenueChartData}
-            dataKey="total"
-            chartColor="hsl(var(--chart-1))"
-            totalCurrent={totalCurrentRevenue}
-            totalPrevious={totalPreviousRevenue}
-        />
-        <MonthlyTrendChart 
-            title="Grafik Pengeluaran"
-            description="Tren pengeluaran dari BPJS & Lain-lain per bulan (berdasarkan harga beli)."
-            data={expenditureChartData}
-            dataKey="total"
-            chartColor="hsl(var(--chart-2))"
-            totalCurrent={totalCurrentExpenditure}
-            totalPrevious={totalPreviousExpenditure}
-        />
+        <SalesTrendsChart title="Grafik Pendapatan (UMUM)" data={revenueComparisonData} />
+        <SalesTrendsChart title="Grafik Pengeluaran (Non-UMUM)" data={expenditureComparisonData} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

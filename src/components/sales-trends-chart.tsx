@@ -15,26 +15,27 @@ interface SalesComparisonData {
 }
 
 interface SalesTrendsChartProps {
+  title: string;
   data: SalesComparisonData[];
 }
 
 const chartConfig = {
   current: {
     label: 'Periode Ini',
-    color: 'hsl(var(--primary))',
+    color: 'hsl(var(--chart-1))',
   },
   previous: {
-    label: 'Periode Sebelumnya',
-    color: 'hsl(var(--secondary))',
+    label: 'Periode Lalu',
+    color: 'hsl(var(--chart-2))',
   },
 };
 
-export function SalesTrendsChart({ data }: SalesTrendsChartProps) {
+export function SalesTrendsChart({ title, data }: SalesTrendsChartProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Tren Penjualan</CardTitle>
-        <CardDescription>Perbandingan kinerja penjualan dengan periode sebelumnya.</CardDescription>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>Perbandingan kinerja dengan periode waktu yang sama sebelumnya.</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
@@ -54,7 +55,7 @@ export function SalesTrendsChart({ data }: SalesTrendsChartProps) {
                 cursor={false}
                 content={<ChartTooltipContent 
                   formatter={(value, name) => {
-                    const label = name === 'current' ? 'Periode Ini' : 'Periode Sebelumnya';
+                    const label = name === 'current' ? 'Periode Ini' : 'Periode Lalu';
                     return (
                         <div className="flex flex-col">
                             <span>{label}</span>
@@ -73,7 +74,7 @@ export function SalesTrendsChart({ data }: SalesTrendsChartProps) {
       </CardContent>
        <CardFooter>
         <p className="text-sm text-muted-foreground">
-          *Grafik ini membandingkan total nilai penjualan (omzet) dari rentang tanggal yang Anda pilih dengan periode waktu yang sama sebelumnya.
+          *Grafik ini membandingkan total nilai dari rentang tanggal yang Anda pilih dengan periode waktu yang sama sebelumnya.
         </p>
       </CardFooter>
     </Card>
