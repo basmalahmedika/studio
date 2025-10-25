@@ -4,7 +4,7 @@
 import * as React from 'react';
 import type { DateRange } from 'react-day-picker';
 import { startOfMonth, subDays, differenceInDays } from 'date-fns';
-import { DollarSign, ReceiptText, Users, Pill, Stethoscope } from 'lucide-react';
+import { DollarSign, ReceiptText, Pill, Stethoscope } from 'lucide-react';
 
 import { StatCard } from '@/components/stat-card';
 import { RecentTransactions } from '@/components/recent-transactions';
@@ -13,7 +13,7 @@ import { DateRangePicker } from '@/components/date-range-picker';
 import { useAppContext } from '@/context/app-context';
 import type { Transaction } from '@/lib/types';
 import { MonthlyTrendChart } from '@/components/monthly-trend-chart';
-import { CategoryAnalysisChart } from '@/components/category-analysis-chart';
+import { CategoryBreakdownChart } from '@/components/category-breakdown-chart';
 import { TopBpjsExpenditures } from '@/components/top-bpjs-expenditures';
 
 interface DetailedStats {
@@ -23,12 +23,19 @@ interface DetailedStats {
   expenditureRI: number;
 }
 
+interface CategoryBreakdown {
+  rjUmum: number;
+  rjBpjs: number;
+  riUmum: number;
+  riBpjs: number;
+}
+
 interface AllStats {
   totalRevenue: number;
   totalExpenditure: number;
   totalTransactions: number;
   details: DetailedStats;
-  categoryDetails: Record<string, { revenue: number; expenditure: number }>;
+  categoryBreakdown: CategoryBreakdown;
 }
 
 const calculateStats = (transactions: Transaction[]): AllStats => {
@@ -42,37 +49,38 @@ const calculateStats = (transactions: Transaction[]): AllStats => {
         expenditureRJ: 0,
         expenditureRI: 0,
       },
-      categoryDetails: {
-        'Rawat Jalan': { revenue: 0, expenditure: 0 },
-        'Rawat Inap': { revenue: 0, expenditure: 0 },
-        'Lain-lain': { revenue: 0, expenditure: 0 },
+      categoryBreakdown: {
+        rjUmum: 0,
+        rjBpjs: 0,
+        riUmum: 0,
+        riBpjs: 0,
       }
     };
 
     transactions.forEach(t => {
       stats.totalTransactions += 1;
       
-      const categoryKey = t.patientType;
-      
+      const isRJ = t.patientType === 'Rawat Jalan';
+      const isRI = t.patientType === 'Rawat Inap';
+
       if (t.paymentMethod === 'UMUM') {
         stats.totalRevenue += t.totalPrice;
-        if(stats.categoryDetails[categoryKey]) stats.categoryDetails[categoryKey].revenue += t.totalPrice;
-
-        if (t.patientType === 'Rawat Jalan') {
+        if (isRJ) {
             stats.details.revenueRJ += t.totalPrice;
-        } else if (t.patientType === 'Rawat Inap') {
+            stats.categoryBreakdown.rjUmum += t.totalPrice;
+        } else if (isRI) {
             stats.details.revenueRI += t.totalPrice;
+            stats.categoryBreakdown.riUmum += t.totalPrice;
         }
-
-      } else { // BPJS and Lain-lain
+      } else { 
         stats.totalExpenditure += t.totalPrice;
-        if(stats.categoryDetails[categoryKey]) stats.categoryDetails[categoryKey].expenditure += t.totalPrice;
-
         if(t.paymentMethod === 'BPJS') {
-             if (t.patientType === 'Rawat Jalan') {
+             if (isRJ) {
                 stats.details.expenditureRJ += t.totalPrice;
-            } else if (t.patientType === 'Rawat Inap') {
+                stats.categoryBreakdown.rjBpjs += t.totalPrice;
+            } else if (isRI) {
                 stats.details.expenditureRI += t.totalPrice;
+                stats.categoryBreakdown.riBpjs += t.totalPrice;
             }
         }
       }
@@ -91,7 +99,13 @@ export default function DashboardPage() {
     to: new Date(),
   });
   
-  const { filteredTransactions, currentPeriodStats, revenueChartData, expenditureChartData, categoryChartData } = React.useMemo(() => {
+  const { 
+    filteredTransactions, 
+    revenueChartData, 
+    expenditureChartData,
+    categoryChartDataRJ,
+    categoryChartDataRI,
+  } = React.useMemo(() => {
     const filterTransactions = (range: DateRange | undefined): Transaction[] => {
         return transactions.filter(t => {
             const transactionDate = new Date(t.date);
@@ -105,9 +119,19 @@ export default function DashboardPage() {
     };
 
     const currentFiltered = filterTransactions(date);
+    
+    // Calculate previous period
+    const duration = date?.from && date.to ? differenceInDays(date.to, date.from) : 30;
+    const prevDate = {
+      from: date?.from ? subDays(date.from, duration + 1) : subDays(new Date(), (duration * 2) + 1),
+      to: date?.from ? subDays(date.from, 1) : subDays(new Date(), duration + 1),
+    };
+    const previousFiltered = filterTransactions(prevDate);
+    
     const currentStats = calculateStats(currentFiltered);
+    const previousStats = calculateStats(previousFiltered);
 
-    // Chart data calculation
+    // Monthly Trend Chart Data
     const monthlyRevenue: Record<string, number> = {};
     const monthlyExpenditure: Record<string, number> = {};
     
@@ -128,22 +152,28 @@ export default function DashboardPage() {
       .map(([name, total]) => ({ name, total }))
       .sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime());
 
-    const categoryData = [
-      { name: 'Rawat Jalan', revenue: currentStats.categoryDetails['Rawat Jalan'].revenue, expenditure: currentStats.categoryDetails['Rawat Jalan'].expenditure },
-      { name: 'Rawat Inap', revenue: currentStats.categoryDetails['Rawat Inap'].revenue, expenditure: currentStats.categoryDetails['Rawat Inap'].expenditure },
-      { name: 'Lain-lain', revenue: currentStats.categoryDetails['Lain-lain'].revenue, expenditure: currentStats.categoryDetails['Lain-lain'].expenditure },
+    // Category Breakdown Chart Data
+    const rjData = [
+        { name: 'Periode Ini', umum: currentStats.categoryBreakdown.rjUmum, bpjs: currentStats.categoryBreakdown.rjBpjs },
+        { name: 'Periode Lalu', umum: previousStats.categoryBreakdown.rjUmum, bpjs: previousStats.categoryBreakdown.rjBpjs }
+    ];
+    const riData = [
+        { name: 'Periode Ini', umum: currentStats.categoryBreakdown.riUmum, bpjs: currentStats.categoryBreakdown.riBpjs },
+        { name: 'Periode Lalu', umum: previousStats.categoryBreakdown.riUmum, bpjs: previousStats.categoryBreakdown.riBpjs }
     ];
       
     return {
         filteredTransactions: currentFiltered,
-        currentPeriodStats: currentStats,
         revenueChartData: revenueData,
         expenditureChartData: expenditureData,
-        categoryChartData: categoryData,
+        categoryChartDataRJ: rjData,
+        categoryChartDataRI: riData
     };
 
   }, [date, transactions]);
   
+  const currentPeriodStats = calculateStats(filteredTransactions);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -165,7 +195,7 @@ export default function DashboardPage() {
           title="Total Pengeluaran"
           value={formatCurrency(currentPeriodStats.totalExpenditure)}
           icon={DollarSign}
-          description="Total dari BPJS & Lain-lain"
+          description="Total dari BPJS &amp; Lain-lain"
            color="bg-red-100 dark:bg-red-800/50"
         />
         <StatCard
@@ -218,24 +248,35 @@ export default function DashboardPage() {
         />
         <MonthlyTrendChart 
             title="Grafik Pengeluaran"
-            description="Tren pengeluaran dari BPJS & Lain-lain per bulan."
+            description="Tren pengeluaran dari BPJS &amp; Lain-lain per bulan."
             data={expenditureChartData}
             dataKey="total"
             chartColor="hsl(var(--chart-2))"
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+         <CategoryBreakdownChart 
+            title="Analisis Rawat Jalan"
+            description="Perbandingan UMUM vs BPJS untuk pasien Rawat Jalan"
+            data={categoryChartDataRJ}
+         />
+         <CategoryBreakdownChart 
+            title="Analisis Rawat Inap"
+            description="Perbandingan UMUM vs BPJS untuk pasien Rawat Inap"
+            data={categoryChartDataRI}
+         />
+      </div>
+       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <div className="lg:col-span-3">
-           <CategoryAnalysisChart data={categoryChartData} />
+            <RecentTransactions transactions={filteredTransactions} />
         </div>
          <div className="lg:col-span-2">
            <TopBpjsExpenditures transactions={filteredTransactions} />
         </div>
       </div>
       
-       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <RecentTransactions transactions={filteredTransactions} />
+       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <TopSellingItems 
           title="Obat Terlaris (Penjualan UMUM)"
           transactions={transactions.filter(t => t.paymentMethod === 'UMUM')}
@@ -254,5 +295,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
