@@ -6,7 +6,6 @@ import type { FirebaseApp } from 'firebase/app';
 import {
   getFirestore,
   collection,
-  onSnapshot,
   addDoc,
   updateDoc,
   deleteDoc,
@@ -18,21 +17,19 @@ import {
   getDocs,
   where,
   type Firestore,
-  DocumentReference,
-  DocumentSnapshot,
 } from 'firebase/firestore';
-import type { InventoryItem, Transaction, TransactionItem } from '@/lib/types';
+import type { InventoryItem, Transaction } from '@/lib/types';
 
 interface AppContextType {
   inventory: InventoryItem[];
   transactions: Transaction[];
   loading: boolean;
-  addInventoryItem: (item: Omit<InventoryItem, 'id'>) => Promise<void>;
+  addInventoryItem: (item: Omit<InventoryItem, 'id'>) => Promise<DocumentReference>;
   updateInventoryItem: (id: string, updatedItem: Partial<Omit<InventoryItem, 'id'>>) => Promise<void>;
   deleteInventoryItem: (id: string) => Promise<void>;
   bulkAddInventoryItems: (items: Omit<InventoryItem, 'id'>[]) => Promise<void>;
   bulkDeleteInventoryItems: (ids: string[]) => Promise<void>;
-  addTransaction: (transaction: Omit<Transaction, 'id'>) => Promise<void>;
+  addTransaction: (transaction: Omit<Transaction, 'id'>) => Promise<DocumentReference>;
   updateTransaction: (id: string, updatedTransactionData: Omit<Transaction, 'id'>) => Promise<void>;
   deleteTransaction: (id: string, transactionToDelete: Transaction) => Promise<void>;
 }
@@ -56,39 +53,35 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
       return;
     }
 
-    try {
-      const db = getFirestore(firebaseApp);
-      dbInstanceRef.current = db;
+    async function fetchData() {
+      try {
+        const db = getFirestore(firebaseApp);
+        dbInstanceRef.current = db;
+        setLoading(true);
 
-      setLoading(true);
-      const inventoryQuery = query(collection(db, 'inventory'), orderBy('itemName'));
-      const transactionsQuery = query(collection(db, 'transactions'), orderBy('date', 'desc'));
+        const inventoryQuery = query(collection(db, 'inventory'), orderBy('itemName'));
+        const transactionsQuery = query(collection(db, 'transactions'), orderBy('date', 'desc'));
 
-      const unsubInventory = onSnapshot(inventoryQuery, (snapshot) => {
-        const inventoryData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem));
+        const [inventorySnapshot, transactionsSnapshot] = await Promise.all([
+          getDocs(inventoryQuery),
+          getDocs(transactionsQuery),
+        ]);
+
+        const inventoryData = inventorySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem));
+        const transactionsData = transactionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
+        
         setInventory(inventoryData);
-        setLoading(false);
-      }, (error) => {
-        console.error("Error fetching inventory:", error);
-        setLoading(false);
-      });
-
-      const unsubTransactions = onSnapshot(transactionsQuery, (snapshot) => {
-        const transactionsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
         setTransactions(transactionsData);
-        // Do not set loading to false here, inventory is the primary data source for initial load
-      }, (error) => {
-        console.error("Error fetching transactions:", error);
-      });
 
-      return () => {
-        unsubInventory();
-        unsubTransactions();
-      };
-    } catch (error) {
+      } catch (error) {
         console.error("Failed to initialize Firestore or fetch data:", error);
+      } finally {
         setLoading(false);
+      }
     }
+    
+    fetchData();
+
   }, [firebaseApp]);
 
   const getDb = () => {
@@ -101,18 +94,23 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
   // INVENTORY MANAGEMENT
   const addInventoryItem = async (item: Omit<InventoryItem, 'id'>) => {
     const db = getDb();
-    await addDoc(collection(db, 'inventory'), item);
+    const docRef = await addDoc(collection(db, 'inventory'), item);
+    const newItem = { id: docRef.id, ...item } as InventoryItem;
+    setInventory(prev => [...prev, newItem].sort((a, b) => a.itemName.localeCompare(b.itemName)));
+    return docRef;
   };
 
   const updateInventoryItem = async (id: string, updatedItem: Partial<Omit<InventoryItem, 'id'>>) => {
     const db = getDb();
     const itemDoc = doc(db, 'inventory', id);
     await updateDoc(itemDoc, updatedItem);
+    setInventory(prev => prev.map(item => item.id === id ? { ...item, ...updatedItem } : item).sort((a, b) => a.itemName.localeCompare(b.itemName)));
   };
 
   const deleteInventoryItem = async (id: string) => {
     const db = getDb();
     await deleteDoc(doc(db, 'inventory', id));
+    setInventory(prev => prev.filter(item => item.id !== id));
   };
 
   const bulkAddInventoryItems = async (items: Omit<InventoryItem, 'id'>[]) => {
@@ -120,7 +118,6 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
     const batch = writeBatch(db);
     const inventoryCollectionRef = collection(db, 'inventory');
     
-    // Fetch all existing inventory items once to avoid queries in a loop
     const inventorySnapshot = await getDocs(inventoryCollectionRef);
     const existingItemsMap = new Map<string, { id: string; quantity: number }>();
     inventorySnapshot.docs.forEach(doc => {
@@ -129,27 +126,35 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
       existingItemsMap.set(key, { id: doc.id, quantity: data.quantity });
     });
 
+    const newDocs: InventoryItem[] = [];
+    const updatedDocs: {[id: string]: Partial<InventoryItem>} = {};
+
     for (const item of items) {
       const key = `${item.itemName}_${item.batchNumber}`;
       const existingItem = existingItemsMap.get(key);
 
       if (existingItem) {
-        // If item exists, update its quantity
         const docRef = doc(db, 'inventory', existingItem.id);
         const newQuantity = (existingItem.quantity || 0) + item.quantity;
-        batch.update(docRef, { ...item, quantity: newQuantity });
-        // Update the map for subsequent items in the same batch
+        const updatePayload = { ...item, quantity: newQuantity };
+        batch.update(docRef, updatePayload);
+        updatedDocs[existingItem.id] = updatePayload;
         existingItemsMap.set(key, { ...existingItem, quantity: newQuantity });
       } else {
-        // If item doesn't exist, create a new one
         const newDocRef = doc(inventoryCollectionRef);
         batch.set(newDocRef, item);
-         // Add the new item to the map so it can be found by subsequent items in the same import
+        const newItemWithId = { id: newDocRef.id, ...item } as InventoryItem;
+        newDocs.push(newItemWithId);
         existingItemsMap.set(key, { id: newDocRef.id, quantity: item.quantity });
       }
     }
     
     await batch.commit();
+
+    setInventory(prev => {
+        const updated = prev.map(i => i.id in updatedDocs ? { ...i, ...updatedDocs[i.id] } : i);
+        return [...updated, ...newDocs].sort((a, b) => a.itemName.localeCompare(b.itemName));
+    });
   };
   
   const bulkDeleteInventoryItems = async (ids: string[]) => {
@@ -160,11 +165,14 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
       batch.delete(docRef);
     });
     await batch.commit();
+    setInventory(prev => prev.filter(item => !ids.includes(item.id)));
   };
 
   // TRANSACTION MANAGEMENT & STOCK SYNCHRONIZATION
   const addTransaction = async (transaction: Omit<Transaction, 'id'>) => {
     const db = getDb();
+    const newTransactionRef = doc(collection(db, "transactions"));
+    
     await runTransaction(db, async (t) => {
       const transactionItems = transaction.items || [];
       if (transactionItems.length === 0) {
@@ -187,11 +195,28 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
         const newQuantity = currentQuantity - soldItem.quantity;
         t.update(itemRef, { quantity: newQuantity });
       }
-
-      // CORRECTED LOGIC: Create a new document reference first, then set data
-      const newTransactionRef = doc(collection(db, 'transactions'));
+      
       t.set(newTransactionRef, transaction);
     });
+
+    const newTransaction = { id: newTransactionRef.id, ...transaction } as Transaction;
+    setTransactions(prev => [newTransaction, ...prev]);
+
+    setInventory(prevInventory => {
+      const newInventory = [...prevInventory];
+      (transaction.items || []).forEach(soldItem => {
+        const itemIndex = newInventory.findIndex(invItem => invItem.id === soldItem.itemId);
+        if (itemIndex > -1) {
+          newInventory[itemIndex] = {
+            ...newInventory[itemIndex],
+            quantity: newInventory[itemIndex].quantity - soldItem.quantity
+          };
+        }
+      });
+      return newInventory;
+    });
+    
+    return newTransactionRef;
   };
 
  const updateTransaction = async (id: string, updatedTransactionData: Omit<Transaction, 'id'>) => {
@@ -207,7 +232,6 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
         const originalTransaction = originalTransactionDoc.data() as Transaction;
         const stockAdjustments = new Map<string, number>();
 
-        // Calculate adjustments: positive for stock to be returned, negative for stock to be removed
         (originalTransaction.items || []).forEach(item => {
             stockAdjustments.set(item.itemId, (stockAdjustments.get(item.itemId) || 0) + item.quantity);
         });
@@ -216,68 +240,92 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
             stockAdjustments.set(item.itemId, (stockAdjustments.get(item.itemId) || 0) - item.quantity);
         });
 
-        const itemRefsToFetch = Array.from(stockAdjustments.keys()).map(itemId => doc(db, 'inventory', itemId));
-        if (itemRefsToFetch.length === 0) {
-            // If no items, just update the transaction data
-            t.update(transactionDocRef, updatedTransactionData);
-            return;
-        }
-
-        // Fetch all necessary inventory documents within the transaction
-        const itemDocs = await Promise.all(itemRefsToFetch.map(ref => t.get(ref)));
-        const itemDocsMap = new Map(itemDocs.map(itemDoc => [itemDoc.id, itemDoc]));
-
-        // Apply stock adjustments
         for (const [itemId, adjustment] of stockAdjustments.entries()) {
              if (adjustment === 0) continue; 
 
-             const itemDoc = itemDocsMap.get(itemId);
+             const itemDocRef = doc(db, 'inventory', itemId);
+             const itemDoc = await t.get(itemDocRef);
 
-             if (!itemDoc || !itemDoc.exists()) {
-                 throw new Error(`Item inventaris dengan ID ${itemId} tidak ditemukan. Tidak dapat memperbarui transaksi.`);
+             if (!itemDoc.exists()) {
+                 throw new Error(`Item inventaris dengan ID ${itemId} tidak ditemukan.`);
              }
 
              const currentQuantity = itemDoc.data()?.quantity || 0;
              const newQuantity = currentQuantity + adjustment;
 
              if (newQuantity < 0) {
-                 throw new Error(`Stok tidak mencukupi untuk item ${itemDoc.data()?.itemName}. Perubahan yang diperlukan akan menghasilkan stok negatif.`);
+                 throw new Error(`Stok tidak mencukupi untuk item ${itemDoc.data()?.itemName}.`);
              }
              
-             t.update(itemDoc.ref, { quantity: newQuantity });
+             t.update(itemDocRef, { quantity: newQuantity });
         }
         
-        // Finally, update the transaction document itself
         t.update(transactionDocRef, updatedTransactionData);
     });
-};
 
+    setTransactions(prev => prev.map(tr => tr.id === id ? { id, ...updatedTransactionData } as Transaction : tr).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+
+    // Manually update inventory state after transaction update
+    const stockAdjustments = new Map<string, number>();
+    const originalTransaction = transactions.find(t => t.id === id);
+    if(originalTransaction) {
+        (originalTransaction.items || []).forEach(item => {
+            stockAdjustments.set(item.itemId, (stockAdjustments.get(item.itemId) || 0) + item.quantity);
+        });
+    }
+    (updatedTransactionData.items || []).forEach(item => {
+        stockAdjustments.set(item.itemId, (stockAdjustments.get(item.itemId) || 0) - item.quantity);
+    });
+
+    setInventory(prevInventory => {
+      let newInventory = [...prevInventory];
+      for (const [itemId, adjustment] of stockAdjustments.entries()) {
+        const itemIndex = newInventory.findIndex(invItem => invItem.id === itemId);
+        if(itemIndex > -1) {
+            newInventory[itemIndex] = {
+                ...newInventory[itemIndex],
+                quantity: newInventory[itemIndex].quantity + adjustment,
+            }
+        }
+      }
+      return newInventory;
+    });
+
+};
 
  const deleteTransaction = async (id: string, transactionToDelete: Transaction) => {
      const db = getDb();
      await runTransaction(db, async (t) => {
         const itemsToRestore = transactionToDelete.items || [];
-        if (itemsToRestore.length === 0) {
-             const transactionDocRef = doc(db, 'transactions', id);
-             t.delete(transactionDocRef);
-             return;
+        if (itemsToRestore.length > 0) {
+            for (const itemToRestore of itemsToRestore) {
+              const itemRef = doc(db, 'inventory', itemToRestore.itemId);
+              const itemDoc = await t.get(itemRef);
+              
+              if (itemDoc.exists()) {
+                  const currentQuantity = itemDoc.data().quantity || 0;
+                  const newQuantity = currentQuantity + itemToRestore.quantity;
+                  t.update(itemRef, { quantity: newQuantity });
+              }
+            }
         }
-
-        for (const itemToRestore of itemsToRestore) {
-          const itemRef = doc(db, 'inventory', itemToRestore.itemId);
-          const itemDoc = await t.get(itemRef);
-          
-          if (itemDoc.exists()) {
-              const currentQuantity = itemDoc.data().quantity || 0;
-              const newQuantity = currentQuantity + itemToRestore.quantity;
-              t.update(itemRef, { quantity: newQuantity });
-          } else {
-              console.warn(`Item inventaris dengan ID ${itemToRestore.itemId} tidak ditemukan. Tidak dapat mengembalikan stok.`);
-          }
-        }
-        
         const transactionDocRef = doc(db, 'transactions', id);
         t.delete(transactionDocRef);
+    });
+
+    setTransactions(prev => prev.filter(tr => tr.id !== id));
+    setInventory(prevInventory => {
+      const newInventory = [...prevInventory];
+      (transactionToDelete.items || []).forEach(itemToRestore => {
+        const itemIndex = newInventory.findIndex(invItem => invItem.id === itemToRestore.itemId);
+        if (itemIndex > -1) {
+          newInventory[itemIndex] = {
+            ...newInventory[itemIndex],
+            quantity: newInventory[itemIndex].quantity + itemToRestore.quantity
+          };
+        }
+      });
+      return newInventory;
     });
   };
 
