@@ -12,9 +12,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import type { Transaction, TransactionItem } from '@/lib/types';
 import { useAppContext } from '@/context/app-context';
 
@@ -203,6 +204,43 @@ export function AbcAnalysis({ transactions, itemTypeFilter }: AbcAnalysisProps) 
             </Table>
         </div>
       </CardContent>
+      <CardFooter className="flex-col items-start gap-4">
+        <h3 className="font-semibold">Rekomendasi Aksi</h3>
+         <Accordion type="single" collapsible className="w-full">
+          <AccordionItem value="item-1">
+            <AccordionTrigger>Kategori A (Cepat Laku)</AccordionTrigger>
+            <AccordionContent>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Pastikan stok selalu tersedia dan jaga tingkat stok pengaman (safety stock) yang cukup.</li>
+                <li>Pertimbangkan untuk melakukan negosiasi harga dengan pemasok untuk mendapatkan harga beli yang lebih baik karena volume pembelian tinggi.</li>
+                <li>Tempatkan item di lokasi yang mudah dijangkau atau terlihat oleh pelanggan jika relevan.</li>
+              </ul>
+            </AccordionContent>
+          </AccordionItem>
+          <AccordionItem value="item-2">
+            <AccordionTrigger>Kategori B (Cukup Laku)</AccordionTrigger>
+            <AccordionContent>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Lakukan pemantauan stok secara berkala untuk menghindari kehabisan stok atau kelebihan stok.</li>
+                <li>Analisis tren penjualan untuk memprediksi kebutuhan di masa mendatang.</li>
+                 <li>Pertimbangkan promosi sesekali untuk meningkatkan penjualan.</li>
+              </ul>
+            </AccordionContent>
+          </AccordionItem>
+          <AccordionItem value="item-3">
+            <AccordionTrigger>Kategori C (Kurang Laku)</AccordionTrigger>
+            <AccordionContent>
+               <ul className="list-disc pl-5 space-y-1">
+                <li>Kurangi tingkat stok untuk meminimalkan biaya penyimpanan.</li>
+                <li>Buat program promosi, diskon, atau bundling untuk meningkatkan penjualan.</li>
+                <li>Jika penjualan tetap rendah, pertimbangkan untuk tidak melakukan pengadaan ulang (delisting) item tersebut.</li>
+              </ul>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      </CardFooter>
     </Card>
   );
 }
+
+    
