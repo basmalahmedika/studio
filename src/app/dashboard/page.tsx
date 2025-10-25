@@ -13,7 +13,6 @@ import { useAppContext } from '@/context/app-context';
 import type { Transaction, InventoryItem } from '@/lib/types';
 import { SalesTrendsChart } from '@/components/sales-trends-chart';
 import { CategoryBreakdownChart } from '@/components/category-breakdown-chart';
-import { TopBpjsExpenditures } from '@/components/top-bpjs-expenditures';
 import { CardFooter } from '@/components/ui/card';
 import { BpjsExpenditureAnalysis } from '@/components/bpjs-expenditure-analysis';
 
@@ -244,14 +243,14 @@ export default function DashboardPage() {
           value={formatCurrency(currentPeriodStats.totalRevenue)}
           icon={DollarSign}
           description="Total dari penjualan UMUM"
-          color="bg-green-900/50"
+          color="border-t-green-500"
         />
         <StatCard
           title="Total Transaksi"
           value={currentPeriodStats.totalTransactions.toString()}
           icon={ReceiptText}
           description="Jumlah total semua penjualan"
-           color="bg-blue-900/50"
+          color="border-t-blue-500"
         />
       </div>
 
@@ -261,28 +260,28 @@ export default function DashboardPage() {
           value={formatCurrency(currentPeriodStats.details.revenueRJ)}
           icon={Pill}
           description="Pendapatan dari pasien Rawat Jalan UMUM"
-          color="bg-green-900/50"
+          color="border-t-green-500"
         />
         <StatCard
           title="Pendapatan RI (UMUM)"
           value={formatCurrency(currentPeriodStats.details.revenueRI)}
           icon={Pill}
           description="Pendapatan dari pasien Rawat Inap UMUM"
-          color="bg-green-900/50"
+          color="border-t-green-500"
         />
          <StatCard
           title="Pengeluaran RJ (BPJS)"
           value={formatCurrency(currentPeriodStats.details.expenditureRJ)}
           icon={Stethoscope}
           description="Pengeluaran untuk pasien Rawat Jalan BPJS"
-          color="bg-amber-900/50"
+          color="border-t-orange-500"
         />
          <StatCard
           title="Pengeluaran RI (BPJS)"
           value={formatCurrency(currentPeriodStats.details.expenditureRI)}
           icon={Stethoscope}
           description="Pengeluaran untuk pasien Rawat Inap BPJS"
-          color="bg-amber-900/50"
+          color="border-t-orange-500"
         />
       </div>
       
@@ -345,5 +344,7 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
 
     
