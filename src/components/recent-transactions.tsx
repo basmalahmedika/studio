@@ -22,6 +22,7 @@ interface RecentTransactionsProps {
 }
 
 export function RecentTransactions({ transactions }: RecentTransactionsProps) {
+  // This component is no longer used on the main dashboard but kept for potential future use.
   const recentTransactions = transactions.slice(0, 5);
 
   return (
@@ -34,7 +35,7 @@ export function RecentTransactions({ transactions }: RecentTransactionsProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Obat</TableHead>
+              <TableHead>Deskripsi</TableHead>
               <TableHead className="hidden sm:table-cell">Tipe Pasien</TableHead>
               <TableHead className="hidden sm:table-cell">Pembayaran</TableHead>
               <TableHead className="text-right">Jumlah</TableHead>
@@ -54,7 +55,7 @@ export function RecentTransactions({ transactions }: RecentTransactionsProps) {
                     {transaction.patientType}
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">
-                    <Badge className="text-xs" variant={transaction.paymentMethod === 'BPJS' ? 'secondary' : 'outline'}>
+                    <Badge className="text-xs" variant={transaction.paymentMethod === 'UMUM' ? 'outline' : 'secondary'}>
                       {transaction.paymentMethod}
                     </Badge>
                   </TableCell>

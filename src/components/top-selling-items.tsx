@@ -84,7 +84,7 @@ export function TopSellingItems({ title, icon: Icon, transactions, inventory, it
             ) : (
               <TableRow>
                 <TableCell colSpan={2} className="h-24 text-center">
-                  Tidak ada data untuk periode ini.
+                  Tidak ada data penjualan.
                 </TableCell>
               </TableRow>
             )}
