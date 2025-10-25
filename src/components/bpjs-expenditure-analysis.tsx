@@ -235,49 +235,35 @@ export function BpjsExpenditureAnalysis({ transactions, inventory }: BpjsExpendi
 
   return (
     <div className='space-y-6'>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <TopExpenditureTable 
-            title="Pengeluaran BPJS RJ Teratas"
-            description="Transaksi BPJS Rawat Jalan dengan biaya tertinggi."
-            data={topExpendituresRJ}
-            onExport={() => handleExportData(topExpendituresRJ, 'Pengeluaran BPJS RJ', 'laporan_pengeluaran_bpjs_rj.xlsx')}
-            />
-            <TopExpenditureTable 
-            title="Pengeluaran BPJS RI Teratas"
-            description="Transaksi BPJS Rawat Inap dengan biaya tertinggi."
-            data={topExpendituresRI}
-            onExport={() => handleExportData(topExpendituresRI, 'Pengeluaran BPJS RI', 'laporan_pengeluaran_bpjs_ri.xlsx')}
-            />
-        </div>
-        <Card>
+       <Card className="bg-pink-600/90 text-white">
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5 text-muted-foreground" />
+                    <TrendingUp className="h-5 w-5" />
                     Analisis Rata-rata Pengeluaran BPJS
                 </CardTitle>
-                <CardDescription>Rata-rata biaya per transaksi untuk layanan BPJS. Data ditampilkan berdasarkan filter tanggal utama di atas.</CardDescription>
+                <CardDescription className='text-white/80'>Rata-rata biaya per transaksi untuk layanan BPJS. Data ditampilkan berdasarkan filter tanggal utama di atas.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-6 md:grid-cols-2">
-                 <div className="flex flex-row items-center justify-between space-y-0 rounded-lg border p-4">
+                 <div className="flex flex-row items-center justify-between space-y-0 rounded-lg border border-white/20 bg-white/10 p-4">
                     <div className='space-y-0.5'>
-                        <p className="text-sm text-muted-foreground">Rata-rata Pengeluaran per Transaksi RJ</p>
+                        <p className="text-sm">Rata-rata Pengeluaran per Transaksi RJ</p>
                         <h2 className="text-2xl font-bold">{formatCurrency(overallAverages.averageRJ.average)}</h2>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-white/80">
                             dari {overallAverages.averageRJ.count} transaksi
                         </p>
                     </div>
                 </div>
-                 <div className="flex flex-row items-center justify-between space-y-0 rounded-lg border p-4">
+                 <div className="flex flex-row items-center justify-between space-y-0 rounded-lg border border-white/20 bg-white/10 p-4">
                     <div className='space-y-0.5'>
-                        <p className="text-sm text-muted-foreground">Rata-rata Pengeluaran per Transaksi RI</p>
+                        <p className="text-sm">Rata-rata Pengeluaran per Transaksi RI</p>
                         <h2 className="text-2xl font-bold">{formatCurrency(overallAverages.averageRI.average)}</h2>
-                         <p className="text-xs text-muted-foreground">
+                         <p className="text-xs text-white/80">
                             dari {overallAverages.averageRI.count} transaksi
                         </p>
                     </div>
                 </div>
                  <div className="md:col-span-2">
-                  <Card>
+                  <Card className='text-card-foreground'>
                       <CardHeader>
                           <CardTitle>Perbandingan Rata-Rata Pengeluaran Bulanan</CardTitle>
                           <CardDescription>Perbandingan rata-rata biaya per transaksi BPJS antara Rawat Jalan dan Rawat Inap setiap bulan.</CardDescription>
@@ -305,11 +291,25 @@ export function BpjsExpenditureAnalysis({ transactions, inventory }: BpjsExpendi
                 </div>
             </CardContent>
             <CardFooter>
-                <p className="text-xs text-muted-foreground">
-                    Rumus: Rata-rata = (Total Harga Beli dari semua transaksi BPJS) / (Jumlah transaksi BPJS).
+                <p className="text-xs text-white/80">
+                    Rata-rata dihitung dengan rumus: (Total Harga Beli dari semua transaksi BPJS) / (Jumlah transaksi BPJS).
                 </p>
             </CardFooter>
         </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <TopExpenditureTable 
+            title="Pengeluaran BPJS RJ Teratas"
+            description="Transaksi BPJS Rawat Jalan dengan biaya tertinggi."
+            data={topExpendituresRJ}
+            onExport={() => handleExportData(topExpendituresRJ, 'Pengeluaran BPJS RJ', 'laporan_pengeluaran_bpjs_rj.xlsx')}
+            />
+            <TopExpenditureTable 
+            title="Pengeluaran BPJS RI Teratas"
+            description="Transaksi BPJS Rawat Inap dengan biaya tertinggi."
+            data={topExpendituresRI}
+            onExport={() => handleExportData(topExpendituresRI, 'Pengeluaran BPJS RI', 'laporan_pengeluaran_bpjs_ri.xlsx')}
+            />
+        </div>
     </div>
   );
 }

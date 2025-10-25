@@ -265,7 +265,7 @@ export default function DashboardPage() {
         <StatCard
           title="Pendapatan RI (UMUM)"
           value={formatCurrency(currentPeriodStats.details.revenueRI)}
-icon={Pill}
+          icon={Pill}
           description="Pendapatan dari pasien Rawat Inap UMUM"
           className="bg-green-600/90 text-white"
         />
@@ -284,6 +284,8 @@ icon={Pill}
           className="bg-orange-500/90 text-white"
         />
       </div>
+
+      <BpjsExpenditureAnalysis transactions={filteredTransactions} inventory={inventory} />
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <SalesTrendsChart 
@@ -322,8 +324,6 @@ icon={Pill}
             data={categoryChartDataRI}
          />
       </div>
-      
-      <BpjsExpenditureAnalysis transactions={filteredTransactions} inventory={inventory} />
       
        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <TopSellingItems 
