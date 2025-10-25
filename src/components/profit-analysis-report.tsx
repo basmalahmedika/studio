@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -74,11 +73,8 @@ export function ProfitAnalysisReport() {
       t.items.forEach(item => {
         const inventoryItem = inventory.find(inv => inv.id === item.itemId);
         if (inventoryItem) {
-          // For BPJS or Lain-lain, revenue must be calculated from purchase price.
-          const itemRevenue = (t.paymentMethod === 'BPJS' || t.paymentMethod === 'Lain-lain')
-            ? inventoryItem.purchasePrice * item.quantity
-            : item.price * item.quantity;
-
+          // CORRECTED LOGIC: Always use the price from the transaction item for revenue
+          const itemRevenue = item.price * item.quantity;
           const itemCost = inventoryItem.purchasePrice * item.quantity;
           const itemProfit = itemRevenue - itemCost;
           
