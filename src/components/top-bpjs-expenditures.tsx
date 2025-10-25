@@ -31,32 +31,36 @@ interface EnrichedTransactionItem extends TransactionItem {
   purchasePrice: number;
   subtotal: number;
 }
-interface BpjsPatientExpenditure {
-  mrNumber: string;
+
+interface DailyBpjsExpenditure {
+  date: string;
   totalCost: number;
-  items: EnrichedTransactionItem[];
   transactionCount: number;
-  lastTransactionDate: string;
+  patients: {
+    mrNumber: string;
+    patientTotal: number;
+    items: EnrichedTransactionItem[];
+  }[];
 }
 
 const formatCurrency = (value: number) => `Rp ${value.toLocaleString('id-ID')}`;
 
 export function TopBpjsExpenditures({ transactions, inventory }: TopBpjsExpendituresProps) {
 
-  const topExpenditures = React.useMemo(() => {
-    const patientExpenditures = new Map<string, BpjsPatientExpenditure>();
+  const topExpendituresByDate = React.useMemo(() => {
+    const dailyExpenditures = new Map<string, DailyBpjsExpenditure>();
 
     transactions.forEach(t => {
       if (t.patientType === 'Rawat Jalan' && t.paymentMethod === 'BPJS' && t.medicalRecordNumber) {
-        let patientData = patientExpenditures.get(t.medicalRecordNumber);
         
-        if (!patientData) {
-          patientData = {
-            mrNumber: t.medicalRecordNumber,
+        let dayData = dailyExpenditures.get(t.date);
+        
+        if (!dayData) {
+          dayData = {
+            date: t.date,
             totalCost: 0,
-            items: [],
             transactionCount: 0,
-            lastTransactionDate: t.date
+            patients: [],
           };
         }
 
@@ -74,37 +78,50 @@ export function TopBpjsExpenditures({ transactions, inventory }: TopBpjsExpendit
             };
         });
 
-        patientData.totalCost += transactionCost;
-        patientData.items.push(...enrichedItems);
-        patientData.transactionCount += 1;
-        
-        // Keep the latest transaction date
-        if (new Date(t.date) > new Date(patientData.lastTransactionDate)) {
-             patientData.lastTransactionDate = t.date;
-        }
+        dayData.totalCost += transactionCost;
+        dayData.transactionCount += 1;
 
-        patientExpenditures.set(t.medicalRecordNumber, patientData);
+        // Group items by patient within the day
+        let patientInDay = dayData.patients.find(p => p.mrNumber === t.medicalRecordNumber);
+        if (!patientInDay) {
+            patientInDay = {
+                mrNumber: t.medicalRecordNumber,
+                patientTotal: 0,
+                items: []
+            };
+            dayData.patients.push(patientInDay);
+        }
+        patientInDay.patientTotal += transactionCost;
+        patientInDay.items.push(...enrichedItems);
+
+        dailyExpenditures.set(t.date, dayData);
       }
     });
 
-    return Array.from(patientExpenditures.values())
+    return Array.from(dailyExpenditures.values())
       .sort((a, b) => b.totalCost - a.totalCost)
       .slice(0, 10);
 
   }, [transactions, inventory]);
 
   const handleExportData = () => {
-    const dataToExport = topExpenditures.flatMap(patient => 
-      patient.items.map(item => ({
-        'No. Rekam Medis': patient.mrNumber,
-        'Tanggal Transaksi Terakhir': patient.lastTransactionDate,
-        'Nama Item': item.itemName,
-        'Kuantitas': item.quantity,
-        'Harga Beli Satuan': item.purchasePrice,
-        'Total Biaya Item': item.subtotal,
-        'Total Pengeluaran Pasien': patient.totalCost,
-      }))
-    );
+    const dataToExport: any[] = [];
+    topExpendituresByDate.forEach(day => {
+        day.patients.forEach(patient => {
+            patient.items.forEach(item => {
+                dataToExport.push({
+                    'Tanggal': day.date,
+                    'No. Rekam Medis': patient.mrNumber,
+                    'Nama Item': item.itemName,
+                    'Kuantitas': item.quantity,
+                    'Harga Beli Satuan': item.purchasePrice,
+                    'Subtotal Item': item.subtotal,
+                    'Total Pasien Hari Ini': patient.patientTotal,
+                    'Total Pengeluaran Hari Ini': day.totalCost,
+                });
+            });
+        });
+    });
 
     if (dataToExport.length === 0) {
       alert("Tidak ada data untuk diekspor.");
@@ -113,11 +130,11 @@ export function TopBpjsExpenditures({ transactions, inventory }: TopBpjsExpendit
 
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     ws['!cols'] = [
-      { wch: 20 }, { wch: 20 }, { wch: 30 }, { wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 25 }
+      { wch: 15 }, { wch: 20 }, { wch: 30 }, { wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 25 }, { wch: 25 }
     ];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Pengeluaran BPJS RJ Teratas');
-    XLSX.writeFile(wb, 'laporan_pengeluaran_bpjs_rj_teratas.xlsx');
+    XLSX.utils.book_append_sheet(wb, ws, 'Pengeluaran BPJS RJ per Hari');
+    XLSX.writeFile(wb, 'laporan_pengeluaran_harian_bpjs_rj.xlsx');
   };
 
   return (
@@ -125,8 +142,8 @@ export function TopBpjsExpenditures({ transactions, inventory }: TopBpjsExpendit
       <CardHeader>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="space-y-1.5">
-            <CardTitle>Pengeluaran Pasien BPJS RJ Teratas</CardTitle>
-            <CardDescription>Daftar pasien Rawat Jalan BPJS dengan total pengeluaran (berdasarkan harga beli) terbesar.</CardDescription>
+            <CardTitle>Pengeluaran BPJS RJ Harian Teratas</CardTitle>
+            <CardDescription>Daftar tanggal dengan total pengeluaran BPJS Rawat Jalan (berdasarkan harga beli) terbesar.</CardDescription>
           </div>
           <Button variant="outline" size="sm" onClick={handleExportData}>
               <FileDown className="mr-2 h-4 w-4" />
@@ -139,20 +156,19 @@ export function TopBpjsExpenditures({ transactions, inventory }: TopBpjsExpendit
             <Table>
             <TableHeader>
                 <TableRow>
-                <TableHead>No. Rekam Medis</TableHead>
-                <TableHead>Tgl Transaksi Terakhir</TableHead>
-                <TableHead className="text-right">Total Pengeluaran (Harga Beli)</TableHead>
+                    <TableHead>Tanggal</TableHead>
+                    <TableHead className="text-center">Jumlah Transaksi</TableHead>
+                    <TableHead className="text-right">Total Pengeluaran (Harga Beli)</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
-                {topExpenditures.length > 0 ? (
-                topExpenditures.map(item => (
-                    <TableRow key={item.mrNumber}>
+                {topExpendituresByDate.length > 0 ? (
+                topExpendituresByDate.map(item => (
+                    <TableRow key={item.date}>
                         <TableCell>
-                            <div className="font-medium">{item.mrNumber}</div>
-                             <div className="text-sm text-muted-foreground">{item.transactionCount} transaksi</div>
+                            <div className="font-medium">{item.date}</div>
                         </TableCell>
-                         <TableCell>{item.lastTransactionDate}</TableCell>
+                        <TableCell className="text-center">{item.transactionCount}</TableCell>
                         <TableCell className="text-right font-semibold">{formatCurrency(item.totalCost)}</TableCell>
                     </TableRow>
                 ))
@@ -170,5 +186,3 @@ export function TopBpjsExpenditures({ transactions, inventory }: TopBpjsExpendit
     </Card>
   );
 }
-
-    
