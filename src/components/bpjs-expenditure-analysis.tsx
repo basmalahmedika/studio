@@ -235,7 +235,7 @@ export function BpjsExpenditureAnalysis({ transactions, inventory }: BpjsExpendi
 
   return (
     <div className='space-y-6'>
-       <Card className="bg-pink-600/90 text-white">
+       <Card className="bg-gradient-to-br from-green-500 to-yellow-500 text-white">
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <TrendingUp className="h-5 w-5" />

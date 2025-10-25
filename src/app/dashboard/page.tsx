@@ -33,16 +33,18 @@ interface CategoryBreakdown {
 
 interface AllStats {
   totalRevenue: number;
-  totalTransactions: number;
+  totalTransactionsRJ: number;
+  totalTransactionsRI: number;
   details: DetailedStats;
   categoryBreakdown: CategoryBreakdown;
-  totalExpenditure: number; // Re-add for footer analysis
+  totalExpenditure: number; 
 }
 
 const calculateStats = (transactions: Transaction[], inventory: InventoryItem[]): AllStats => {
     const stats: AllStats = {
       totalRevenue: 0,
-      totalTransactions: 0,
+      totalTransactionsRJ: 0,
+      totalTransactionsRI: 0,
       details: {
         revenueRJ: 0,
         revenueRI: 0,
@@ -62,7 +64,11 @@ const calculateStats = (transactions: Transaction[], inventory: InventoryItem[])
 
     transactions.forEach(t => {
       if (!uniqueTransactionIds.has(t.id)) {
-        stats.totalTransactions += 1;
+         if (t.patientType === 'Rawat Jalan') {
+            stats.totalTransactionsRJ += 1;
+         } else if (t.patientType === 'Rawat Inap') {
+            stats.totalTransactionsRI += 1;
+         }
         uniqueTransactionIds.add(t.id);
       }
       
@@ -237,7 +243,7 @@ export default function DashboardPage() {
         </div>
       </div>
       
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Pendapatan"
           value={formatCurrency(currentPeriodStats.totalRevenue)}
@@ -246,11 +252,25 @@ export default function DashboardPage() {
           className="bg-green-600/90 text-white"
         />
         <StatCard
-          title="Total Transaksi"
-          value={currentPeriodStats.totalTransactions.toString()}
+          title="Total Transaksi RJ"
+          value={currentPeriodStats.totalTransactionsRJ.toString()}
           icon={ReceiptText}
-          description="Jumlah total semua penjualan"
+          description="Jml. transaksi Rawat Jalan (UMUM & BPJS)"
           className="bg-blue-600/90 text-white"
+        />
+        <StatCard
+          title="Total Transaksi RI"
+          value={currentPeriodStats.totalTransactionsRI.toString()}
+          icon={ReceiptText}
+          description="Jml. transaksi Rawat Inap (UMUM & BPJS)"
+          className="bg-blue-600/90 text-white"
+        />
+         <StatCard
+          title="Total Pengeluaran"
+          value={formatCurrency(currentPeriodStats.totalExpenditure)}
+          icon={Stethoscope}
+          description="Pengeluaran untuk pasien BPJS & Lain-lain"
+          className="bg-orange-500/90 text-white"
         />
       </div>
 
