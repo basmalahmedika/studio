@@ -243,14 +243,14 @@ export default function DashboardPage() {
           value={formatCurrency(currentPeriodStats.totalRevenue)}
           icon={DollarSign}
           description="Total dari penjualan UMUM"
-          color="border-t-green-500"
+          className="bg-green-600/90 text-white"
         />
         <StatCard
           title="Total Transaksi"
           value={currentPeriodStats.totalTransactions.toString()}
           icon={ReceiptText}
           description="Jumlah total semua penjualan"
-          color="border-t-blue-500"
+          className="bg-blue-600/90 text-white"
         />
       </div>
 
@@ -260,28 +260,28 @@ export default function DashboardPage() {
           value={formatCurrency(currentPeriodStats.details.revenueRJ)}
           icon={Pill}
           description="Pendapatan dari pasien Rawat Jalan UMUM"
-          color="border-t-green-500"
+          className="bg-green-600/90 text-white"
         />
         <StatCard
           title="Pendapatan RI (UMUM)"
           value={formatCurrency(currentPeriodStats.details.revenueRI)}
-          icon={Pill}
+icon={Pill}
           description="Pendapatan dari pasien Rawat Inap UMUM"
-          color="border-t-green-500"
+          className="bg-green-600/90 text-white"
         />
          <StatCard
           title="Pengeluaran RJ (BPJS)"
           value={formatCurrency(currentPeriodStats.details.expenditureRJ)}
           icon={Stethoscope}
           description="Pengeluaran untuk pasien Rawat Jalan BPJS"
-          color="border-t-orange-500"
+          className="bg-orange-500/90 text-white"
         />
          <StatCard
           title="Pengeluaran RI (BPJS)"
           value={formatCurrency(currentPeriodStats.details.expenditureRI)}
           icon={Stethoscope}
           description="Pengeluaran untuk pasien Rawat Inap BPJS"
-          color="border-t-orange-500"
+          className="bg-orange-500/90 text-white"
         />
       </div>
       
@@ -344,7 +344,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
-
-    

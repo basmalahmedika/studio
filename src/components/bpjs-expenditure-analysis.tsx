@@ -211,7 +211,7 @@ export function BpjsExpenditureAnalysis({ transactions, inventory }: BpjsExpendi
                     <TrendingUp className="h-5 w-5 text-muted-foreground" />
                     Analisis Rata-rata Pengeluaran BPJS
                 </CardTitle>
-                <CardDescription>Rata-rata biaya per transaksi untuk layanan BPJS.</CardDescription>
+                <CardDescription>Rata-rata biaya per transaksi untuk layanan BPJS. Data ditampilkan berdasarkan filter tanggal utama di atas.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
                  <div className="flex flex-row items-center justify-between space-y-0 rounded-lg border p-4">
@@ -227,9 +227,12 @@ export function BpjsExpenditureAnalysis({ transactions, inventory }: BpjsExpendi
                     </div>
                 </div>
             </CardContent>
+            <CardFooter>
+                <p className="text-xs text-muted-foreground">
+                    Rumus: Rata-rata = (Total Harga Beli dari semua transaksi BPJS) / (Jumlah transaksi BPJS).
+                </p>
+            </CardFooter>
         </Card>
     </div>
   );
 }
-
-    
