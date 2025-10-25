@@ -2,7 +2,7 @@
 'use client';
 
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend } from 'recharts';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import {
   ChartContainer,
   ChartTooltipContent,
@@ -71,6 +71,11 @@ export function SalesTrendsChart({ data }: SalesTrendsChartProps) {
             </BarChart>
         </ChartContainer>
       </CardContent>
+       <CardFooter>
+        <p className="text-sm text-muted-foreground">
+          *Grafik ini membandingkan total nilai penjualan (omzet) dari rentang tanggal yang Anda pilih dengan periode waktu yang sama sebelumnya.
+        </p>
+      </CardFooter>
     </Card>
   );
 }
