@@ -168,12 +168,9 @@ export function TransactionsDataTable() {
 
     try {
         if (values.id) {
-          const originalTransaction = transactions.find(t => t.id === values.id);
-          if (originalTransaction) {
-            const { id, ...updateData } = transactionData;
-            await updateTransaction(id!, updateData, originalTransaction);
-            toast({ title: "Sukses", description: "Transaksi telah diperbarui." });
-          }
+          const { id, ...updateData } = transactionData;
+          await updateTransaction(id!, updateData);
+          toast({ title: "Sukses", description: "Transaksi telah diperbarui." });
         } else {
           const { id, ...createData } = transactionData;
           await addTransaction(createData);

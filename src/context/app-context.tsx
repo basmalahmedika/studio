@@ -33,7 +33,7 @@ interface AppContextType {
   bulkAddInventoryItems: (items: Omit<InventoryItem, 'id'>[]) => Promise<void>;
   bulkDeleteInventoryItems: (ids: string[]) => Promise<void>;
   addTransaction: (transaction: Omit<Transaction, 'id'>) => Promise<void>;
-  updateTransaction: (id: string, updatedTransactionData: Omit<Transaction, 'id'>, originalTransaction: Transaction) => Promise<void>;
+  updateTransaction: (id: string, updatedTransactionData: Omit<Transaction, 'id'>) => Promise<void>;
   deleteTransaction: (id: string, transactionToDelete: Transaction) => Promise<void>;
 }
 
@@ -120,6 +120,7 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
     const batch = writeBatch(db);
     const inventoryCollectionRef = collection(db, 'inventory');
     
+    // Fetch all existing inventory items once to avoid queries in a loop
     const inventorySnapshot = await getDocs(inventoryCollectionRef);
     const existingItemsMap = new Map<string, { id: string; quantity: number }>();
     inventorySnapshot.docs.forEach(doc => {
@@ -133,13 +134,17 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
       const existingItem = existingItemsMap.get(key);
 
       if (existingItem) {
+        // If item exists, update its quantity
         const docRef = doc(db, 'inventory', existingItem.id);
         const newQuantity = (existingItem.quantity || 0) + item.quantity;
         batch.update(docRef, { ...item, quantity: newQuantity });
+        // Update the map for subsequent items in the same batch
         existingItemsMap.set(key, { ...existingItem, quantity: newQuantity });
       } else {
+        // If item doesn't exist, create a new one
         const newDocRef = doc(inventoryCollectionRef);
         batch.set(newDocRef, item);
+         // Add the new item to the map so it can be found by subsequent items in the same import
         existingItemsMap.set(key, { id: newDocRef.id, quantity: item.quantity });
       }
     }
@@ -183,18 +188,26 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
         t.update(itemRef, { quantity: newQuantity });
       }
 
-      // Create a new document reference in the 'transactions' collection
+      // CORRECTED LOGIC: Create a new document reference first, then set data
       const newTransactionRef = doc(collection(db, 'transactions'));
-      // Use the transaction 'set' method to create the new document
       t.set(newTransactionRef, transaction);
     });
   };
 
-  const updateTransaction = async (id: string, updatedTransactionData: Omit<Transaction, 'id'>, originalTransaction: Transaction) => {
+ const updateTransaction = async (id: string, updatedTransactionData: Omit<Transaction, 'id'>) => {
     const db = getDb();
     await runTransaction(db, async (t) => {
+        const transactionDocRef = doc(db, 'transactions', id);
+        const originalTransactionDoc = await t.get(transactionDocRef);
+
+        if (!originalTransactionDoc.exists()) {
+            throw new Error("Transaksi tidak ditemukan.");
+        }
+        
+        const originalTransaction = originalTransactionDoc.data() as Transaction;
         const stockAdjustments = new Map<string, number>();
 
+        // Calculate adjustments: positive for stock to be returned, negative for stock to be removed
         (originalTransaction.items || []).forEach(item => {
             stockAdjustments.set(item.itemId, (stockAdjustments.get(item.itemId) || 0) + item.quantity);
         });
@@ -202,17 +215,19 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
         (updatedTransactionData.items || []).forEach(item => {
             stockAdjustments.set(item.itemId, (stockAdjustments.get(item.itemId) || 0) - item.quantity);
         });
-        
+
         const itemRefsToFetch = Array.from(stockAdjustments.keys()).map(itemId => doc(db, 'inventory', itemId));
         if (itemRefsToFetch.length === 0) {
-            const transactionDocRef = doc(db, 'transactions', id);
+            // If no items, just update the transaction data
             t.update(transactionDocRef, updatedTransactionData);
             return;
         }
-        
+
+        // Fetch all necessary inventory documents within the transaction
         const itemDocs = await Promise.all(itemRefsToFetch.map(ref => t.get(ref)));
         const itemDocsMap = new Map(itemDocs.map(itemDoc => [itemDoc.id, itemDoc]));
 
+        // Apply stock adjustments
         for (const [itemId, adjustment] of stockAdjustments.entries()) {
              if (adjustment === 0) continue; 
 
@@ -231,8 +246,8 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
              
              t.update(itemDoc.ref, { quantity: newQuantity });
         }
-
-        const transactionDocRef = doc(db, 'transactions', id);
+        
+        // Finally, update the transaction document itself
         t.update(transactionDocRef, updatedTransactionData);
     });
 };
