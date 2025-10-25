@@ -5,7 +5,7 @@ import * as React from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { PlusCircle, MoreHorizontal, Pen, Trash2, Upload, Download, FileDown, Search } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Pen, Trash2, Upload, Download, FileDown, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from "date-fns"
 import { Calendar as CalendarIcon } from "lucide-react"
 import * as XLSX from 'xlsx';
@@ -64,7 +64,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Input } from '@/components/ui/input';
 import { Calendar } from "@/components/ui/calendar"
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAppContext } from '@/context/app-context';
 import type { InventoryItem } from '@/lib/types';
@@ -178,6 +178,8 @@ export function InventoryDataTable() {
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
   const [selectedRows, setSelectedRows] = React.useState<string[]>([]);
   const [searchTerm, setSearchTerm] = React.useState('');
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [itemsPerPage, setItemsPerPage] = React.useState(10);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -402,9 +404,23 @@ export function InventoryDataTable() {
     XLSX.writeFile(wb, 'inventory_export.xlsx');
   };
   
+  const filteredInventory = React.useMemo(() => {
+    return inventory.filter(item =>
+      item.itemName.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [inventory, searchTerm]);
+
+  // Pagination Logic
+  const totalItems = filteredInventory.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const paginatedData = filteredInventory.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedRows(filteredInventory.map(item => item.id));
+      setSelectedRows(paginatedData.map(item => item.id));
     } else {
       setSelectedRows([]);
     }
@@ -417,12 +433,13 @@ export function InventoryDataTable() {
       setSelectedRows(prev => prev.filter(rowId => rowId !== id));
     }
   };
-
-  const filteredInventory = React.useMemo(() => {
-    return inventory.filter(item =>
-      item.itemName.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [inventory, searchTerm]);
+  
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1);
+  };
+  
+  const isAllOnPageSelected = paginatedData.length > 0 && selectedRows.length === paginatedData.length && paginatedData.every(item => selectedRows.includes(item.id));
 
   return (
     <Card>
@@ -760,7 +777,7 @@ export function InventoryDataTable() {
               placeholder="Search items..."
               className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={handleSearchChange}
             />
           </div>
         </div>
@@ -772,7 +789,7 @@ export function InventoryDataTable() {
               <TableRow>
                  <TableHead className="w-[40px]">
                   <Checkbox
-                    checked={selectedRows.length === filteredInventory.length && filteredInventory.length > 0}
+                    checked={isAllOnPageSelected}
                     onCheckedChange={(value) => handleSelectAll(!!value)}
                     aria-label="Select all"
                   />
@@ -792,7 +809,7 @@ export function InventoryDataTable() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredInventory.map((item) => (
+              {paginatedData.map((item) => (
                 <TableRow key={item.id} data-state={selectedRows.includes(item.id) && "selected"}>
                    <TableCell>
                     <Checkbox
@@ -857,6 +874,61 @@ export function InventoryDataTable() {
           </Table>
         </div>
       </CardContent>
+       <CardFooter>
+        <div className="flex items-center justify-between w-full text-sm text-muted-foreground">
+          <div className="flex-1">
+            Showing {Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)} to {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} items.
+          </div>
+          <div className="flex items-center gap-4">
+             <div className="flex items-center gap-2">
+                <span>Rows per page</span>
+                 <Select
+                    value={`${itemsPerPage}`}
+                    onValueChange={(value) => {
+                      setItemsPerPage(Number(value));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-[70px]">
+                      <SelectValue placeholder={itemsPerPage} />
+                    </SelectTrigger>
+                    <SelectContent side="top">
+                      {[10, 25, 50, 100].map((pageSize) => (
+                        <SelectItem key={pageSize} value={`${pageSize}`}>
+                          {pageSize}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+             </div>
+             <div className="w-20 text-center">
+                Page {currentPage} of {totalPages}
+            </div>
+            <div className="flex gap-2">
+                 <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  <span className="sr-only">Previous Page</span>
+                </Button>
+                 <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                >
+                  <span className="sr-only">Next Page</span>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+            </div>
+          </div>
+        </div>
+      </CardFooter>
     </Card>
   );
 }
+
+    
