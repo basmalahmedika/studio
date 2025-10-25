@@ -19,20 +19,24 @@ interface SalesTrendsChartProps {
   title: string;
   data: SalesComparisonData[];
   footer?: ReactNode;
+  currentLabel?: string;
+  previousLabel?: string;
 }
 
-const chartConfig = {
-  current: {
-    label: 'Periode Ini',
-    color: 'hsl(var(--chart-1))',
-  },
-  previous: {
-    label: 'Periode Lalu',
-    color: 'hsl(var(--chart-2))',
-  },
-};
 
-export function SalesTrendsChart({ title, data, footer }: SalesTrendsChartProps) {
+export function SalesTrendsChart({ title, data, footer, currentLabel = 'Periode Ini', previousLabel = 'Periode Lalu' }: SalesTrendsChartProps) {
+  
+  const chartConfig = {
+    current: {
+      label: currentLabel,
+      color: 'hsl(var(--chart-1))',
+    },
+    previous: {
+      label: previousLabel,
+      color: 'hsl(var(--chart-2))',
+    },
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -57,7 +61,8 @@ export function SalesTrendsChart({ title, data, footer }: SalesTrendsChartProps)
                 cursor={false}
                 content={<ChartTooltipContent 
                   formatter={(value, name) => {
-                    const label = name === 'current' ? 'Bulan Ini' : 'Bulan Lalu';
+                    const dataKey = name as keyof typeof chartConfig;
+                    const label = chartConfig[dataKey]?.label || name;
                     return (
                         <div className="flex flex-col">
                             <span>{label}</span>

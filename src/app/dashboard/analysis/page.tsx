@@ -13,6 +13,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useAppContext } from '@/context/app-context';
 import type { Transaction } from '@/lib/types';
 import { SalesTrendsChart } from '@/components/sales-trends-chart';
+import { AbcAnalysis } from '@/components/abc-analysis';
+import { ProfitAnalysisReport } from '@/components/profit-analysis-report';
+import { SupplierPriceAnalysis } from '@/components/supplier-price-analysis';
 
 const MONTHS = [
   'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
@@ -42,7 +45,13 @@ const calculateYearlyAverages = (
   } = {};
 
   transactions
-    .filter(t => new Date(t.date).getFullYear() === year && t.paymentMethod === 'BPJS')
+    .filter(t => {
+        try {
+            return new Date(t.date).getFullYear() === year && t.paymentMethod === 'BPJS';
+        } catch (e) {
+            return false;
+        }
+    })
     .forEach(t => {
       const month = new Date(t.date).getMonth();
       if (!monthlyAggregates[month]) {
@@ -83,7 +92,13 @@ export default function AnalysisPage() {
   const [comparisonYear, setComparisonYear] = React.useState(currentYear - 1);
 
   const availableYears = React.useMemo(() => {
-    const years = new Set(transactions.map(t => new Date(t.date).getFullYear()));
+    const years = new Set(transactions.map(t => {
+        try {
+            return new Date(t.date).getFullYear();
+        } catch(e) {
+            return 0;
+        }
+    }).filter(y => y > 0));
     return Array.from(years).sort((a, b) => b - a);
   }, [transactions]);
 
@@ -113,9 +128,9 @@ export default function AnalysisPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-3xl font-headline font-bold tracking-tight">Analisis Perbandingan Tahunan</h1>
+        <h1 className="text-3xl font-headline font-bold tracking-tight">Analisis</h1>
         <p className="text-muted-foreground">
-          Bandingkan rata-rata pengeluaran BPJS bulanan antara dua tahun yang berbeda.
+          Analisis mendalam mengenai profit, klasifikasi item, dan perbandingan performa.
         </p>
       </div>
 
@@ -166,12 +181,23 @@ export default function AnalysisPage() {
         <SalesTrendsChart 
           title={`Perbandingan Rata-rata Pengeluaran BPJS RJ (${comparisonYear} vs ${selectedYear})`}
           data={chartDataRJ} 
+          currentLabel={selectedYear.toString()}
+          previousLabel={comparisonYear.toString()}
         />
         <SalesTrendsChart 
           title={`Perbandingan Rata-rata Pengeluaran BPJS RI (${comparisonYear} vs ${selectedYear})`}
           data={chartDataRI} 
+          currentLabel={selectedYear.toString()}
+          previousLabel={comparisonYear.toString()}
         />
       </div>
+      
+       <div className="space-y-6">
+        <ProfitAnalysisReport />
+        <AbcAnalysis transactions={transactions} itemTypeFilter={'all'} />
+        <SupplierPriceAnalysis inventory={inventory} />
+      </div>
+
     </div>
   );
 }
