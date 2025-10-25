@@ -116,26 +116,40 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
   };
 
   const bulkAddInventoryItems = async (items: Omit<InventoryItem, 'id'>[]) => {
-      const db = getDb();
-      const batch = writeBatch(db);
-      const inventoryCollection = collection(db, 'inventory');
-      
-      for (const item of items) {
-          const q = query(inventoryCollection, where("itemName", "==", item.itemName), where("batchNumber", "==", item.batchNumber));
-          const querySnapshot = await getDocs(q);
-          
-          if (!querySnapshot.empty) {
-              const existingDoc = querySnapshot.docs[0];
-              const docRef = doc(db, 'inventory', existingDoc.id);
-              const newQuantity = (existingDoc.data().quantity || 0) + item.quantity;
-              batch.update(docRef, { ...item, quantity: newQuantity });
-          } else {
-              const newDocRef = doc(inventoryCollection);
-              batch.set(newDocRef, item);
-          }
+    const db = getDb();
+    const batch = writeBatch(db);
+    const inventoryCollectionRef = collection(db, 'inventory');
+    
+    // Fetch all existing inventory items once to create a lookup map.
+    // This is far more efficient than querying inside a loop.
+    const inventorySnapshot = await getDocs(inventoryCollectionRef);
+    const existingItemsMap = new Map<string, { id: string; quantity: number }>();
+    inventorySnapshot.docs.forEach(doc => {
+      const data = doc.data();
+      const key = `${data.itemName}_${data.batchNumber}`;
+      existingItemsMap.set(key, { id: doc.id, quantity: data.quantity });
+    });
+
+    for (const item of items) {
+      const key = `${item.itemName}_${item.batchNumber}`;
+      const existingItem = existingItemsMap.get(key);
+
+      if (existingItem) {
+        // If item exists, update its quantity
+        const docRef = doc(db, 'inventory', existingItem.id);
+        const newQuantity = (existingItem.quantity || 0) + item.quantity;
+        batch.update(docRef, { ...item, quantity: newQuantity });
+        // Update the map for subsequent items in the same batch run
+        existingItemsMap.set(key, { ...existingItem, quantity: newQuantity });
+      } else {
+        // If item is new, add it and update the map
+        const newDocRef = doc(inventoryCollectionRef);
+        batch.set(newDocRef, item);
+        existingItemsMap.set(key, { id: newDocRef.id, quantity: item.quantity });
       }
-      
-      await batch.commit();
+    }
+    
+    await batch.commit();
   };
   
   const bulkDeleteInventoryItems = async (ids: string[]) => {
@@ -152,34 +166,26 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
   const addTransaction = async (transaction: Omit<Transaction, 'id'>) => {
     const db = getDb();
     await runTransaction(db, async (t) => {
-      if (!transaction.items || transaction.items.length === 0) {
+      const transactionItems = transaction.items || [];
+      if (transactionItems.length === 0) {
         throw new Error("Transaction must have at least one item.");
       }
 
-      // 1. READ PHASE: Get all documents first.
-      const itemRefs = transaction.items.map(item => doc(db, 'inventory', item.itemId));
-      const itemDocs = await Promise.all(itemRefs.map(ref => t.get(ref)));
-
-      // 2. VALIDATION PHASE: Check stock and data integrity.
-      for (let i = 0; i < transaction.items.length; i++) {
-        const soldItem = transaction.items[i];
-        const itemDoc = itemDocs[i];
+      for (const soldItem of transactionItems) {
+        const itemRef = doc(db, 'inventory', soldItem.itemId);
+        const itemDoc = await t.get(itemRef);
 
         if (!itemDoc.exists()) {
           throw new Error(`Item with id ${soldItem.itemId} does not exist!`);
         }
+        
         const currentQuantity = itemDoc.data().quantity;
         if (currentQuantity < soldItem.quantity) {
           throw new Error(`Insufficient stock for item ${itemDoc.data().itemName}. Available: ${currentQuantity}, Required: ${soldItem.quantity}`);
         }
-      }
-
-      // 3. WRITE PHASE: Perform all writes after all reads are complete.
-      for (let i = 0; i < transaction.items.length; i++) {
-        const soldItem = transaction.items[i];
-        const itemDoc = itemDocs[i];
-        const currentQuantity = itemDoc.data().quantity;
-        t.update(itemRefs[i], { quantity: currentQuantity - soldItem.quantity });
+        
+        const newQuantity = currentQuantity - soldItem.quantity;
+        t.update(itemRef, { quantity: newQuantity });
       }
 
       const transactionCollection = collection(db, 'transactions');
@@ -202,42 +208,31 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
             stockAdjustments.set(item.itemId, (stockAdjustments.get(item.itemId) || 0) - item.quantity);
         });
 
-        // 1. READ PHASE
-        const itemIds = Array.from(stockAdjustments.keys());
-        if (itemIds.length === 0) { // Only transaction details are updated, no item changes
-          const transactionDocRef = doc(db, 'transactions', id);
-          t.update(transactionDocRef, updatedTransactionData);
-          return;
+        // If no items were changed, just update the transaction details
+        if (stockAdjustments.size === 0) {
+            const transactionDocRef = doc(db, 'transactions', id);
+            t.update(transactionDocRef, updatedTransactionData);
+            return;
         }
-
-        const itemRefs = itemIds.map(itemId => doc(db, 'inventory', itemId));
-        const itemDocs = await Promise.all(itemRefs.map(ref => t.get(ref)));
-
-        const inventoryMap = new Map<string, DocumentSnapshot>();
-        itemDocs.forEach((docSnap) => {
-            if (docSnap.exists()) {
-                inventoryMap.set(docSnap.id, docSnap);
-            }
-        });
-
-        // 2. VALIDATION PHASE
+        
         for (const [itemId, adjustment] of stockAdjustments.entries()) {
-            const itemDoc = inventoryMap.get(itemId);
-            if (!itemDoc) {
-                throw new Error(`Item with id ${itemId} was not found.`);
-            }
-            const currentQuantity = itemDoc.data()?.quantity || 0;
-            // The final quantity is the current stock plus the net adjustment
-            if (currentQuantity + adjustment < 0) {
-                throw new Error(`Insufficient stock for item ${itemDoc.data()?.itemName}. Required change would result in negative stock.`);
-            }
-        }
+             if (adjustment === 0) continue; // Skip items with no net change
 
-        // 3. WRITE PHASE
-        for (const [itemId, adjustment] of stockAdjustments.entries()) {
-            const itemDoc = inventoryMap.get(itemId)!;
-            const newQuantity = (itemDoc.data()?.quantity || 0) + adjustment;
-            t.update(itemDoc.ref, { quantity: newQuantity });
+             const itemRef = doc(db, 'inventory', itemId);
+             const itemDoc = await t.get(itemRef);
+
+             if (!itemDoc.exists()) {
+                 throw new Error(`Item with id ${itemId} was not found.`);
+             }
+
+             const currentQuantity = itemDoc.data()?.quantity || 0;
+             const newQuantity = currentQuantity + adjustment;
+
+             if (newQuantity < 0) {
+                 throw new Error(`Insufficient stock for item ${itemDoc.data()?.itemName}. Required change would result in negative stock.`);
+             }
+             
+             t.update(itemRef, { quantity: newQuantity });
         }
 
         const transactionDocRef = doc(db, 'transactions', id);
@@ -256,21 +251,15 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
              return;
         }
 
-        // 1. READ PHASE
-        const itemRefs = itemsToRestore.map(item => doc(db, 'inventory', item.itemId));
-        const itemDocs = await Promise.all(itemRefs.map(ref => t.get(ref)));
-
-        // 2. WRITE PHASE
-        for (let i = 0; i < itemsToRestore.length; i++) {
-          const itemToRestore = itemsToRestore[i];
-          const itemDoc = itemDocs[i];
+        for (const itemToRestore of itemsToRestore) {
+          const itemRef = doc(db, 'inventory', itemToRestore.itemId);
+          const itemDoc = await t.get(itemRef);
           
           if (itemDoc.exists()) {
               const currentQuantity = itemDoc.data().quantity || 0;
               const newQuantity = currentQuantity + itemToRestore.quantity;
-              t.update(itemRefs[i], { quantity: newQuantity });
+              t.update(itemRef, { quantity: newQuantity });
           } else {
-              // Optionally handle case where item was deleted from inventory
               console.warn(`Inventory item with ID ${itemToRestore.itemId} not found. Cannot restore stock.`);
           }
         }
