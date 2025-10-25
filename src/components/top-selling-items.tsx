@@ -63,14 +63,14 @@ export function TopSellingItems({ title, icon: Icon, transactions, inventory, it
             <Icon className="h-5 w-5 text-muted-foreground" />
             {title}
         </CardTitle>
-        <CardDescription>Top 5 most sold items from the selected period.</CardDescription>
+        <CardDescription>5 item terlaris dari periode yang dipilih.</CardDescription>
       </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Item Name</TableHead>
-              <TableHead className="text-right">Quantity Sold</TableHead>
+              <TableHead>Nama Item</TableHead>
+              <TableHead className="text-right">Kuantitas Terjual</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -84,7 +84,7 @@ export function TopSellingItems({ title, icon: Icon, transactions, inventory, it
             ) : (
               <TableRow>
                 <TableCell colSpan={2} className="h-24 text-center">
-                  No data available for this period.
+                  Tidak ada data untuk periode ini.
                 </TableCell>
               </TableRow>
             )}

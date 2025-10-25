@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -35,14 +36,14 @@ export function LowStockReport() {
     
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Low Stock');
+    XLSX.utils.book_append_sheet(wb, ws, 'Stok Menipis');
 
     ws['!cols'] = [
         { wch: 30 }, 
         { wch: 15 },
     ];
 
-    XLSX.writeFile(wb, 'low_stock_report.xlsx');
+    XLSX.writeFile(wb, 'laporan_stok_menipis.xlsx');
   };
 
   return (
@@ -52,15 +53,15 @@ export function LowStockReport() {
           <div className="space-y-1.5">
             <CardTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-destructive" />
-              Low Stock Report
+              Laporan Stok Menipis
             </CardTitle>
             <CardDescription>
-              Items with quantity below {LOW_STOCK_THRESHOLD} units.
+              Item dengan kuantitas di bawah {LOW_STOCK_THRESHOLD} unit.
             </CardDescription>
           </div>
            <Button variant="outline" size="sm" onClick={handleExportData}>
               <FileDown className="mr-2 h-4 w-4" />
-              Export Excel
+              Ekspor Excel
           </Button>
         </div>
       </CardHeader>
@@ -69,8 +70,8 @@ export function LowStockReport() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Item Name</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
+                  <TableHead>Nama Item</TableHead>
+                  <TableHead className="text-right">Kuantitas</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -84,7 +85,7 @@ export function LowStockReport() {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={2} className="h-24 text-center">
-                      No items are running low on stock.
+                      Tidak ada item yang stoknya menipis.
                     </TableCell>
                   </TableRow>
                 )}

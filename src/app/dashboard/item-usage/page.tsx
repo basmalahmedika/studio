@@ -123,17 +123,17 @@ export default function ItemUsagePage() {
     
     const wsUmum = XLSX.utils.json_to_sheet(formatDataForExport(itemUsageDataUmum));
     wsUmum['!cols'] = [{ wch: 40 }, { wch: 15 }, { wch: 20 }, { wch: 15 }];
-    XLSX.utils.book_append_sheet(wb, wsUmum, 'Usage Report (UMUM)');
+    XLSX.utils.book_append_sheet(wb, wsUmum, 'Laporan Pemakaian (UMUM)');
     
     const wsBpjs = XLSX.utils.json_to_sheet(formatDataForExport(itemUsageDataBpjs));
     wsBpjs['!cols'] = [{ wch: 40 }, { wch: 15 }, { wch: 20 }, { wch: 15 }];
-    XLSX.utils.book_append_sheet(wb, wsBpjs, 'Usage Report (BPJS)');
+    XLSX.utils.book_append_sheet(wb, wsBpjs, 'Laporan Pemakaian (BPJS)');
 
     const wsLain = XLSX.utils.json_to_sheet(formatDataForExport(itemUsageDataLain));
     wsLain['!cols'] = [{ wch: 40 }, { wch: 15 }, { wch: 20 }, { wch: 15 }];
-    XLSX.utils.book_append_sheet(wb, wsLain, 'Usage Report (Lain-lain)');
+    XLSX.utils.book_append_sheet(wb, wsLain, 'Laporan Pemakaian (Lain-lain)');
 
-    XLSX.writeFile(wb, 'item_usage_report.xlsx');
+    XLSX.writeFile(wb, 'laporan_pemakaian_item.xlsx');
   };
   
   const formatCurrency = (value: number) => `Rp ${value.toLocaleString('id-ID')}`;
@@ -143,7 +143,7 @@ export default function ItemUsagePage() {
         <CardHeader>
             <CardTitle>{title}</CardTitle>
             <CardDescription>
-                A list of items sold within the filtered period, sorted by most sold.
+                Daftar item yang terjual dalam periode yang dipilih, diurutkan berdasarkan yang paling banyak terjual.
             </CardDescription>
         </CardHeader>
         <CardContent>
@@ -170,7 +170,7 @@ export default function ItemUsagePage() {
                         ) : (
                              <TableRow>
                                 <TableCell colSpan={4} className="h-24 text-center">
-                                    No data available for the selected filters.
+                                    Tidak ada data untuk filter yang dipilih.
                                 </TableCell>
                             </TableRow>
                         )}
@@ -184,19 +184,19 @@ export default function ItemUsagePage() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-3xl font-headline font-bold tracking-tight">Item Usage Report</h1>
+        <h1 className="text-3xl font-headline font-bold tracking-tight">Laporan Pemakaian Item</h1>
         <p className="text-muted-foreground">
-          Monitor items sold based on payment method and selected filters.
+          Pantau item yang terjual berdasarkan metode pembayaran dan filter yang dipilih.
         </p>
       </div>
       
       <Card>
         <CardHeader>
              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <CardTitle>Filters & Export</CardTitle>
+                <CardTitle>Filter & Ekspor</CardTitle>
                 <Button variant="outline" size="sm" onClick={handleExportData}>
                     <FileDown className="mr-2 h-4 w-4" />
-                    Export Excel
+                    Ekspor Excel
                 </Button>
             </div>
         </CardHeader>
@@ -205,10 +205,10 @@ export default function ItemUsagePage() {
               <DateRangePicker date={date} onDateChange={setDate} />
             <Select value={patientType} onValueChange={(value) => setPatientType(value as PatientType)}>
               <SelectTrigger>
-                <SelectValue placeholder="Select Patient Type" />
+                <SelectValue placeholder="Pilih Tipe Pasien" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Patient Types</SelectItem>
+                <SelectItem value="all">Semua Tipe Pasien</SelectItem>
                 <SelectItem value="Rawat Jalan">Rawat Jalan</SelectItem>
                 <SelectItem value="Rawat Inap">Rawat Inap</SelectItem>
                  <SelectItem value="Lain-lain">Lain-lain</SelectItem>
@@ -219,11 +219,11 @@ export default function ItemUsagePage() {
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ItemUsageTable title="Item Usage (UMUM)" data={itemUsageDataUmum} />
-        <ItemUsageTable title="Item Usage (BPJS)" data={itemUsageDataBpjs} />
+        <ItemUsageTable title="Pemakaian Item (UMUM)" data={itemUsageDataUmum} />
+        <ItemUsageTable title="Pemakaian Item (BPJS)" data={itemUsageDataBpjs} />
       </div>
        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-         <ItemUsageTable title="Item Usage (Lain-lain)" data={itemUsageDataLain} />
+         <ItemUsageTable title="Pemakaian Item (Lain-lain)" data={itemUsageDataLain} />
       </div>
     </div>
   );

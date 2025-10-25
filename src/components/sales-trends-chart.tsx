@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
@@ -14,7 +15,7 @@ interface SalesTrendsChartProps {
 
 const chartConfig = {
   total: {
-    label: 'Sales',
+    label: 'Penjualan',
     color: 'hsl(var(--primary))',
   },
 };
@@ -23,8 +24,8 @@ export function SalesTrendsChart({ data }: SalesTrendsChartProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Sales Trends</CardTitle>
-        <CardDescription>Monthly sales performance</CardDescription>
+        <CardTitle>Tren Penjualan</CardTitle>
+        <CardDescription>Kinerja penjualan bulanan</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">

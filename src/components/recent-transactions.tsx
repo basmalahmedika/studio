@@ -27,17 +27,17 @@ export function RecentTransactions({ transactions }: RecentTransactionsProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Recent Transactions</CardTitle>
-        <CardDescription>A list of the most recent sales from the selected period.</CardDescription>
+        <CardTitle>Transaksi Terkini</CardTitle>
+        <CardDescription>Daftar penjualan terbaru dari periode yang dipilih.</CardDescription>
       </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Medication</TableHead>
-              <TableHead className="hidden sm:table-cell">Patient Type</TableHead>
-              <TableHead className="hidden sm:table-cell">Payment</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
+              <TableHead>Obat</TableHead>
+              <TableHead className="hidden sm:table-cell">Tipe Pasien</TableHead>
+              <TableHead className="hidden sm:table-cell">Pembayaran</TableHead>
+              <TableHead className="text-right">Jumlah</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -66,7 +66,7 @@ export function RecentTransactions({ transactions }: RecentTransactionsProps) {
             ) : (
               <TableRow>
                 <TableCell colSpan={4} className="h-24 text-center">
-                  No transactions found for the selected period.
+                  Tidak ada transaksi untuk periode yang dipilih.
                 </TableCell>
               </TableRow>
             )}

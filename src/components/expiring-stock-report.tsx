@@ -88,7 +88,7 @@ export function ExpiringStockReport() {
     
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Expiring Stock');
+    XLSX.utils.book_append_sheet(wb, ws, 'Stok Kadaluarsa');
     
     ws['!cols'] = [
         { wch: 5 }, 
@@ -99,7 +99,7 @@ export function ExpiringStockReport() {
         { wch: 10 },
     ];
 
-    XLSX.writeFile(wb, 'expiring_stock_report.xlsx');
+    XLSX.writeFile(wb, 'laporan_stok_kadaluarsa.xlsx');
   };
 
   return (
@@ -109,15 +109,15 @@ export function ExpiringStockReport() {
           <div className="space-y-1.5">
             <CardTitle className="flex items-center gap-2">
                 <Clock className="h-5 w-5 text-muted-foreground" />
-                Expiring Stock Report
+                Laporan Stok Kadaluarsa
             </CardTitle>
             <CardDescription>
-              Stock classified by expiration date proximity.
+              Stok diklasifikasikan berdasarkan kedekatan tanggal kadaluarsa.
             </CardDescription>
           </div>
           <Button variant="outline" size="sm" onClick={handleExportData}>
               <FileDown className="mr-2 h-4 w-4" />
-              Export Excel
+              Ekspor Excel
           </Button>
         </div>
       </CardHeader>
@@ -127,9 +127,9 @@ export function ExpiringStockReport() {
             <TableHeader>
                 <TableRow>
                 <TableHead className="w-[50px]">No.</TableHead>
-                <TableHead>Item Name</TableHead>
+                <TableHead>Nama Item</TableHead>
                 <TableHead className="text-right">Sisa Stok</TableHead>
-                <TableHead>Expired Date</TableHead>
+                <TableHead>Tgl Kadaluarsa</TableHead>
                 <TableHead>Sisa Waktu</TableHead>
                 <TableHead className="text-right">Status</TableHead>
                 </TableRow>

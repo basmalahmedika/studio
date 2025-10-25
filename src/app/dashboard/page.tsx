@@ -100,7 +100,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <h1 className="text-3xl font-headline font-bold tracking-tight">Dashboard</h1>
+        <h1 className="text-3xl font-headline font-bold tracking-tight">Dasbor</h1>
         <div className="w-full md:w-auto">
            <DateRangePicker date={date} onDateChange={setDate} align="end" />
         </div>
@@ -108,28 +108,28 @@ export default function DashboardPage() {
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Total Revenue"
+          title="Total Pendapatan"
           value={`Rp ${stats.totalRevenue.toLocaleString('id-ID')}`}
           icon={DollarSign}
-          description="Total revenue from all transactions"
+          description="Total pendapatan dari semua transaksi"
         />
         <StatCard
-          title="Total Transactions"
+          title="Total Transaksi"
           value={stats.totalTransactions.toString()}
           icon={ReceiptText}
-          description="Total number of sales"
+          description="Jumlah total penjualan"
         />
         <StatCard
-          title="Outpatient (UMUM / BPJS)"
+          title="Rawat Jalan (UMUM / BPJS)"
           value={`${stats.rjUmum} / ${stats.rjBpjs}`}
           icon={Users}
-          description="Number of outpatient services"
+          description="Jumlah layanan rawat jalan"
         />
         <StatCard
-          title="Inpatient (UMUM / BPJS)"
+          title="Rawat Inap (UMUM / BPJS)"
           value={`${stats.riUmum} / ${stats.riBpjs}`}
           icon={Users}
-          description="Number of inpatient services"
+          description="Jumlah layanan rawat inap"
         />
         <StatCard
           title="Pendapatan RJ Umum"
@@ -159,14 +159,14 @@ export default function DashboardPage() {
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <TopSellingItems 
-          title="Top Selling Medications"
+          title="Obat Terlaris"
           transactions={filteredTransactions}
           inventory={inventory}
           itemType="Obat"
           icon={Pill}
         />
         <TopSellingItems 
-          title="Top Selling Medical Devices"
+          title="Alat Kesehatan Terlaris"
           transactions={filteredTransactions}
           inventory={inventory}
           itemType="Alkes"

@@ -14,13 +14,13 @@ import {
 } from '@/components/ui/sidebar';
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/dashboard/transactions', label: 'Transactions', icon: ReceiptText },
-  { href: '/dashboard/inventory', label: 'Inventory', icon: Warehouse },
-  { href: '/dashboard/item-usage', label: 'Item Usage', icon: ArrowRightLeft },
-  { href: '/dashboard/analysis', label: 'Analysis', icon: BarChart2 },
-  { href: '/dashboard/reports', label: 'Reports', icon: FileText },
-  { href: '/dashboard/settings', label: 'Settings', icon: Settings },
+  { href: '/dashboard', label: 'Dasbor', icon: LayoutDashboard },
+  { href: '/dashboard/transactions', label: 'Transaksi', icon: ReceiptText },
+  { href: '/dashboard/inventory', label: 'Inventaris', icon: Warehouse },
+  { href: '/dashboard/item-usage', label: 'Pemakaian Item', icon: ArrowRightLeft },
+  { href: '/dashboard/analysis', label: 'Analisis', icon: BarChart2 },
+  { href: '/dashboard/reports', label: 'Laporan', icon: FileText },
+  { href: '/dashboard/settings', label: 'Pengaturan', icon: Settings },
 ];
 
 export default function SidebarNav() {

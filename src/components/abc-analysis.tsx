@@ -116,25 +116,25 @@ export function AbcAnalysis({ transactions, itemTypeFilter }: AbcAnalysisProps) 
 
   const getCategoryLabel = (category: AnalysisCategory) => {
     switch(category) {
-      case 'A': return 'Fast Moving';
-      case 'B': return 'Medium Moving';
-      case 'C': return 'Slow Moving';
+      case 'A': return 'Cepat Laku';
+      case 'B': return 'Cukup Laku';
+      case 'C': return 'Kurang Laku';
     }
   }
 
   const handleExportData = () => {
     const dataToExport = analyzedItems.map(item => ({
-      'Item Name': item.name,
-      'Total Sales': item.totalSales,
+      'Nama Item': item.name,
+      'Total Penjualan': item.totalSales,
       'Sisa Stok': item.remainingStock,
-      'Contribution (%)': item.contributionPercent,
-      'Cumulative (%)': item.cumulativePercent,
-      'Category': getCategoryLabel(item.category),
+      'Kontribusi (%)': item.contributionPercent,
+      'Kumulatif (%)': item.cumulativePercent,
+      'Kategori': getCategoryLabel(item.category),
     }));
     
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'ABC Analysis');
+    XLSX.utils.book_append_sheet(wb, ws, 'Analisis ABC');
     
     // Set column widths
     ws['!cols'] = [
@@ -146,7 +146,7 @@ export function AbcAnalysis({ transactions, itemTypeFilter }: AbcAnalysisProps) 
         { wch: 15 }, // Category
     ];
 
-    XLSX.writeFile(wb, 'abc_analysis_report.xlsx');
+    XLSX.writeFile(wb, 'laporan_analisis_abc.xlsx');
   };
 
   return (
@@ -154,14 +154,14 @@ export function AbcAnalysis({ transactions, itemTypeFilter }: AbcAnalysisProps) 
       <CardHeader>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div className='space-y-1.5'>
-                <CardTitle>ABC Analysis</CardTitle>
+                <CardTitle>Analisis ABC</CardTitle>
                 <CardDescription>
-                Classification of items based on sales contribution.
+                Klasifikasi item berdasarkan kontribusi penjualan.
                 </CardDescription>
             </div>
             <Button variant="outline" size="sm" onClick={handleExportData}>
                 <FileDown className="mr-2 h-4 w-4" />
-                Export Excel
+                Ekspor Excel
             </Button>
         </div>
       </CardHeader>
@@ -170,12 +170,12 @@ export function AbcAnalysis({ transactions, itemTypeFilter }: AbcAnalysisProps) 
             <Table>
             <TableHeader>
                 <TableRow>
-                  <TableHead>Item Name</TableHead>
+                  <TableHead>Nama Item</TableHead>
                   <TableHead className="text-right">Sisa Stok</TableHead>
-                  <TableHead className="text-right">Total Sales</TableHead>
-                  <TableHead className="text-right">Contribution</TableHead>
-                  <TableHead className="text-right">Cumulative</TableHead>
-                  <TableHead className="text-right">Category</TableHead>
+                  <TableHead className="text-right">Total Penjualan</TableHead>
+                  <TableHead className="text-right">Kontribusi</TableHead>
+                  <TableHead className="text-right">Kumulatif</TableHead>
+                  <TableHead className="text-right">Kategori</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -195,7 +195,7 @@ export function AbcAnalysis({ transactions, itemTypeFilter }: AbcAnalysisProps) 
                 ) : (
                     <TableRow>
                         <TableCell colSpan={6} className="h-24 text-center">
-                            No data available for the selected filters.
+                            Tidak ada data untuk filter yang dipilih.
                         </TableCell>
                     </TableRow>
                 )}

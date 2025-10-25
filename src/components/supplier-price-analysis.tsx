@@ -57,16 +57,16 @@ export function SupplierPriceAnalysis({ inventory }: { inventory: InventoryItem[
   const handleExportData = () => {
     const dataToExport = analysisData.flatMap(item => 
       item.suppliers.map(supplierInfo => ({
-        'Item Name': item.itemName,
-        'Supplier': supplierInfo.supplier,
-        'Purchase Price': supplierInfo.price,
-        'Is Lowest Price': supplierInfo.isLowest ? 'Yes' : 'No',
+        'Nama Item': item.itemName,
+        'Pemasok': supplierInfo.supplier,
+        'Harga Beli': supplierInfo.price,
+        'Harga Terendah': supplierInfo.isLowest ? 'Ya' : 'Tidak',
       }))
     );
     
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, `Price Analysis ${activeTab}`);
+    XLSX.utils.book_append_sheet(wb, ws, `Analisis Harga ${activeTab}`);
 
     ws['!cols'] = [
         { wch: 30 },
@@ -75,7 +75,7 @@ export function SupplierPriceAnalysis({ inventory }: { inventory: InventoryItem[
         { wch: 15 },
     ];
     
-    XLSX.writeFile(wb, `supplier_price_analysis_${activeTab.toLowerCase()}.xlsx`);
+    XLSX.writeFile(wb, `analisis_harga_pemasok_${activeTab.toLowerCase()}.xlsx`);
   };
 
 
@@ -86,15 +86,15 @@ export function SupplierPriceAnalysis({ inventory }: { inventory: InventoryItem[
             <div className='space-y-1.5'>
                 <CardTitle className="flex items-center gap-2">
                     <DollarSign className="h-5 w-5 text-muted-foreground" />
-                    Supplier Price Comparison
+                    Perbandingan Harga Pemasok
                 </CardTitle>
                 <CardDescription>
-                Compare purchase prices across different suppliers to find the most affordable option.
+                Bandingkan harga beli dari berbagai pemasok untuk menemukan pilihan yang paling terjangkau.
                 </CardDescription>
             </div>
             <Button variant="outline" size="sm" onClick={handleExportData}>
                 <FileDown className="mr-2 h-4 w-4" />
-                Export Excel
+                Ekspor Excel
             </Button>
         </div>
         <div className="mt-4">
@@ -102,7 +102,7 @@ export function SupplierPriceAnalysis({ inventory }: { inventory: InventoryItem[
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
-              placeholder="Search by item name..."
+              placeholder="Cari berdasarkan nama item..."
               className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -121,9 +121,9 @@ export function SupplierPriceAnalysis({ inventory }: { inventory: InventoryItem[
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Item Name</TableHead>
-                    <TableHead>Supplier</TableHead>
-                    <TableHead className="text-right">Purchase Price</TableHead>
+                    <TableHead>Nama Item</TableHead>
+                    <TableHead>Pemasok</TableHead>
+                    <TableHead className="text-right">Harga Beli</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -152,7 +152,7 @@ export function SupplierPriceAnalysis({ inventory }: { inventory: InventoryItem[
                   ) : (
                     <TableRow>
                       <TableCell colSpan={3} className="h-24 text-center">
-                        No data available for {activeTab}.
+                        Tidak ada data untuk {activeTab}.
                       </TableCell>
                     </TableRow>
                   )}

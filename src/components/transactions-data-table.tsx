@@ -68,16 +68,16 @@ import { useToast } from '@/hooks/use-toast';
 const transactionSchema = z.object({
   id: z.string().optional(),
   date: z.date(),
-  medicalRecordNumber: z.string().min(1, 'Medical record number is required'),
+  medicalRecordNumber: z.string().min(1, 'Nomor rekam medis harus diisi'),
   patientType: z.enum(['Rawat Jalan', 'Rawat Inap', 'Lain-lain']),
   paymentMethod: z.enum(['UMUM', 'BPJS', 'Lain-lain']),
   items: z.array(z.object({
     itemId: z.string(),
     itemName: z.string(),
-    quantity: z.coerce.number().min(1, 'Quantity must be at least 1'),
+    quantity: z.coerce.number().min(1, 'Kuantitas minimal 1'),
     price: z.number(),
     stock: z.number(),
-  })).min(1, 'At least one item is required'),
+  })).min(1, 'Minimal satu item harus ditambahkan'),
   totalPrice: z.number(),
 });
 
@@ -165,21 +165,21 @@ export function TransactionsDataTable() {
           if (originalTransaction) {
             const { id, ...updateData } = transactionData;
             await updateTransaction(id!, updateData, originalTransaction);
-            toast({ title: "Success", description: "Transaction has been updated." });
+            toast({ title: "Sukses", description: "Transaksi telah diperbarui." });
           }
         } else {
           const { id, ...createData } = transactionData;
           await addTransaction(createData);
-          toast({ title: "Success", description: "New transaction has been added." });
+          toast({ title: "Sukses", description: "Transaksi baru telah ditambahkan." });
         }
         form.reset();
         setIsDialogOpen(false);
     } catch (error: any) {
-        console.error("Transaction Error: ", error);
+        console.error("Kesalahan Transaksi: ", error);
         toast({
             variant: "destructive",
-            title: "Transaction Failed",
-            description: error.message || "An unexpected error occurred.",
+            title: "Transaksi Gagal",
+            description: error.message || "Terjadi kesalahan yang tidak terduga.",
         });
     }
   };
@@ -193,7 +193,7 @@ export function TransactionsDataTable() {
         return {
             ...item,
             price: item.price,
-            itemName: inventoryItem?.itemName || 'Unknown Item',
+            itemName: inventoryItem?.itemName || 'Item Tidak Dikenal',
             stock: inventoryItem?.quantity || 0,
         };
     });
@@ -215,9 +215,9 @@ export function TransactionsDataTable() {
     if (transactionToDelete) {
         try {
             await deleteTransaction(transactionId, transactionToDelete);
-            toast({ title: "Success", description: "Transaction has been deleted." });
+            toast({ title: "Sukses", description: "Transaksi telah dihapus." });
         } catch(error) {
-            toast({ variant: "destructive", title: "Error", description: "Failed to delete transaction." });
+            toast({ variant: "destructive", title: "Error", description: "Gagal menghapus transaksi." });
         }
     }
   }
@@ -315,7 +315,7 @@ export function TransactionsDataTable() {
                 ...t,
                 ...item,
                 price: sellingPrice,
-                itemName: inventoryItem?.itemName || 'Unknown Item',
+                itemName: inventoryItem?.itemName || 'Item Tidak Dikenal',
                 purchasePrice,
                 margin,
                 subtotal,
@@ -327,22 +327,22 @@ export function TransactionsDataTable() {
 
   const handleExportData = () => {
     const dataToExport = flattenedData.map(d => ({
-        'Date': d.date,
-        'Medical Record': d.medicalRecordNumber,
-        'Patient Type': d.patientType,
-        'Payment Method': d.paymentMethod,
-        'Item Name': d.itemName,
-        'Quantity': d.quantity,
-        'Purchase Price': d.purchasePrice,
-        'Selling Price': d.price,
+        'Tanggal': d.date,
+        'No. Rekam Medis': d.medicalRecordNumber,
+        'Tipe Pasien': d.patientType,
+        'Metode Pembayaran': d.paymentMethod,
+        'Nama Item': d.itemName,
+        'Kuantitas': d.quantity,
+        'Harga Beli': d.purchasePrice,
+        'Harga Jual': d.price,
         'Margin': d.margin,
         'Subtotal': d.subtotal,
     }));
 
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Transactions');
-    XLSX.writeFile(wb, 'transactions_export.xlsx');
+    XLSX.utils.book_append_sheet(wb, ws, 'Transaksi');
+    XLSX.writeFile(wb, 'riwayat_transaksi.xlsx');
   };
 
   const filteredInventory = React.useMemo(() => {
@@ -368,24 +368,24 @@ export function TransactionsDataTable() {
     <Card>
       <CardHeader>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <CardTitle>Transaction Log</CardTitle>
+          <CardTitle>Riwayat Transaksi</CardTitle>
           <div className="flex flex-wrap gap-2">
              <Button variant="outline" onClick={handleExportData}>
               <FileDown className="mr-2 h-4 w-4" />
-              Export Excel
+              Ekspor Excel
             </Button>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button onClick={handleOpenAddNew}>
                   <PlusCircle className="mr-2 h-4 w-4" />
-                  Add New Transaction
+                  Tambah Transaksi Baru
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>{form.getValues('id') ? 'Edit Transaction' : 'Add New Transaction'}</DialogTitle>
+                  <DialogTitle>{form.getValues('id') ? 'Ubah Transaksi' : 'Tambah Transaksi Baru'}</DialogTitle>
                   <DialogDescription>
-                    Fill in the form below to create a new transaction.
+                    Isi formulir di bawah ini untuk membuat transaksi baru.
                   </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
@@ -396,14 +396,14 @@ export function TransactionsDataTable() {
                         name="date"
                         render={({ field }) => (
                           <FormItem className="flex flex-col">
-                            <FormLabel>Transaction Date</FormLabel>
+                            <FormLabel>Tanggal Transaksi</FormLabel>
                             <Popover>
                               <PopoverTrigger asChild>
                                 <FormControl>
                                   <Button
                                     variant={"outline"}
                                     className={cn("w-full pl-3 text-left font-normal",!field.value && "text-muted-foreground")}>
-                                    {field.value ? (format(field.value, "PPP")) : (<span>Pick a date</span>)}
+                                    {field.value ? (format(field.value, "PPP")) : (<span>Pilih tanggal</span>)}
                                     <CalendarIconLucide className="ml-auto h-4 w-4 opacity-50" />
                                   </Button>
                                 </FormControl>
@@ -429,9 +429,9 @@ export function TransactionsDataTable() {
                           name="medicalRecordNumber"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>No. Medical Record</FormLabel>
+                              <FormLabel>No. Rekam Medis</FormLabel>
                               <FormControl>
-                                <Input placeholder="e.g., MR123456" {...field} />
+                                <Input placeholder="cth., RM123456" {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -442,11 +442,11 @@ export function TransactionsDataTable() {
                           name="patientType"
                           render={({ field }) => (
                              <FormItem>
-                                <FormLabel>Patient Type</FormLabel>
+                                <FormLabel>Tipe Pasien</FormLabel>
                                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                                 <FormControl>
                                     <SelectTrigger>
-                                    <SelectValue placeholder="Select patient type" />
+                                    <SelectValue placeholder="Pilih tipe pasien" />
                                     </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
@@ -464,11 +464,11 @@ export function TransactionsDataTable() {
                           name="paymentMethod"
                           render={({ field }) => (
                              <FormItem>
-                                <FormLabel>Payment Method</FormLabel>
+                                <FormLabel>Metode Pembayaran</FormLabel>
                                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                                 <FormControl>
                                     <SelectTrigger>
-                                    <SelectValue placeholder="Select payment method" />
+                                    <SelectValue placeholder="Pilih metode pembayaran" />
                                     </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
@@ -485,14 +485,14 @@ export function TransactionsDataTable() {
                     
                     <Card>
                       <CardHeader>
-                        <CardTitle>Cashier</CardTitle>
+                        <CardTitle>Kasir</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-4">
                            <div className="relative">
-                              <FormLabel>Add Item</FormLabel>
+                              <FormLabel>Tambah Item</FormLabel>
                               <Input
-                                placeholder="Search and select an item..."
+                                placeholder="Cari dan pilih item..."
                                 value={itemSearch}
                                 onChange={(e) => setItemSearch(e.target.value)}
                               />
@@ -504,7 +504,7 @@ export function TransactionsDataTable() {
                                       onClick={() => handleAddItem(item)}
                                       className="px-3 py-2 text-sm cursor-pointer hover:bg-accent"
                                     >
-                                      {item.itemName} (Stock: {item.quantity})
+                                      {item.itemName} (Stok: {item.quantity})
                                     </div>
                                   ))}
                                 </div>
@@ -544,9 +544,9 @@ export function TransactionsDataTable() {
 
                     <DialogFooter>
                       <DialogClose asChild>
-                          <Button type="button" variant="secondary">Cancel</Button>
+                          <Button type="button" variant="secondary">Batal</Button>
                       </DialogClose>
-                      <Button type="submit">Save Transaction</Button>
+                      <Button type="submit">Simpan Transaksi</Button>
                     </DialogFooter>
                   </form>
                 </Form>
@@ -556,7 +556,7 @@ export function TransactionsDataTable() {
         </div>
         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Input
-            placeholder="Filter by medication..."
+            placeholder="Filter berdasarkan obat..."
             value={filters.medicationName}
             onChange={(e) => handleFilterChange('medicationName', e.target.value)}
             className="lg:col-span-1"
@@ -566,10 +566,10 @@ export function TransactionsDataTable() {
             onValueChange={(value) => handleFilterChange('patientType', value)}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Patient Type" />
+              <SelectValue placeholder="Tipe Pasien" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Patient Types</SelectItem>
+              <SelectItem value="all">Semua Tipe Pasien</SelectItem>
               <SelectItem value="Rawat Jalan">Rawat Jalan</SelectItem>
               <SelectItem value="Rawat Inap">Rawat Inap</SelectItem>
               <SelectItem value="Lain-lain">Lain-lain</SelectItem>
@@ -580,10 +580,10 @@ export function TransactionsDataTable() {
             onValueChange={(value) => handleFilterChange('paymentMethod', value)}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Payment Method" />
+              <SelectValue placeholder="Metode Pembayaran" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Payment Methods</SelectItem>
+              <SelectItem value="all">Semua Metode Pembayaran</SelectItem>
               <SelectItem value="BPJS">BPJS</SelectItem>
               <SelectItem value="UMUM">UMUM</SelectItem>
               <SelectItem value="Lain-lain">Lain-lain</SelectItem>
@@ -597,16 +597,16 @@ export function TransactionsDataTable() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
+                <TableHead>Tanggal</TableHead>
                 <TableHead>No. RM</TableHead>
-                <TableHead>Patient/Payment</TableHead>
-                <TableHead>Item Name</TableHead>
-                <TableHead className="text-right">Qty</TableHead>
-                <TableHead className="text-right">Purchase Price</TableHead>
-                <TableHead className="text-right">Selling Price</TableHead>
+                <TableHead>Pasien/Pembayaran</TableHead>
+                <TableHead>Nama Item</TableHead>
+                <TableHead className="text-right">Jml</TableHead>
+                <TableHead className="text-right">Harga Beli</TableHead>
+                <TableHead className="text-right">Harga Jual</TableHead>
                 <TableHead className="text-right">Margin</TableHead>
                 <TableHead className="text-right">Subtotal</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="text-right">Aksi</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -636,33 +636,33 @@ export function TransactionsDataTable() {
                            <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" className="h-8 w-8 p-0">
-                                  <span className="sr-only">Open menu</span>
+                                  <span className="sr-only">Buka menu</span>
                                   <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem onClick={() => handleEdit(d.id)}>
                                   <Pen className="mr-2 h-4 w-4" />
-                                  Edit
+                                  Ubah
                                 </DropdownMenuItem>
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
                                     <Button variant="ghost" className="w-full justify-start text-sm text-red-500 hover:text-red-500 hover:bg-red-50 p-2 font-normal">
                                       <Trash2 className="mr-2 h-4 w-4" />
-                                      Delete
+                                      Hapus
                                     </Button>
                                   </AlertDialogTrigger>
                                   <AlertDialogContent>
                                     <AlertDialogHeader>
-                                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                      <AlertDialogTitle>Apakah Anda benar-benar yakin?</AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        This action cannot be undone. This will permanently delete the transaction.
+                                        Tindakan ini tidak bisa dibatalkan. Ini akan menghapus transaksi secara permanen.
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogCancel>Batal</AlertDialogCancel>
                                       <AlertDialogAction onClick={() => handleDelete(d.id)} className="bg-destructive hover:bg-destructive/90">
-                                        Delete
+                                        Hapus
                                       </AlertDialogAction>
                                     </AlertDialogFooter>
                                   </AlertDialogContent>
@@ -676,7 +676,7 @@ export function TransactionsDataTable() {
               ) : (
                 <TableRow>
                   <TableCell colSpan={10} className="h-24 text-center">
-                    No results found.
+                    Tidak ada hasil yang ditemukan.
                   </TableCell>
                 </TableRow>
               )}
@@ -687,11 +687,11 @@ export function TransactionsDataTable() {
        <CardFooter>
         <div className="flex items-center justify-between w-full text-sm text-muted-foreground">
           <div className="flex-1">
-            Showing {Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)} to {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} transactions.
+            Menampilkan {Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)} sampai {Math.min(currentPage * itemsPerPage, totalItems)} dari {totalItems} transaksi.
           </div>
           <div className="flex items-center gap-4">
              <div className="flex items-center gap-2">
-                <span>Rows per page</span>
+                <span>Baris per halaman</span>
                  <Select
                     value={`${itemsPerPage}`}
                     onValueChange={(value) => {
@@ -712,7 +712,7 @@ export function TransactionsDataTable() {
                   </Select>
              </div>
              <div className="w-20 text-center">
-                Page {currentPage} of {totalPages}
+                Halaman {currentPage} dari {totalPages}
             </div>
             <div className="flex gap-2">
                  <Button
@@ -722,7 +722,7 @@ export function TransactionsDataTable() {
                   disabled={currentPage === 1}
                 >
                   <ChevronLeft className="h-4 w-4" />
-                  <span className="sr-only">Previous Page</span>
+                  <span className="sr-only">Halaman Sebelumnya</span>
                 </Button>
                  <Button
                   variant="outline"
@@ -730,7 +730,7 @@ export function TransactionsDataTable() {
                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                   disabled={currentPage === totalPages}
                 >
-                  <span className="sr-only">Next Page</span>
+                  <span className="sr-only">Halaman Berikutnya</span>
                   <ChevronRight className="h-4 w-4" />
                 </Button>
             </div>
@@ -741,4 +741,3 @@ export function TransactionsDataTable() {
     </div>
   );
 }
-

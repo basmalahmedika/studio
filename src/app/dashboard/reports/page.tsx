@@ -9,9 +9,9 @@ export default function ReportsPage() {
   return (
     <div className="space-y-6">
        <div className="space-y-2">
-        <h1 className="text-3xl font-headline font-bold tracking-tight">Reports</h1>
+        <h1 className="text-3xl font-headline font-bold tracking-tight">Laporan</h1>
         <p className="text-muted-foreground">
-          Generate and view detailed reports for your pharmacy operations.
+          Buat dan lihat laporan terperinci untuk operasional apotek Anda.
         </p>
       </div>
 

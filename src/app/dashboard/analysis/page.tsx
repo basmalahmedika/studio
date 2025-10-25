@@ -82,9 +82,9 @@ export default function AnalysisPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-3xl font-headline font-bold tracking-tight">Movement & Price Analysis</h1>
+        <h1 className="text-3xl font-headline font-bold tracking-tight">Analisis Pergerakan & Harga</h1>
         <p className="text-muted-foreground">
-          Analyze medication movement, sales trends, and supplier pricing.
+          Analisis pergerakan obat, tren penjualan, dan harga dari pemasok.
         </p>
       </div>
       
@@ -94,10 +94,10 @@ export default function AnalysisPage() {
               <DateRangePicker date={date} onDateChange={setDate} />
             <Select value={patientType} onValueChange={(value) => setPatientType(value as PatientType)}>
               <SelectTrigger>
-                <SelectValue placeholder="Select Patient Type" />
+                <SelectValue placeholder="Pilih Tipe Pasien" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Patient Types</SelectItem>
+                <SelectItem value="all">Semua Tipe Pasien</SelectItem>
                 <SelectItem value="Rawat Jalan">Rawat Jalan</SelectItem>
                 <SelectItem value="Rawat Inap">Rawat Inap</SelectItem>
                 <SelectItem value="Lain-lain">Lain-lain</SelectItem>
@@ -105,10 +105,10 @@ export default function AnalysisPage() {
             </Select>
             <Select value={paymentMethod} onValueChange={(value) => setPaymentMethod(value as PaymentMethod)}>
               <SelectTrigger>
-                <SelectValue placeholder="Select Payment Method" />
+                <SelectValue placeholder="Pilih Metode Pembayaran" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Payment Methods</SelectItem>
+                <SelectItem value="all">Semua Metode Pembayaran</SelectItem>
                 <SelectItem value="UMUM">UMUM</SelectItem>
                 <SelectItem value="BPJS">BPJS</SelectItem>
                 <SelectItem value="Lain-lain">Lain-lain</SelectItem>
@@ -116,10 +116,10 @@ export default function AnalysisPage() {
             </Select>
              <Select value={itemType} onValueChange={(value) => setItemType(value as ItemTypeFilter)}>
               <SelectTrigger>
-                <SelectValue placeholder="Select Item Type" />
+                <SelectValue placeholder="Pilih Tipe Item" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Item Types</SelectItem>
+                <SelectItem value="all">Semua Tipe Item</SelectItem>
                 <SelectItem value="Obat">Obat</SelectItem>
                 <SelectItem value="Alkes">Alkes</SelectItem>
               </SelectContent>

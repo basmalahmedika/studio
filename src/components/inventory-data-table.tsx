@@ -75,39 +75,39 @@ import { useToast } from '@/hooks/use-toast';
 const inventorySchema = z.object({
   id: z.string().optional(),
   inputDate: z.date({
-    required_error: "A date of input is required.",
+    required_error: "Tanggal input harus diisi.",
   }),
-  itemName: z.string().min(1, 'Item name is required'),
-  batchNumber: z.string().min(1, 'Batch number is required'),
+  itemName: z.string().min(1, 'Nama item harus diisi'),
+  batchNumber: z.string().min(1, 'Nomor batch harus diisi'),
   itemType: z.enum(['Alkes', 'Obat']),
   category: z.enum(['Oral', 'Topikal', 'Injeksi', 'Suppositoria', 'Inhalasi/Nasal', 'Vaksin', 'Lainnya']),
   unit: z.enum(['Tablet', 'Kapsul', 'Vial', 'Amp', 'Pcs', 'Cm', 'Btl']),
-  quantity: z.coerce.number().min(0, 'Quantity must be a positive number'),
-  purchasePrice: z.coerce.number().min(0, 'Purchase price must be a positive number'),
-  sellingPriceRJ: z.coerce.number().min(0, 'Selling price is required'),
-  sellingPriceRI: z.coerce.number().min(0, 'Selling price is required'),
+  quantity: z.coerce.number().min(0, 'Kuantitas harus angka positif'),
+  purchasePrice: z.coerce.number().min(0, 'Harga beli harus angka positif'),
+  sellingPriceRJ: z.coerce.number().min(0, 'Harga jual harus diisi'),
+  sellingPriceRI: z.coerce.number().min(0, 'Harga jual harus diisi'),
   expiredDate: z.date({
-    required_error: "An expiration date is required.",
+    required_error: "Tanggal kadaluarsa harus diisi.",
   }),
-  supplier: z.string().min(1, 'Supplier is required'),
+  supplier: z.string().min(1, 'Pemasok harus diisi'),
 });
 
 type InventoryFormValues = z.infer<typeof inventorySchema>;
 
 // A more robust schema for Excel import that coerces types
 const excelRowSchema = z.object({
-  inputDate: z.any().refine(val => val, { message: "inputDate is required" }),
-  itemName: z.string({ required_error: "itemName is required" }).min(1, "itemName is required"),
-  batchNumber: z.any().refine(val => val !== null && val !== undefined, { message: "batchNumber is required" }).transform(val => String(val)),
-  itemType: z.enum(['Alkes', 'Obat'], { errorMap: () => ({ message: "itemType must be 'Alkes' or 'Obat'" }) }),
-  category: z.enum(['Oral', 'Topikal', 'Injeksi', 'Suppositoria', 'Inhalasi/Nasal', 'Vaksin', 'Lainnya'], { errorMap: () => ({ message: "Invalid category value" }) }),
-  unit: z.enum(['Tablet', 'Kapsul', 'Vial', 'Amp', 'Pcs', 'Cm', 'Btl'], { errorMap: () => ({ message: "Invalid unit value" }) }),
-  quantity: z.any().pipe(z.coerce.number({ invalid_type_error: "quantity must be a number" }).min(0, "quantity must be non-negative")),
-  purchasePrice: z.any().pipe(z.coerce.number({ invalid_type_error: "purchasePrice must be a number" }).min(0, "purchasePrice must be non-negative")),
-  sellingPriceRJ: z.any().pipe(z.coerce.number({ invalid_type_error: "sellingPriceRJ must be a number" }).min(0, "sellingPriceRJ must be non-negative")),
-  sellingPriceRI: z.any().pipe(z.coerce.number({ invalid_type_error: "sellingPriceRI must be a number" }).min(0, "sellingPriceRI must be non-negative")),
-  expiredDate: z.any().refine(val => val, { message: "expiredDate is required" }),
-  supplier: z.string({ required_error: "supplier is required" }).min(1, "supplier is required"),
+  inputDate: z.any().refine(val => val, { message: "inputDate harus diisi" }),
+  itemName: z.string({ required_error: "itemName harus diisi" }).min(1, "itemName harus diisi"),
+  batchNumber: z.any().refine(val => val !== null && val !== undefined, { message: "batchNumber harus diisi" }).transform(val => String(val)),
+  itemType: z.enum(['Alkes', 'Obat'], { errorMap: () => ({ message: "itemType harus 'Alkes' atau 'Obat'" }) }),
+  category: z.enum(['Oral', 'Topikal', 'Injeksi', 'Suppositoria', 'Inhalasi/Nasal', 'Vaksin', 'Lainnya'], { errorMap: () => ({ message: "Nilai kategori tidak valid" }) }),
+  unit: z.enum(['Tablet', 'Kapsul', 'Vial', 'Amp', 'Pcs', 'Cm', 'Btl'], { errorMap: () => ({ message: "Nilai unit tidak valid" }) }),
+  quantity: z.any().pipe(z.coerce.number({ invalid_type_error: "kuantitas harus berupa angka" }).min(0, "kuantitas tidak boleh negatif")),
+  purchasePrice: z.any().pipe(z.coerce.number({ invalid_type_error: "hargaBeli harus berupa angka" }).min(0, "hargaBeli tidak boleh negatif")),
+  sellingPriceRJ: z.any().pipe(z.coerce.number({ invalid_type_error: "hargaJualRJ harus berupa angka" }).min(0, "hargaJualRJ tidak boleh negatif")),
+  sellingPriceRI: z.any().pipe(z.coerce.number({ invalid_type_error: "hargaJualRI harus berupa angka" }).min(0, "hargaJualRI tidak boleh negatif")),
+  expiredDate: z.any().refine(val => val, { message: "expiredDate harus diisi" }),
+  supplier: z.string({ required_error: "supplier harus diisi" }).min(1, "supplier harus diisi"),
 });
 
 
@@ -210,17 +210,17 @@ export function InventoryDataTable() {
       if (values.id) {
         const { id, ...updateData } = formattedValues;
         await updateInventoryItem(id, updateData);
-        toast({ title: "Success", description: "Item has been updated." });
+        toast({ title: "Sukses", description: "Item telah diperbarui." });
       } else {
         const { id, ...createData } = formattedValues;
         await addInventoryItem(createData);
-        toast({ title: "Success", description: "New item has been added." });
+        toast({ title: "Sukses", description: "Item baru telah ditambahkan." });
       }
       form.reset();
       setIsEditDialogOpen(false);
     } catch(error) {
        console.error("Error submitting form:", error);
-       toast({ variant: "destructive", title: "Error", description: "An error occurred while saving the item." });
+       toast({ variant: "destructive", title: "Error", description: "Terjadi kesalahan saat menyimpan item." });
     }
   };
 
@@ -237,19 +237,19 @@ export function InventoryDataTable() {
   const handleDelete = async (id: string) => {
     try {
         await deleteInventoryItem(id);
-        toast({ title: "Success", description: "Item has been deleted." });
+        toast({ title: "Sukses", description: "Item telah dihapus." });
     } catch(error) {
-        toast({ variant: "destructive", title: "Error", description: "Failed to delete item." });
+        toast({ variant: "destructive", title: "Error", description: "Gagal menghapus item." });
     }
   }
   
   const handleBulkDelete = async () => {
     try {
       await bulkDeleteInventoryItems(selectedRows);
-      toast({ title: 'Success', description: `${selectedRows.length} item(s) have been deleted.` });
+      toast({ title: 'Sukses', description: `${selectedRows.length} item telah dihapus.` });
       setSelectedRows([]);
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete selected items.' });
+      toast({ variant: 'destructive', title: 'Error', description: 'Gagal menghapus item yang dipilih.' });
     }
   };
 
@@ -284,7 +284,7 @@ export function InventoryDataTable() {
           const json = XLSX.utils.sheet_to_json(worksheet, { defval: null, header: 1 });
           
           if(json.length < 2) {
-             throw new Error("The Excel file is empty or contains only a header.");
+             throw new Error("File Excel kosong atau hanya berisi header.");
           }
 
           const headers = json[0] as string[];
@@ -306,7 +306,7 @@ export function InventoryDataTable() {
             if (!validationResult.success) {
               const firstError = validationResult.error.issues[0];
               const columnName = firstError.path.join('.');
-              throw new Error(`Error on row ${rowIndex}: For column '${columnName}', ${firstError.message}`);
+              throw new Error(`Error pada baris ${rowIndex}: Untuk kolom '${columnName}', ${firstError.message}`);
             }
             
             const { data: validatedData } = validationResult;
@@ -315,10 +315,10 @@ export function InventoryDataTable() {
             const expiredDate = parseDateFromExcel(validatedData.expiredDate);
 
             if (!inputDate) {
-              throw new Error(`Error on row ${rowIndex}: Invalid or missing inputDate. Please use dd/mm/yyyy format.`);
+              throw new Error(`Error pada baris ${rowIndex}: inputDate tidak valid atau kosong. Harap gunakan format dd/mm/yyyy.`);
             }
             if (!expiredDate) {
-              throw new Error(`Error on row ${rowIndex}: Invalid or missing expiredDate. Please use dd/mm/yyyy format.`);
+              throw new Error(`Error pada baris ${rowIndex}: expiredDate tidak valid atau kosong. Harap gunakan format dd/mm/yyyy.`);
             }
 
             newItems.push({
@@ -330,14 +330,14 @@ export function InventoryDataTable() {
 
           if (newItems.length > 0) {
             await bulkAddInventoryItems(newItems);
-            toast({ title: "Upload Successful", description: `${newItems.length} new items have been added.` });
+            toast({ title: "Unggah Berhasil", description: `${newItems.length} item baru telah ditambahkan.` });
           } else {
-            toast({ variant: "destructive", title: "Upload Info", description: "No new items found in the file to upload." });
+            toast({ variant: "destructive", title: "Info Unggahan", description: "Tidak ada item baru yang ditemukan di file untuk diunggah." });
           }
 
         } catch (error: any) {
            console.error("File processing error:", error);
-           toast({ variant: "destructive", title: "Upload Failed", description: error.message || "An unexpected error occurred while processing the file.", duration: 10000 });
+           toast({ variant: "destructive", title: "Unggah Gagal", description: error.message || "Terjadi kesalahan tak terduga saat memproses file.", duration: 10000 });
         } finally {
             if (event.target) {
                 event.target.value = '';
@@ -394,14 +394,14 @@ export function InventoryDataTable() {
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Template');
-    XLSX.writeFile(wb, 'inventory_template.xlsx');
+    XLSX.writeFile(wb, 'template_inventaris.xlsx');
   };
 
   const handleExportData = () => {
     const ws = XLSX.utils.json_to_sheet(inventory);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Inventory');
-    XLSX.writeFile(wb, 'inventory_export.xlsx');
+    XLSX.utils.book_append_sheet(wb, ws, 'Inventaris');
+    XLSX.writeFile(wb, 'ekspor_inventaris.xlsx');
   };
   
   const filteredInventory = React.useMemo(() => {
@@ -445,27 +445,27 @@ export function InventoryDataTable() {
     <Card>
       <CardHeader>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <CardTitle>Inventory List</CardTitle>
+          <CardTitle>Daftar Inventaris</CardTitle>
           <div className="flex flex-wrap gap-2 items-center">
              {selectedRows.length > 0 && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="destructive">
                     <Trash2 className="mr-2 h-4 w-4" />
-                    Delete Selected ({selectedRows.length})
+                    Hapus Pilihan ({selectedRows.length})
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogTitle>Apakah Anda benar-benar yakin?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This action cannot be undone. This will permanently delete {selectedRows.length} item(s) from your inventory.
+                      Tindakan ini tidak dapat dibatalkan. Ini akan menghapus {selectedRows.length} item secara permanen dari inventaris Anda.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel>Batal</AlertDialogCancel>
                     <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive hover:bg-destructive/90">
-                      Delete
+                      Hapus
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
@@ -480,28 +480,28 @@ export function InventoryDataTable() {
             />
              <Button variant="outline" onClick={handleDownloadTemplate}>
               <Download className="mr-2 h-4 w-4" />
-              Download Template
+              Unduh Template
             </Button>
             <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
               <Upload className="mr-2 h-4 w-4" />
-              Upload Excel
+              Unggah Excel
             </Button>
              <Button variant="outline" onClick={handleExportData}>
               <FileDown className="mr-2 h-4 w-4" />
-              Export Excel
+              Ekspor Excel
             </Button>
             <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
               <DialogTrigger asChild>
                 <Button onClick={handleOpenAddNew}>
                   <PlusCircle className="mr-2 h-4 w-4" />
-                  Add New Item
+                  Tambah Item Baru
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>{form.getValues('id') ? 'Edit Item' : 'Add New Item'}</DialogTitle>
+                  <DialogTitle>{form.getValues('id') ? 'Ubah Item' : 'Tambah Item Baru'}</DialogTitle>
                   <DialogDescription>
-                    Fill in the form below to add a new item to the inventory.
+                    Isi formulir di bawah ini untuk menambahkan item baru ke inventaris.
                   </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
@@ -512,9 +512,9 @@ export function InventoryDataTable() {
                         name="itemName"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Item Name</FormLabel>
+                            <FormLabel>Nama Item</FormLabel>
                             <FormControl>
-                              <Input placeholder="e.g., Paracetamol 500mg" {...field} />
+                              <Input placeholder="cth., Paracetamol 500mg" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -527,7 +527,7 @@ export function InventoryDataTable() {
                           <FormItem>
                             <FormLabel>No. Batch</FormLabel>
                             <FormControl>
-                              <Input placeholder="e.g., B12345" {...field} />
+                              <Input placeholder="cth., B12345" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -538,7 +538,7 @@ export function InventoryDataTable() {
                         name="inputDate"
                         render={({ field }) => (
                           <FormItem className="flex flex-col">
-                            <FormLabel>Input Date</FormLabel>
+                            <FormLabel>Tanggal Input</FormLabel>
                             <Popover>
                               <PopoverTrigger asChild>
                                 <FormControl>
@@ -552,7 +552,7 @@ export function InventoryDataTable() {
                                     {field.value ? (
                                       format(field.value, "PPP")
                                     ) : (
-                                      <span>Pick a date</span>
+                                      <span>Pilih tanggal</span>
                                     )}
                                     <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                                   </Button>
@@ -582,11 +582,11 @@ export function InventoryDataTable() {
                         name="itemType"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Item Type</FormLabel>
+                            <FormLabel>Tipe Item</FormLabel>
                              <Select onValueChange={field.onChange} defaultValue={field.value}>
                               <FormControl>
                                 <SelectTrigger>
-                                  <SelectValue placeholder="Select item type" />
+                                  <SelectValue placeholder="Pilih tipe item" />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
@@ -603,11 +603,11 @@ export function InventoryDataTable() {
                         name="category"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Category</FormLabel>
+                            <FormLabel>Kategori</FormLabel>
                              <Select onValueChange={field.onChange} defaultValue={field.value}>
                               <FormControl>
                                 <SelectTrigger>
-                                  <SelectValue placeholder="Select a category" />
+                                  <SelectValue placeholder="Pilih kategori" />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
@@ -633,7 +633,7 @@ export function InventoryDataTable() {
                              <Select onValueChange={field.onChange} defaultValue={field.value}>
                               <FormControl>
                                 <SelectTrigger>
-                                  <SelectValue placeholder="Select a unit" />
+                                  <SelectValue placeholder="Pilih unit" />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
@@ -655,7 +655,7 @@ export function InventoryDataTable() {
                         name="quantity"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Quantity</FormLabel>
+                            <FormLabel>Kuantitas</FormLabel>
                             <FormControl>
                               <Input type="number" placeholder="0" {...field} />
                             </FormControl>
@@ -668,7 +668,7 @@ export function InventoryDataTable() {
                         name="purchasePrice"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Purchase Price</FormLabel>
+                            <FormLabel>Harga Beli</FormLabel>
                             <FormControl>
                               <Input type="number" placeholder="Rp 0" {...field} />
                             </FormControl>
@@ -681,7 +681,7 @@ export function InventoryDataTable() {
                         name="sellingPriceRJ"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Selling Price (RJ)</FormLabel>
+                            <FormLabel>Harga Jual (RJ)</FormLabel>
                             <FormControl>
                               <Input type="number" placeholder="Rp 0" {...field} />
                             </FormControl>
@@ -694,7 +694,7 @@ export function InventoryDataTable() {
                         name="sellingPriceRI"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Selling Price (RI)</FormLabel>
+                            <FormLabel>Harga Jual (RI)</FormLabel>
                             <FormControl>
                               <Input type="number" placeholder="Rp 0" {...field} />
                             </FormControl>
@@ -707,7 +707,7 @@ export function InventoryDataTable() {
                         name="expiredDate"
                         render={({ field }) => (
                           <FormItem className="flex flex-col">
-                            <FormLabel>Expiration Date</FormLabel>
+                            <FormLabel>Tanggal Kadaluarsa</FormLabel>
                             <Popover>
                               <PopoverTrigger asChild>
                                 <FormControl>
@@ -721,7 +721,7 @@ export function InventoryDataTable() {
                                     {field.value ? (
                                       format(field.value, "PPP")
                                     ) : (
-                                      <span>Pick a date</span>
+                                      <span>Pilih tanggal</span>
                                     )}
                                     <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                                   </Button>
@@ -748,9 +748,9 @@ export function InventoryDataTable() {
                         name="supplier"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Supplier</FormLabel>
+                            <FormLabel>Pemasok</FormLabel>
                             <FormControl>
-                              <Input placeholder="e.g., Supplier A" {...field} />
+                              <Input placeholder="cth., Pemasok A" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -759,9 +759,9 @@ export function InventoryDataTable() {
                     </div>
                     <DialogFooter>
                       <DialogClose asChild>
-                          <Button type="button" variant="secondary">Cancel</Button>
+                          <Button type="button" variant="secondary">Batal</Button>
                       </DialogClose>
-                      <Button type="submit">Save changes</Button>
+                      <Button type="submit">Simpan Perubahan</Button>
                     </DialogFooter>
                   </form>
                 </Form>
@@ -774,7 +774,7 @@ export function InventoryDataTable() {
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
-              placeholder="Search items..."
+              placeholder="Cari item..."
               className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
               value={searchTerm}
               onChange={handleSearchChange}
@@ -791,21 +791,21 @@ export function InventoryDataTable() {
                   <Checkbox
                     checked={isAllOnPageSelected}
                     onCheckedChange={(value) => handleSelectAll(!!value)}
-                    aria-label="Select all"
+                    aria-label="Pilih semua"
                   />
                 </TableHead>
-                <TableHead>Item Name</TableHead>
+                <TableHead>Nama Item</TableHead>
                 <TableHead>No. Batch</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Qty</TableHead>
+                <TableHead>Tipe</TableHead>
+                <TableHead>Kategori</TableHead>
+                <TableHead>Jml</TableHead>
                 <TableHead>Unit</TableHead>
-                <TableHead>Purchase Price</TableHead>
-                <TableHead>Selling Price (RJ)</TableHead>
-                <TableHead>Selling Price (RI)</TableHead>
-                <TableHead>Expired</TableHead>
-                <TableHead>Supplier</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>Harga Beli</TableHead>
+                <TableHead>Harga Jual (RJ)</TableHead>
+                <TableHead>Harga Jual (RI)</TableHead>
+                <TableHead>Kadaluarsa</TableHead>
+                <TableHead>Pemasok</TableHead>
+                <TableHead className="text-right">Aksi</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -815,7 +815,7 @@ export function InventoryDataTable() {
                     <Checkbox
                       checked={selectedRows.includes(item.id)}
                       onCheckedChange={(value) => handleRowSelect(item.id, !!value)}
-                      aria-label="Select row"
+                      aria-label="Pilih baris"
                     />
                   </TableCell>
                   <TableCell className="font-medium">{item.itemName}</TableCell>
@@ -833,34 +833,34 @@ export function InventoryDataTable() {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Open menu</span>
+                          <span className="sr-only">Buka menu</span>
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => handleEdit(item)}>
                           <Pen className="mr-2 h-4 w-4" />
-                          Edit
+                          Ubah
                         </DropdownMenuItem>
                          <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button variant="ghost" className="w-full justify-start text-sm text-red-500 hover:text-red-500 hover:bg-red-50 p-2 font-normal">
                               <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
+                              Hapus
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                              <AlertDialogTitle>Apakah Anda benar-benar yakin?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete the item
-                                from your inventory.
+                                Tindakan ini tidak bisa dibatalkan. Ini akan menghapus item secara permanen
+                                dari inventaris Anda.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogCancel>Batal</AlertDialogCancel>
                               <AlertDialogAction onClick={() => handleDelete(item.id)} className="bg-destructive hover:bg-destructive/90">
-                                Delete
+                                Hapus
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
@@ -877,11 +877,11 @@ export function InventoryDataTable() {
        <CardFooter>
         <div className="flex items-center justify-between w-full text-sm text-muted-foreground">
           <div className="flex-1">
-            Showing {Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)} to {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} items.
+            Menampilkan {Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)} sampai {Math.min(currentPage * itemsPerPage, totalItems)} dari {totalItems} item.
           </div>
           <div className="flex items-center gap-4">
              <div className="flex items-center gap-2">
-                <span>Rows per page</span>
+                <span>Baris per halaman</span>
                  <Select
                     value={`${itemsPerPage}`}
                     onValueChange={(value) => {
@@ -902,7 +902,7 @@ export function InventoryDataTable() {
                   </Select>
              </div>
              <div className="w-20 text-center">
-                Page {currentPage} of {totalPages}
+                Halaman {currentPage} dari {totalPages}
             </div>
             <div className="flex gap-2">
                  <Button
@@ -912,7 +912,7 @@ export function InventoryDataTable() {
                   disabled={currentPage === 1}
                 >
                   <ChevronLeft className="h-4 w-4" />
-                  <span className="sr-only">Previous Page</span>
+                  <span className="sr-only">Halaman Sebelumnya</span>
                 </Button>
                  <Button
                   variant="outline"
@@ -920,7 +920,7 @@ export function InventoryDataTable() {
                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                   disabled={currentPage === totalPages}
                 >
-                  <span className="sr-only">Next Page</span>
+                  <span className="sr-only">Halaman Berikutnya</span>
                   <ChevronRight className="h-4 w-4" />
                 </Button>
             </div>
@@ -930,5 +930,3 @@ export function InventoryDataTable() {
     </Card>
   );
 }
-
-    

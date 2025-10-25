@@ -21,8 +21,8 @@ type PatientType = 'all' | 'Rawat Jalan' | 'Rawat Inap' | 'Lain-lain';
 type PaymentMethod = 'all' | 'UMUM' | 'BPJS' | 'Lain-lain';
 
 const chartConfig = {
-  revenue: { label: 'Revenue', color: 'hsl(var(--chart-2))' },
-  cost: { label: 'Cost', color: 'hsl(var(--chart-5))' },
+  revenue: { label: 'Pendapatan', color: 'hsl(var(--chart-2))' },
+  cost: { label: 'Biaya', color: 'hsl(var(--chart-5))' },
   profit: { label: 'Profit', color: 'hsl(var(--primary))' },
 };
 
@@ -105,10 +105,10 @@ export function ProfitAnalysisReport() {
 
   const handleExportData = () => {
     const dataToExport = [
-      { Category: 'Obat', ...analysisData.obat },
-      { Category: 'Alkes', ...analysisData.alkes },
+      { Kategori: 'Obat', ...analysisData.obat },
+      { Kategori: 'Alkes', ...analysisData.alkes },
       { 
-        Category: 'Total',
+        Kategori: 'Total',
         revenue: analysisData.obat.revenue + analysisData.alkes.revenue,
         cost: analysisData.obat.cost + analysisData.alkes.cost,
         profit: analysisData.obat.profit + analysisData.alkes.profit,
@@ -117,10 +117,10 @@ export function ProfitAnalysisReport() {
     
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Profit Analysis');
+    XLSX.utils.book_append_sheet(wb, ws, 'Analisis Profit');
     
     ws['!cols'] = [{ wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }];
-    XLSX.writeFile(wb, 'profit_analysis_report.xlsx');
+    XLSX.writeFile(wb, 'laporan_analisis_profit.xlsx');
   };
 
   const handlePrint = () => {
@@ -130,7 +130,7 @@ export function ProfitAnalysisReport() {
     if (printContents) {
       const printWindow = window.open('', '', 'height=600,width=800');
       if (printWindow) {
-        printWindow.document.write('<html><head><title>Print Report</title>');
+        printWindow.document.write('<html><head><title>Cetak Laporan</title>');
         // Simple styling for print
         printWindow.document.write(`
           <style>
@@ -172,20 +172,20 @@ export function ProfitAnalysisReport() {
           <div className="space-y-1.5">
             <CardTitle className="flex items-center gap-2">
               <DollarSign className="h-5 w-5 text-muted-foreground" />
-              Profit & Cost Analysis
+              Analisis Profit & Biaya
             </CardTitle>
             <CardDescription>
-              Analyze revenue, cost, and profit from sales based on the selected filters.
+              Analisis pendapatan, biaya, dan profit dari penjualan berdasarkan filter yang dipilih.
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2 print-hide">
              <Button variant="outline" size="sm" onClick={handlePrint}>
                 <Printer className="mr-2 h-4 w-4" />
-                Print PDF
+                Cetak PDF
             </Button>
              <Button variant="outline" size="sm" onClick={handleExportData}>
                 <FileDown className="mr-2 h-4 w-4" />
-                Export Excel
+                Ekspor Excel
             </Button>
           </div>
         </div>
@@ -193,10 +193,10 @@ export function ProfitAnalysisReport() {
             <DateRangePicker date={date} onDateChange={setDate} />
             <Select value={patientType} onValueChange={(value) => setPatientType(value as PatientType)}>
               <SelectTrigger>
-                <SelectValue placeholder="Select Patient Type" />
+                <SelectValue placeholder="Pilih Tipe Pasien" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Patient Types</SelectItem>
+                <SelectItem value="all">Semua Tipe Pasien</SelectItem>
                 <SelectItem value="Rawat Jalan">Rawat Jalan</SelectItem>
                 <SelectItem value="Rawat Inap">Rawat Inap</SelectItem>
                 <SelectItem value="Lain-lain">Lain-lain</SelectItem>
@@ -204,10 +204,10 @@ export function ProfitAnalysisReport() {
             </Select>
             <Select value={paymentMethod} onValueChange={(value) => setPaymentMethod(value as PaymentMethod)}>
               <SelectTrigger>
-                <SelectValue placeholder="Select Payment Method" />
+                <SelectValue placeholder="Pilih Metode Pembayaran" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Payment Methods</SelectItem>
+                <SelectItem value="all">Semua Metode Pembayaran</SelectItem>
                 <SelectItem value="UMUM">UMUM</SelectItem>
                 <SelectItem value="BPJS">BPJS</SelectItem>
                  <SelectItem value="Lain-lain">Lain-lain</SelectItem>
@@ -217,15 +217,15 @@ export function ProfitAnalysisReport() {
       </CardHeader>
       <CardContent ref={reportRef} className="space-y-6">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-           <StatCard title="Total Revenue" value={formatCurrency(analysisData.obat.revenue + analysisData.alkes.revenue)} icon={DollarSign} description="Total income from sales" />
-           <StatCard title="Total Cost" value={formatCurrency(analysisData.obat.cost + analysisData.alkes.cost)} icon={DollarSign} description="Total purchase cost of goods sold" />
-           <StatCard title="Total Profit" value={formatCurrency(analysisData.obat.profit + analysisData.alkes.profit)} icon={DollarSign} description="Total net profit" />
+           <StatCard title="Total Pendapatan" value={formatCurrency(analysisData.obat.revenue + analysisData.alkes.revenue)} icon={DollarSign} description="Total pemasukan dari penjualan" />
+           <StatCard title="Total Biaya" value={formatCurrency(analysisData.obat.cost + analysisData.alkes.cost)} icon={DollarSign} description="Total biaya pokok penjualan" />
+           <StatCard title="Total Profit" value={formatCurrency(analysisData.obat.profit + analysisData.alkes.profit)} icon={DollarSign} description="Total profit bersih" />
         </div>
         <div className="grid gap-6 md:grid-cols-2">
             <Card className="chart-container print-hide">
                 <CardHeader>
-                    <CardTitle>Analysis Chart</CardTitle>
-                    <CardDescription>Revenue, Cost, and Profit Visualization</CardDescription>
+                    <CardTitle>Grafik Analisis</CardTitle>
+                    <CardDescription>Visualisasi Pendapatan, Biaya, dan Profit</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <ChartContainer config={chartConfig} className="h-[250px] w-full">
@@ -250,28 +250,28 @@ export function ProfitAnalysisReport() {
             </Card>
              <Card>
                 <CardHeader>
-                    <CardTitle>Detailed Breakdown</CardTitle>
-                     <CardDescription>Numeric breakdown by item type</CardDescription>
+                    <CardTitle>Rincian Detail</CardTitle>
+                     <CardDescription>Rincian numerik berdasarkan tipe item</CardDescription>
                 </CardHeader>
                 <CardContent>
                    <div className="space-y-4">
                         <div>
-                            <h4 className="font-semibold text-lg">Obat (Medication)</h4>
+                            <h4 className="font-semibold text-lg">Obat</h4>
                             <dl className="grid grid-cols-3 gap-2 text-sm mt-2">
-                                <dt className="text-muted-foreground">Revenue</dt>
+                                <dt className="text-muted-foreground">Pendapatan</dt>
                                 <dd className="col-span-2">{formatCurrency(analysisData.obat.revenue)}</dd>
-                                <dt className="text-muted-foreground">Cost</dt>
+                                <dt className="text-muted-foreground">Biaya</dt>
                                 <dd className="col-span-2">{formatCurrency(analysisData.obat.cost)}</dd>
                                 <dt className="text-muted-foreground">Profit</dt>
                                 <dd className="col-span-2 font-bold text-primary">{formatCurrency(analysisData.obat.profit)}</dd>
                             </dl>
                         </div>
                          <div>
-                            <h4 className="font-semibold text-lg">Alkes (Medical Devices)</h4>
+                            <h4 className="font-semibold text-lg">Alkes</h4>
                              <dl className="grid grid-cols-3 gap-2 text-sm mt-2">
-                                <dt className="text-muted-foreground">Revenue</dt>
+                                <dt className="text-muted-foreground">Pendapatan</dt>
                                 <dd className="col-span-2">{formatCurrency(analysisData.alkes.revenue)}</dd>
-                                <dt className="text-muted-foreground">Cost</dt>
+                                <dt className="text-muted-foreground">Biaya</dt>
                                 <dd className="col-span-2">{formatCurrency(analysisData.alkes.cost)}</dd>
                                 <dt className="text-muted-foreground">Profit</dt>
                                 <dd className="col-span-2 font-bold text-primary">{formatCurrency(analysisData.alkes.profit)}</dd>

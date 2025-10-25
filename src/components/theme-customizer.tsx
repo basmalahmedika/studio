@@ -15,16 +15,16 @@ import { cn } from '@/lib/utils';
 import { Separator } from './ui/separator';
 
 const themeSchema = z.object({
-  appName: z.string().min(1, 'Application name is required'),
+  appName: z.string().min(1, 'Nama aplikasi harus diisi'),
   logo: z.any(),
   // Main Colors
-  primaryColor: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, 'Invalid hex color'),
-  backgroundColor: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, 'Invalid hex color'),
-  accentColor: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, 'Invalid hex color'),
-  foregroundColor: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, 'Invalid hex color'),
+  primaryColor: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, 'Warna hex tidak valid'),
+  backgroundColor: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, 'Warna hex tidak valid'),
+  accentColor: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, 'Warna hex tidak valid'),
+  foregroundColor: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, 'Warna hex tidak valid'),
   // Sidebar Colors
-  sidebarBackgroundColor: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, 'Invalid hex color'),
-  sidebarAccentColor: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, 'Invalid hex color'),
+  sidebarBackgroundColor: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, 'Warna hex tidak valid'),
+  sidebarAccentColor: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, 'Warna hex tidak valid'),
 });
 
 type ThemeFormValues = z.infer<typeof themeSchema>;
@@ -42,7 +42,7 @@ const colorPresets = [
     },
   },
   {
-    name: 'Oceanic',
+    name: 'Oseanik',
     colors: {
       primaryColor: '#0e7490',
       backgroundColor: '#f0f9ff',
@@ -53,7 +53,7 @@ const colorPresets = [
     },
   },
   {
-    name: 'Forest',
+    name: 'Hutan',
     colors: {
       primaryColor: '#166534',
       backgroundColor: '#f0fdf4',
@@ -64,7 +64,7 @@ const colorPresets = [
     },
   },
    {
-    name: 'Sunset',
+    name: 'Senja',
     colors: {
       primaryColor: '#ea580c',
       backgroundColor: '#fff7ed',
@@ -131,10 +131,10 @@ export function ThemeCustomizer() {
         const themeToSave = { ...values, logo: values.logo || logoPreview };
         localStorage.setItem('appTheme', JSON.stringify(themeToSave));
         window.dispatchEvent(new CustomEvent('theme-updated', { detail: themeToSave }));
-        toast({ title: 'Success', description: 'Theme updated successfully.' });
+        toast({ title: 'Sukses', description: 'Tema berhasil diperbarui.' });
     } catch (error) {
-        console.error('Failed to save theme:', error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Failed to save theme. Storage might be full.' });
+        console.error('Gagal menyimpan tema:', error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Gagal menyimpan tema. Penyimpanan mungkin penuh.' });
     }
   };
 
@@ -143,10 +143,10 @@ export function ThemeCustomizer() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
             <Paintbrush className="h-5 w-5 text-muted-foreground" />
-            Theme Customizer
+            Kustomisasi Tema
         </CardTitle>
         <CardDescription>
-          Choose a preset or customize the application's appearance manually.
+          Pilih preset atau sesuaikan tampilan aplikasi secara manual.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -154,7 +154,7 @@ export function ThemeCustomizer() {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
 
             <div className="space-y-4">
-                 <FormLabel>Color Presets</FormLabel>
+                 <FormLabel>Preset Warna</FormLabel>
                  <div className="flex flex-wrap gap-2">
                     {colorPresets.map((preset) => (
                         <Button
@@ -181,9 +181,9 @@ export function ThemeCustomizer() {
                         name="appName"
                         render={({ field }) => (
                             <FormItem>
-                            <FormLabel>Application Name</FormLabel>
+                            <FormLabel>Nama Aplikasi</FormLabel>
                             <FormControl>
-                                <Input placeholder="e.g., PharmaFlow" {...field} />
+                                <Input placeholder="cth., PharmaFlow" {...field} />
                             </FormControl>
                             <FormMessage />
                             </FormItem>
@@ -200,7 +200,7 @@ export function ThemeCustomizer() {
                                 </FormControl>
                                 {logoPreview && (
                                     <div className="mt-4">
-                                    <img src={logoPreview} alt="Logo Preview" className="h-16 w-16 object-contain border p-1 rounded-md" />
+                                    <img src={logoPreview} alt="Pratinjau Logo" className="h-16 w-16 object-contain border p-1 rounded-md" />
                                     </div>
                                 )}
                                 <FormMessage />
@@ -211,13 +211,13 @@ export function ThemeCustomizer() {
                 </div>
 
                 <div className="space-y-4">
-                    <CardTitle className="text-xl">Main Colors</CardTitle>
+                    <CardTitle className="text-xl">Warna Utama</CardTitle>
                      <FormField
                         control={form.control}
                         name="primaryColor"
                         render={({ field }) => (
                             <FormItem>
-                            <FormLabel>Primary Color</FormLabel>
+                            <FormLabel>Warna Primer</FormLabel>
                             <FormControl>
                                 <div className='flex items-center gap-2'>
                                     <Input type="color" {...field} className="p-1 h-10 w-14" />
@@ -233,7 +233,7 @@ export function ThemeCustomizer() {
                         name="backgroundColor"
                         render={({ field }) => (
                             <FormItem>
-                            <FormLabel>Background Color</FormLabel>
+                            <FormLabel>Warna Latar</FormLabel>
                             <FormControl>
                                 <div className='flex items-center gap-2'>
                                     <Input type="color" {...field} className="p-1 h-10 w-14" />
@@ -249,7 +249,7 @@ export function ThemeCustomizer() {
                         name="accentColor"
                         render={({ field }) => (
                             <FormItem>
-                            <FormLabel>Accent Color</FormLabel>
+                            <FormLabel>Warna Aksen</FormLabel>
                             <FormControl>
                                 <div className='flex items-center gap-2'>
                                     <Input type="color" {...field} className="p-1 h-10 w-14" />
@@ -265,7 +265,7 @@ export function ThemeCustomizer() {
                         name="foregroundColor"
                         render={({ field }) => (
                             <FormItem>
-                            <FormLabel>Font / Foreground</FormLabel>
+                            <FormLabel>Warna Teks / Latar Depan</FormLabel>
                             <FormControl>
                                 <div className='flex items-center gap-2'>
                                     <Input type="color" {...field} className="p-1 h-10 w-14" />
@@ -279,13 +279,13 @@ export function ThemeCustomizer() {
                 </div>
 
                 <div className="space-y-4">
-                    <CardTitle className="text-xl">Sidebar Colors</CardTitle>
+                    <CardTitle className="text-xl">Warna Sidebar</CardTitle>
                     <FormField
                         control={form.control}
                         name="sidebarBackgroundColor"
                         render={({ field }) => (
                             <FormItem>
-                            <FormLabel>Sidebar Background</FormLabel>
+                            <FormLabel>Latar Sidebar</FormLabel>
                             <FormControl>
                                 <div className='flex items-center gap-2'>
                                     <Input type="color" {...field} className="p-1 h-10 w-14" />
@@ -301,7 +301,7 @@ export function ThemeCustomizer() {
                         name="sidebarAccentColor"
                         render={({ field }) => (
                             <FormItem>
-                            <FormLabel>Sidebar Accent</FormLabel>
+                            <FormLabel>Aksen Sidebar</FormLabel>
                             <FormControl>
                                 <div className='flex items-center gap-2'>
                                     <Input type="color" {...field} className="p-1 h-10 w-14" />
@@ -317,7 +317,7 @@ export function ThemeCustomizer() {
             </div>
             
             <div className="flex justify-end pt-4">
-              <Button type="submit">Save Changes</Button>
+              <Button type="submit">Simpan Perubahan</Button>
             </div>
           </form>
         </Form>
