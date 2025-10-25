@@ -2,173 +2,175 @@
 'use client';
 
 import * as React from 'react';
-import type { DateRange } from 'react-day-picker';
-import { startOfMonth, differenceInDays, subDays } from 'date-fns';
-import { AbcAnalysis } from '@/components/abc-analysis';
-import { SalesTrendsChart } from '@/components/sales-trends-chart';
-import { SupplierPriceAnalysis } from '@/components/supplier-price-analysis';
-import { useAppContext } from '@/context/app-context';
-import type { Transaction, InventoryItem, SalesData } from '@/lib/types';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
-import { DateRangePicker } from '@/components/date-range-picker';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAppContext } from '@/context/app-context';
+import type { Transaction } from '@/lib/types';
+import { SalesTrendsChart } from '@/components/sales-trends-chart';
 
-type PatientType = 'all' | 'Rawat Jalan' | 'Rawat Inap' | 'Lain-lain';
-type PaymentMethod = 'all' | 'UMUM' | 'BPJS' | 'Lain-lain';
-type ItemTypeFilter = 'all' | 'Obat' | 'Alkes';
+const MONTHS = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+  'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
+];
 
-const filterTransactionsByDate = (transactions: Transaction[], dateRange: DateRange | undefined) => {
-  if (!dateRange || !dateRange.from || !dateRange.to) return transactions;
-  
-  return transactions.filter(t => {
-      const transactionDate = new Date(t.date);
-      transactionDate.setHours(0, 0, 0, 0);
-      const fromDate = new Date(dateRange.from!);
-      fromDate.setHours(0, 0, 0, 0);
-      const toDate = new Date(dateRange.to!);
-      toDate.setHours(0, 0, 0, 0);
-      return transactionDate >= fromDate && transactionDate <= toDate;
-  });
-};
+interface MonthlyAverages {
+  averageRJ: number;
+  averageRI: number;
+}
 
-const calculateMonthlySales = (
-    transactions: Transaction[], 
-    inventory: InventoryItem[], 
-    itemType: ItemTypeFilter
-): Record<string, number> => {
-    const sales: Record<string, number> = {};
-    transactions.forEach(t => {
-      const month = new Date(t.date).toLocaleString('default', { month: 'short', year: 'numeric' });
-      let monthTotal = 0;
-      
-      t.items?.forEach(item => {
+const calculateYearlyAverages = (
+  transactions: Transaction[],
+  year: number,
+  inventory: any[]
+): MonthlyAverages[] => {
+  const yearlyData: MonthlyAverages[] = Array(12).fill(0).map(() => ({
+    averageRJ: 0,
+    averageRI: 0,
+  }));
+
+  const monthlyAggregates: {
+    [key: number]: {
+      rjCost: number; rjCount: number;
+      riCost: number; riCount: number;
+    }
+  } = {};
+
+  transactions
+    .filter(t => new Date(t.date).getFullYear() === year && t.paymentMethod === 'BPJS')
+    .forEach(t => {
+      const month = new Date(t.date).getMonth();
+      if (!monthlyAggregates[month]) {
+        monthlyAggregates[month] = { rjCost: 0, rjCount: 0, riCost: 0, riCount: 0 };
+      }
+
+      const transactionCost = (t.items || []).reduce((sum, item) => {
         const inventoryItem = inventory.find(inv => inv.id === item.itemId);
-        if (itemType === 'all' || (inventoryItem && inventoryItem.itemType === itemType)) {
-          monthTotal += t.totalPrice;
-        }
-      });
-      sales[month] = (sales[month] || 0) + monthTotal;
-    });
-    return sales;
-};
+        return sum + (inventoryItem?.purchasePrice || 0) * item.quantity;
+      }, 0);
 
+      if (t.patientType === 'Rawat Jalan') {
+        monthlyAggregates[month].rjCost += transactionCost;
+        monthlyAggregates[month].rjCount += 1;
+      } else if (t.patientType === 'Rawat Inap') {
+        monthlyAggregates[month].riCost += transactionCost;
+        monthlyAggregates[month].riCount += 1;
+      }
+    });
+
+  for (let i = 0; i < 12; i++) {
+    const data = monthlyAggregates[i];
+    if (data) {
+      yearlyData[i] = {
+        averageRJ: data.rjCount > 0 ? data.rjCost / data.rjCount : 0,
+        averageRI: data.riCount > 0 ? data.riCost / data.riCount : 0,
+      };
+    }
+  }
+
+  return yearlyData;
+};
 
 export default function AnalysisPage() {
   const { transactions, inventory } = useAppContext();
-  const [date, setDate] = React.useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: new Date(),
-  });
-  const [patientType, setPatientType] = React.useState<PatientType>('all');
-  const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethod>('all');
-  const [itemType, setItemType] = React.useState<ItemTypeFilter>('all');
-  const [filteredTransactions, setFilteredTransactions] = React.useState<Transaction[]>([]);
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = React.useState(currentYear);
+  const [comparisonYear, setComparisonYear] = React.useState(currentYear - 1);
 
-  React.useEffect(() => {
-    const dateFiltered = filterTransactionsByDate(transactions, date);
-    const finalFiltered = dateFiltered.filter(t => {
-      const isPatientTypeMatch = patientType === 'all' || t.patientType === patientType;
-      const isPaymentMethodMatch = paymentMethod === 'all' || t.paymentMethod === paymentMethod;
-      
-      if (itemType !== 'all') {
-        const hasMatchingItem = t.items?.some(item => {
-          const inventoryItem = inventory.find(inv => inv.id === item.itemId);
-          return inventoryItem?.itemType === itemType;
-        });
-        return isPatientTypeMatch && isPaymentMethodMatch && hasMatchingItem;
-      }
-      
-      return isPatientTypeMatch && isPaymentMethodMatch;
-    });
-    setFilteredTransactions(finalFiltered);
-  }, [date, patientType, paymentMethod, itemType, transactions, inventory]);
-  
-  const salesComparisonData = React.useMemo(() => {
-    if (!date?.from || !date.to) return [];
+  const availableYears = React.useMemo(() => {
+    const years = new Set(transactions.map(t => new Date(t.date).getFullYear()));
+    return Array.from(years).sort((a, b) => b - a);
+  }, [transactions]);
 
-    // Calculate previous period
-    const duration = differenceInDays(date.to, date.from);
-    const prevDate = {
-      from: subDays(date.from, duration + 1),
-      to: subDays(date.to, duration + 1),
-    };
+  const chartDataRJ = React.useMemo(() => {
+    const selectedYearData = calculateYearlyAverages(transactions, selectedYear, inventory);
+    const comparisonYearData = calculateYearlyAverages(transactions, comparisonYear, inventory);
 
-    const currentPeriodTransactions = filterTransactionsByDate(filteredTransactions, date);
-    const previousPeriodTransactions = filterTransactionsByDate(transactions, prevDate)
-      .filter(t => {
-        const isPatientTypeMatch = patientType === 'all' || t.patientType === patientType;
-        const isPaymentMethodMatch = paymentMethod === 'all' || t.paymentMethod === paymentMethod;
-        return isPatientTypeMatch && isPaymentMethodMatch;
-      });
-
-    const currentSales = calculateMonthlySales(currentPeriodTransactions, inventory, itemType);
-    const previousSales = calculateMonthlySales(previousPeriodTransactions, inventory, itemType);
-    
-    const allMonths = new Set([...Object.keys(currentSales), ...Object.keys(previousSales)]);
-    
-    const sortedMonths = Array.from(allMonths).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-
-    return sortedMonths.map(month => ({
+    return MONTHS.map((month, index) => ({
       name: month,
-      current: currentSales[month] || 0,
-      previous: previousSales[month] || 0,
+      current: selectedYearData[index].averageRJ,
+      previous: comparisonYearData[index].averageRJ,
     }));
-  }, [date, filteredTransactions, transactions, inventory, itemType, patientType, paymentMethod]);
+  }, [transactions, inventory, selectedYear, comparisonYear]);
+  
+  const chartDataRI = React.useMemo(() => {
+    const selectedYearData = calculateYearlyAverages(transactions, selectedYear, inventory);
+    const comparisonYearData = calculateYearlyAverages(transactions, comparisonYear, inventory);
+
+    return MONTHS.map((month, index) => ({
+      name: month,
+      current: selectedYearData[index].averageRI,
+      previous: comparisonYearData[index].averageRI,
+    }));
+  }, [transactions, inventory, selectedYear, comparisonYear]);
 
 
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-3xl font-headline font-bold tracking-tight">Analisis Pergerakan & Harga</h1>
+        <h1 className="text-3xl font-headline font-bold tracking-tight">Analisis Perbandingan Tahunan</h1>
         <p className="text-muted-foreground">
-          Analisis pergerakan obat, tren penjualan, dan harga dari pemasok.
+          Bandingkan rata-rata pengeluaran BPJS bulanan antara dua tahun yang berbeda.
         </p>
       </div>
-      
+
       <Card>
         <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <DateRangePicker date={date} onDateChange={setDate} />
-            <Select value={patientType} onValueChange={(value) => setPatientType(value as PatientType)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Pilih Tipe Pasien" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua Tipe Pasien</SelectItem>
-                <SelectItem value="Rawat Jalan">Rawat Jalan</SelectItem>
-                <SelectItem value="Rawat Inap">Rawat Inap</SelectItem>
-                <SelectItem value="Lain-lain">Lain-lain</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={paymentMethod} onValueChange={(value) => setPaymentMethod(value as PaymentMethod)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Pilih Metode Pembayaran" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua Metode Pembayaran</SelectItem>
-                <SelectItem value="UMUM">UMUM</SelectItem>
-                <SelectItem value="BPJS">BPJS</SelectItem>
-                <SelectItem value="Lain-lain">Lain-lain</SelectItem>
-              </SelectContent>
-            </Select>
-             <Select value={itemType} onValueChange={(value) => setItemType(value as ItemTypeFilter)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Pilih Tipe Item" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua Tipe Item</SelectItem>
-                <SelectItem value="Obat">Obat</SelectItem>
-                <SelectItem value="Alkes">Alkes</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Pilih Tahun</label>
+              <Select
+                value={selectedYear.toString()}
+                onValueChange={(value) => setSelectedYear(Number(value))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih Tahun" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableYears.map(year => (
+                    <SelectItem key={year} value={year.toString()}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+             <div className="space-y-2">
+              <label className="text-sm font-medium">Pilih Tahun Pembanding</label>
+              <Select
+                value={comparisonYear.toString()}
+                onValueChange={(value) => setComparisonYear(Number(value))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih Tahun Pembanding" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableYears.map(year => (
+                    <SelectItem key={year} value={year.toString()}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid gap-6">
-        <AbcAnalysis transactions={filteredTransactions} itemTypeFilter={itemType} />
-        <SalesTrendsChart data={salesComparisonData} />
-        <SupplierPriceAnalysis inventory={inventory} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <SalesTrendsChart 
+          title={`Perbandingan Rata-rata Pengeluaran BPJS RJ (${comparisonYear} vs ${selectedYear})`}
+          data={chartDataRJ} 
+        />
+        <SalesTrendsChart 
+          title={`Perbandingan Rata-rata Pengeluaran BPJS RI (${comparisonYear} vs ${selectedYear})`}
+          data={chartDataRI} 
+        />
       </div>
     </div>
   );

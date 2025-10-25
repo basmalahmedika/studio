@@ -1,11 +1,16 @@
 
 'use client';
 
+import { AbcAnalysis } from '@/components/abc-analysis';
 import { ExpiringStockReport } from '@/components/expiring-stock-report';
 import { LowStockReport } from '@/components/low-stock-report';
 import { ProfitAnalysisReport } from '@/components/profit-analysis-report';
+import { SupplierPriceAnalysis } from '@/components/supplier-price-analysis';
+import { useAppContext } from '@/context/app-context';
 
 export default function ReportsPage() {
+  const { transactions, inventory } = useAppContext();
+
   return (
     <div className="space-y-6">
        <div className="space-y-2">
@@ -17,6 +22,8 @@ export default function ReportsPage() {
 
       <div className="space-y-6">
         <ProfitAnalysisReport />
+        <AbcAnalysis transactions={transactions} itemTypeFilter={'all'} />
+        <SupplierPriceAnalysis inventory={inventory} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
