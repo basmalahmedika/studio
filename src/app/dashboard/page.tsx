@@ -17,16 +17,18 @@ import { CategoryAnalysisChart } from '@/components/category-analysis-chart';
 import { TopBpjsExpenditures } from '@/components/top-bpjs-expenditures';
 
 interface DetailedStats {
-  revenue: number;
-  expenditure: number;
-  transactions: number;
+  revenueRJ: number;
+  revenueRI: number;
+  expenditureRJ: number;
+  expenditureRI: number;
 }
 
 interface AllStats {
   totalRevenue: number;
   totalExpenditure: number;
   totalTransactions: number;
-  details: Record<string, DetailedStats>;
+  details: DetailedStats;
+  categoryDetails: Record<string, { revenue: number; expenditure: number }>;
 }
 
 const calculateStats = (transactions: Transaction[]): AllStats => {
@@ -35,26 +37,44 @@ const calculateStats = (transactions: Transaction[]): AllStats => {
       totalExpenditure: 0,
       totalTransactions: 0,
       details: {
-        'Rawat Jalan': { revenue: 0, expenditure: 0, transactions: 0 },
-        'Rawat Inap': { revenue: 0, expenditure: 0, transactions: 0 },
-        'Lain-lain': { revenue: 0, expenditure: 0, transactions: 0 },
+        revenueRJ: 0,
+        revenueRI: 0,
+        expenditureRJ: 0,
+        expenditureRI: 0,
       },
+      categoryDetails: {
+        'Rawat Jalan': { revenue: 0, expenditure: 0 },
+        'Rawat Inap': { revenue: 0, expenditure: 0 },
+        'Lain-lain': { revenue: 0, expenditure: 0 },
+      }
     };
 
     transactions.forEach(t => {
       stats.totalTransactions += 1;
-      const key = t.patientType;
       
-      if (stats.details[key]) {
-        stats.details[key].transactions += 1;
-      }
+      const categoryKey = t.patientType;
       
       if (t.paymentMethod === 'UMUM') {
         stats.totalRevenue += t.totalPrice;
-        if(stats.details[key]) stats.details[key].revenue += t.totalPrice;
-      } else {
+        if(stats.categoryDetails[categoryKey]) stats.categoryDetails[categoryKey].revenue += t.totalPrice;
+
+        if (t.patientType === 'Rawat Jalan') {
+            stats.details.revenueRJ += t.totalPrice;
+        } else if (t.patientType === 'Rawat Inap') {
+            stats.details.revenueRI += t.totalPrice;
+        }
+
+      } else { // BPJS and Lain-lain
         stats.totalExpenditure += t.totalPrice;
-        if(stats.details[key]) stats.details[key].expenditure += t.totalPrice;
+        if(stats.categoryDetails[categoryKey]) stats.categoryDetails[categoryKey].expenditure += t.totalPrice;
+
+        if(t.paymentMethod === 'BPJS') {
+             if (t.patientType === 'Rawat Jalan') {
+                stats.details.expenditureRJ += t.totalPrice;
+            } else if (t.patientType === 'Rawat Inap') {
+                stats.details.expenditureRI += t.totalPrice;
+            }
+        }
       }
     });
 
@@ -109,9 +129,9 @@ export default function DashboardPage() {
       .sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime());
 
     const categoryData = [
-      { name: 'Rawat Jalan', revenue: currentStats.details['Rawat Jalan'].revenue, expenditure: currentStats.details['Rawat Jalan'].expenditure },
-      { name: 'Rawat Inap', revenue: currentStats.details['Rawat Inap'].revenue, expenditure: currentStats.details['Rawat Inap'].expenditure },
-      { name: 'Lain-lain', revenue: currentStats.details['Lain-lain'].revenue, expenditure: currentStats.details['Lain-lain'].expenditure },
+      { name: 'Rawat Jalan', revenue: currentStats.categoryDetails['Rawat Jalan'].revenue, expenditure: currentStats.categoryDetails['Rawat Jalan'].expenditure },
+      { name: 'Rawat Inap', revenue: currentStats.categoryDetails['Rawat Inap'].revenue, expenditure: currentStats.categoryDetails['Rawat Inap'].expenditure },
+      { name: 'Lain-lain', revenue: currentStats.categoryDetails['Lain-lain'].revenue, expenditure: currentStats.categoryDetails['Lain-lain'].expenditure },
     ];
       
     return {
@@ -156,6 +176,37 @@ export default function DashboardPage() {
            color="bg-blue-100 dark:bg-blue-800/50"
         />
       </div>
+
+       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="Pendapatan RJ (UMUM)"
+          value={formatCurrency(currentPeriodStats.details.revenueRJ)}
+          icon={Pill}
+          description="Pendapatan dari pasien Rawat Jalan UMUM"
+          color="bg-emerald-100 dark:bg-emerald-800/50"
+        />
+        <StatCard
+          title="Pendapatan RI (UMUM)"
+          value={formatCurrency(currentPeriodStats.details.revenueRI)}
+          icon={Pill}
+          description="Pendapatan dari pasien Rawat Inap UMUM"
+          color="bg-emerald-100 dark:bg-emerald-800/50"
+        />
+         <StatCard
+          title="Pengeluaran RJ (BPJS)"
+          value={formatCurrency(currentPeriodStats.details.expenditureRJ)}
+          icon={Stethoscope}
+          description="Pengeluaran untuk pasien Rawat Jalan BPJS"
+          color="bg-teal-100 dark:bg-teal-800/50"
+        />
+         <StatCard
+          title="Pengeluaran RI (BPJS)"
+          value={formatCurrency(currentPeriodStats.details.expenditureRI)}
+          icon={Stethoscope}
+          description="Pengeluaran untuk pasien Rawat Inap BPJS"
+          color="bg-teal-100 dark:bg-teal-800/50"
+        />
+      </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <MonthlyTrendChart 
@@ -183,7 +234,7 @@ export default function DashboardPage() {
         </div>
       </div>
       
-       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <RecentTransactions transactions={filteredTransactions} />
         <TopSellingItems 
           title="Obat Terlaris (Penjualan UMUM)"
@@ -203,3 +254,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
