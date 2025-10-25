@@ -113,14 +113,14 @@ export default function DashboardPage() {
           value={`Rp ${stats.totalRevenue.toLocaleString('id-ID')}`}
           icon={DollarSign}
           description="Pendapatan dari RJ Umum & RI Umum"
-          color="bg-green-600"
+          color="bg-green-500"
         />
         <StatCard
           title="Total Transaksi"
           value={stats.totalTransactions.toString()}
           icon={ReceiptText}
           description="Jumlah total penjualan"
-           color="bg-blue-600"
+           color="bg-blue-500"
         />
         <StatCard
           title="Rawat Jalan (UMUM / BPJS)"
