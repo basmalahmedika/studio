@@ -113,48 +113,56 @@ export default function DashboardPage() {
           value={`Rp ${stats.totalRevenue.toLocaleString('id-ID')}`}
           icon={DollarSign}
           description="Pendapatan dari RJ Umum & RI Umum"
+          color="bg-green-600"
         />
         <StatCard
           title="Total Transaksi"
           value={stats.totalTransactions.toString()}
           icon={ReceiptText}
           description="Jumlah total penjualan"
+           color="bg-blue-600"
         />
         <StatCard
           title="Rawat Jalan (UMUM / BPJS)"
           value={`${stats.rjUmum} / ${stats.rjBpjs}`}
           icon={Users}
           description="Jumlah layanan rawat jalan"
+           color="bg-yellow-500"
         />
         <StatCard
           title="Rawat Inap (UMUM / BPJS)"
           value={`${stats.riUmum} / ${stats.riBpjs}`}
           icon={Users}
           description="Jumlah layanan rawat inap"
+           color="bg-sky-500"
         />
         <StatCard
           title="Pendapatan RJ Umum"
           value={`Rp ${stats.revenueRjUmum.toLocaleString('id-ID')}`}
           icon={DollarSign}
           description="Total pendapatan dari Rawat Jalan Umum"
+           color="bg-emerald-500"
         />
          <StatCard
           title="Pengeluaran RJ BPJS"
           value={`Rp ${stats.revenueRjBpjs.toLocaleString('id-ID')}`}
           icon={DollarSign}
           description="Total pengeluaran dari Rawat Jalan BPJS"
+           color="bg-red-500"
         />
          <StatCard
           title="Pendapatan RI Umum"
           value={`Rp ${stats.revenueRiUmum.toLocaleString('id-ID')}`}
           icon={DollarSign}
           description="Total pendapatan dari Rawat Inap Umum"
+           color="bg-teal-500"
         />
          <StatCard
           title="Pengeluaran RI BPJS"
           value={`Rp ${stats.revenueRiBpjs.toLocaleString('id-ID')}`}
           icon={DollarSign}
           description="Total pengeluaran dari Rawat Inap BPJS"
+           color="bg-orange-500"
         />
       </div>
       
