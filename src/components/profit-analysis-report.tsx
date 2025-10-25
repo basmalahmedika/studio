@@ -73,8 +73,16 @@ export function ProfitAnalysisReport() {
       t.items.forEach(item => {
         const inventoryItem = inventory.find(inv => inv.id === item.itemId);
         if (inventoryItem) {
-          // CORRECTED LOGIC: Always use the price from the transaction item for revenue
-          const itemRevenue = item.price * item.quantity;
+          
+          let itemRevenue;
+          // Revenue for UMUM is based on the transaction item's price.
+          // For BPJS/Lain-lain, revenue is considered equal to cost (purchase price) as there's no profit.
+          if (t.paymentMethod === 'UMUM') {
+            itemRevenue = item.price * item.quantity;
+          } else {
+            itemRevenue = inventoryItem.purchasePrice * item.quantity;
+          }
+          
           const itemCost = inventoryItem.purchasePrice * item.quantity;
           const itemProfit = itemRevenue - itemCost;
           
