@@ -1,7 +1,7 @@
 
 'use client';
 import * as React from 'react';
-import type { Transaction } from '@/lib/types';
+import type { Transaction, InventoryItem } from '@/lib/types';
 import {
   Card,
   CardContent,
@@ -20,66 +20,84 @@ import {
 
 interface TopBpjsExpendituresProps {
   transactions: Transaction[];
+  inventory: InventoryItem[];
 }
 
-interface PatientExpenditure {
+interface BpjsTransactionExpenditure {
+  id: string;
+  date: string;
   mrNumber: string;
-  total: number;
+  totalCost: number;
 }
 
 const formatCurrency = (value: number) => `Rp ${value.toLocaleString('id-ID')}`;
 
-export function TopBpjsExpenditures({ transactions }: TopBpjsExpendituresProps) {
+export function TopBpjsExpenditures({ transactions, inventory }: TopBpjsExpendituresProps) {
 
   const topExpenditures = React.useMemo(() => {
-    const patientTotals: Record<string, number> = {};
+    const bpjsRjTransactions: BpjsTransactionExpenditure[] = [];
 
     transactions.forEach(t => {
       if (t.patientType === 'Rawat Jalan' && t.paymentMethod === 'BPJS' && t.medicalRecordNumber) {
-        patientTotals[t.medicalRecordNumber] = (patientTotals[t.medicalRecordNumber] || 0) + t.totalPrice;
+        
+        const totalCost = (t.items || []).reduce((acc, item) => {
+            const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+            const purchasePrice = inventoryItem?.purchasePrice || 0;
+            return acc + (purchasePrice * item.quantity);
+        }, 0);
+
+        bpjsRjTransactions.push({
+            id: t.id,
+            date: t.date,
+            mrNumber: t.medicalRecordNumber,
+            totalCost: totalCost
+        });
       }
     });
 
-    return Object.entries(patientTotals)
-      .map(([mrNumber, total]) => ({ mrNumber, total }))
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 5);
+    return bpjsRjTransactions
+      .sort((a, b) => b.totalCost - a.totalCost)
+      .slice(0, 10);
 
-  }, [transactions]);
+  }, [transactions, inventory]);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Pengeluaran BPJS RJ Teratas</CardTitle>
-        <CardDescription>5 pasien Rawat Jalan BPJS dengan pengeluaran terbesar.</CardDescription>
+        <CardTitle>Transaksi Pengeluaran BPJS RJ Teratas</CardTitle>
+        <CardDescription>Daftar transaksi Rawat Jalan BPJS dengan pengeluaran (berdasarkan harga beli) terbesar.</CardDescription>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>No. Rekam Medis</TableHead>
-              <TableHead className="text-right">Total Pengeluaran</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {topExpenditures.length > 0 ? (
-              topExpenditures.map(item => (
-                <TableRow key={item.mrNumber}>
-                  <TableCell>
-                    <div className="font-medium">{item.mrNumber}</div>
-                  </TableCell>
-                  <TableCell className="text-right font-semibold">{formatCurrency(item.total)}</TableCell>
+        <div className="overflow-x-auto max-h-96">
+            <Table>
+            <TableHeader>
+                <TableRow>
+                <TableHead>Tanggal</TableHead>
+                <TableHead>No. Rekam Medis</TableHead>
+                <TableHead className="text-right">Total Pengeluaran (Harga Beli)</TableHead>
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={2} className="h-24 text-center">
-                  Tidak ada data pengeluaran BPJS RJ.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+                {topExpenditures.length > 0 ? (
+                topExpenditures.map(item => (
+                    <TableRow key={item.id}>
+                        <TableCell>{item.date}</TableCell>
+                        <TableCell>
+                            <div className="font-medium">{item.mrNumber}</div>
+                        </TableCell>
+                        <TableCell className="text-right font-semibold">{formatCurrency(item.totalCost)}</TableCell>
+                    </TableRow>
+                ))
+                ) : (
+                <TableRow>
+                    <TableCell colSpan={3} className="h-24 text-center">
+                    Tidak ada data pengeluaran BPJS RJ untuk periode ini.
+                    </TableCell>
+                </TableRow>
+                )}
+            </TableBody>
+            </Table>
+        </div>
       </CardContent>
     </Card>
   );

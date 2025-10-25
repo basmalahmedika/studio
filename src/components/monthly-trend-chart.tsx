@@ -21,7 +21,7 @@ interface MonthlyTrendChartProps {
 export function MonthlyTrendChart({ title, description, data, dataKey, chartColor }: MonthlyTrendChartProps) {
   const chartConfig = {
     [dataKey]: {
-      label: title,
+      label: title.split(' ')[1], // e.g., "Pendapatan" or "Pengeluaran"
       color: chartColor,
     },
   };

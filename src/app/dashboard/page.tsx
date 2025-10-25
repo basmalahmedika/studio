@@ -7,11 +7,10 @@ import { startOfMonth, subDays, differenceInDays } from 'date-fns';
 import { DollarSign, ReceiptText, Pill, Stethoscope } from 'lucide-react';
 
 import { StatCard } from '@/components/stat-card';
-import { RecentTransactions } from '@/components/recent-transactions';
 import { TopSellingItems } from '@/components/top-selling-items';
 import { DateRangePicker } from '@/components/date-range-picker';
 import { useAppContext } from '@/context/app-context';
-import type { Transaction } from '@/lib/types';
+import type { Transaction, InventoryItem } from '@/lib/types';
 import { MonthlyTrendChart } from '@/components/monthly-trend-chart';
 import { CategoryBreakdownChart } from '@/components/category-breakdown-chart';
 import { TopBpjsExpenditures } from '@/components/top-bpjs-expenditures';
@@ -38,7 +37,7 @@ interface AllStats {
   categoryBreakdown: CategoryBreakdown;
 }
 
-const calculateStats = (transactions: Transaction[]): AllStats => {
+const calculateStats = (transactions: Transaction[], inventory: InventoryItem[]): AllStats => {
     const stats: AllStats = {
       totalRevenue: 0,
       totalExpenditure: 0,
@@ -73,14 +72,21 @@ const calculateStats = (transactions: Transaction[]): AllStats => {
             stats.categoryBreakdown.riUmum += t.totalPrice;
         }
       } else { 
-        stats.totalExpenditure += t.totalPrice;
+        let transactionCost = 0;
+        t.items?.forEach(item => {
+          const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+          transactionCost += (inventoryItem?.purchasePrice || 0) * item.quantity;
+        });
+
+        stats.totalExpenditure += transactionCost;
+
         if(t.paymentMethod === 'BPJS') {
              if (isRJ) {
-                stats.details.expenditureRJ += t.totalPrice;
-                stats.categoryBreakdown.rjBpjs += t.totalPrice;
+                stats.details.expenditureRJ += transactionCost;
+                stats.categoryBreakdown.rjBpjs += transactionCost;
             } else if (isRI) {
-                stats.details.expenditureRI += t.totalPrice;
-                stats.categoryBreakdown.riBpjs += t.totalPrice;
+                stats.details.expenditureRI += transactionCost;
+                stats.categoryBreakdown.riBpjs += transactionCost;
             }
         }
       }
@@ -128,8 +134,8 @@ export default function DashboardPage() {
     };
     const previousFiltered = filterTransactions(prevDate);
     
-    const currentStats = calculateStats(currentFiltered);
-    const previousStats = calculateStats(previousFiltered);
+    const currentStats = calculateStats(currentFiltered, inventory);
+    const previousStats = calculateStats(previousFiltered, inventory);
 
     // Monthly Trend Chart Data
     const monthlyRevenue: Record<string, number> = {};
@@ -140,7 +146,12 @@ export default function DashboardPage() {
         if (t.paymentMethod === 'UMUM') {
             monthlyRevenue[month] = (monthlyRevenue[month] || 0) + t.totalPrice;
         } else {
-            monthlyExpenditure[month] = (monthlyExpenditure[month] || 0) + t.totalPrice;
+             let transactionCost = 0;
+            t.items?.forEach(item => {
+              const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+              transactionCost += (inventoryItem?.purchasePrice || 0) * item.quantity;
+            });
+            monthlyExpenditure[month] = (monthlyExpenditure[month] || 0) + transactionCost;
         }
     });
     
@@ -170,9 +181,9 @@ export default function DashboardPage() {
         categoryChartDataRI: riData
     };
 
-  }, [date, transactions]);
+  }, [date, transactions, inventory]);
   
-  const currentPeriodStats = calculateStats(filteredTransactions);
+  const currentPeriodStats = calculateStats(filteredTransactions, inventory);
 
   return (
     <div className="space-y-6">
@@ -183,20 +194,13 @@ export default function DashboardPage() {
         </div>
       </div>
       
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
         <StatCard
           title="Total Pendapatan"
           value={formatCurrency(currentPeriodStats.totalRevenue)}
           icon={DollarSign}
           description="Total dari penjualan UMUM"
           color="bg-green-100 dark:bg-green-800/50"
-        />
-        <StatCard
-          title="Total Pengeluaran"
-          value={formatCurrency(currentPeriodStats.totalExpenditure)}
-          icon={DollarSign}
-          description="Total dari BPJS &amp; Lain-lain"
-           color="bg-red-100 dark:bg-red-800/50"
         />
         <StatCard
           title="Total Transaksi"
@@ -248,7 +252,7 @@ export default function DashboardPage() {
         />
         <MonthlyTrendChart 
             title="Grafik Pengeluaran"
-            description="Tren pengeluaran dari BPJS &amp; Lain-lain per bulan."
+            description="Tren pengeluaran dari BPJS & Lain-lain per bulan (berdasarkan harga beli)."
             data={expenditureChartData}
             dataKey="total"
             chartColor="hsl(var(--chart-2))"
@@ -267,13 +271,8 @@ export default function DashboardPage() {
             data={categoryChartDataRI}
          />
       </div>
-       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        <div className="lg:col-span-3">
-            <RecentTransactions transactions={filteredTransactions} />
-        </div>
-         <div className="lg:col-span-2">
-           <TopBpjsExpenditures transactions={filteredTransactions} />
-        </div>
+       <div className="grid grid-cols-1">
+         <TopBpjsExpenditures transactions={filteredTransactions} inventory={inventory} />
       </div>
       
        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
