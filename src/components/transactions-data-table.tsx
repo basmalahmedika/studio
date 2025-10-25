@@ -65,21 +65,24 @@ import type { Transaction, InventoryItem, TransactionItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
+const transactionItemSchema = z.object({
+  itemId: z.string(),
+  itemName: z.string(),
+  quantity: z.coerce.number().min(1, 'Kuantitas minimal 1'),
+  price: z.number(),
+  stock: z.number(),
+});
+
 const transactionSchema = z.object({
   id: z.string().optional(),
   date: z.date(),
   medicalRecordNumber: z.string().min(1, 'Nomor rekam medis harus diisi'),
   patientType: z.enum(['Rawat Jalan', 'Rawat Inap', 'Lain-lain']),
   paymentMethod: z.enum(['UMUM', 'BPJS', 'Lain-lain']),
-  items: z.array(z.object({
-    itemId: z.string(),
-    itemName: z.string(),
-    quantity: z.coerce.number().min(1, 'Kuantitas minimal 1'),
-    price: z.number(),
-    stock: z.number(),
-  })).min(1, 'Minimal satu item harus ditambahkan'),
+  items: z.array(transactionItemSchema).min(1, 'Minimal satu item harus ditambahkan'),
   totalPrice: z.number(),
 });
+
 
 type TransactionFormValues = z.infer<typeof transactionSchema>;
 
@@ -194,7 +197,7 @@ export function TransactionsDataTable() {
             ...item,
             price: item.price,
             itemName: inventoryItem?.itemName || 'Item Tidak Dikenal',
-            stock: inventoryItem?.quantity || 0,
+            stock: inventoryItem ? (inventoryItem.quantity + (transaction.items?.find(ti => ti.itemId === item.itemId)?.quantity || 0)) : 0,
         };
     });
 
@@ -532,7 +535,7 @@ export function TransactionsDataTable() {
                               </div>
                             ))}
                            </div>
-                           {form.formState.errors.items && <p className="text-sm font-medium text-destructive">{form.formState.errors.items?.message}</p>}
+                           {form.formState.errors.items && <p className="text-sm font-medium text-destructive">{form.formState.errors.items?.message || (form.formState.errors.items as any)?.root?.message}</p>}
                            <div className="flex justify-end items-center pt-4 border-t">
                              <div className="text-lg font-bold">Total: Rp {form.getValues('totalPrice').toLocaleString('id-ID')}</div>
                            </div>

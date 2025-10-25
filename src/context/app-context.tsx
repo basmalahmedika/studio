@@ -190,57 +190,60 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
   const updateTransaction = async (id: string, updatedTransactionData: Omit<Transaction, 'id'>, originalTransaction: Transaction) => {
     const db = getDb();
     await runTransaction(db, async (t) => {
-      // 1. READ PHASE
-      const itemIds = new Set<string>();
-      (originalTransaction.items || []).forEach(item => itemIds.add(item.itemId));
-      (updatedTransactionData.items || []).forEach(item => itemIds.add(item.itemId));
-      
-      const itemRefs: DocumentReference[] = Array.from(itemIds).map(itemId => doc(db, 'inventory', itemId));
-      const itemDocs = await Promise.all(itemRefs.map(ref => t.get(ref)));
-      
-      const inventoryMap = new Map<string, DocumentSnapshot>();
-      itemDocs.forEach((docSnap, index) => {
-        if (docSnap.exists()) {
-          inventoryMap.set(itemRefs[index].id, docSnap);
-        }
-      });
-      
-      const stockChanges = new Map<string, number>();
+        const stockAdjustments = new Map<string, number>();
 
-      // Calculate stock restoration from original transaction
-      (originalTransaction.items || []).forEach(item => {
-        stockChanges.set(item.itemId, (stockChanges.get(item.itemId) || 0) + item.quantity);
-      });
-      
-      // Calculate stock deduction for updated transaction
-      (updatedTransactionData.items || []).forEach(item => {
-        stockChanges.set(item.itemId, (stockChanges.get(item.itemId) || 0) - item.quantity);
-      });
+        // Calculate stock to be returned from original transaction
+        originalTransaction.items?.forEach(item => {
+            stockAdjustments.set(item.itemId, (stockAdjustments.get(item.itemId) || 0) + item.quantity);
+        });
 
-      // 2. VALIDATION PHASE
-      for (const [itemId, change] of stockChanges.entries()) {
-        const itemDoc = inventoryMap.get(itemId);
-        if (!itemDoc) {
-          throw new Error(`Item with id ${itemId} does not exist!`);
-        }
-        const currentQuantity = itemDoc.data()?.quantity || 0;
-        // The final quantity is the current stock plus the net change
-        if (currentQuantity + change < 0) {
-           throw new Error(`Insufficient stock for item ${itemDoc.data()?.itemName}. Required change: ${-change}, Available: ${currentQuantity}`);
-        }
-      }
+        // Calculate stock to be deducted for the new transaction
+        updatedTransactionData.items?.forEach(item => {
+            stockAdjustments.set(item.itemId, (stockAdjustments.get(item.itemId) || 0) - item.quantity);
+        });
 
-      // 3. WRITE PHASE
-      for (const [itemId, change] of stockChanges.entries()) {
-        const itemDoc = inventoryMap.get(itemId)!;
-        const newQuantity = (itemDoc.data()?.quantity || 0) + change;
-        t.update(itemDoc.ref, { quantity: newQuantity });
-      }
-      
-      const transactionDocRef = doc(db, 'transactions', id);
-      t.update(transactionDocRef, updatedTransactionData);
+        // 1. READ PHASE
+        const itemIds = Array.from(stockAdjustments.keys());
+        if (itemIds.length === 0) { // Only transaction details are updated, no item changes
+          const transactionDocRef = doc(db, 'transactions', id);
+          t.update(transactionDocRef, updatedTransactionData);
+          return;
+        }
+
+        const itemRefs = itemIds.map(itemId => doc(db, 'inventory', itemId));
+        const itemDocs = await Promise.all(itemRefs.map(ref => t.get(ref)));
+
+        const inventoryMap = new Map<string, DocumentSnapshot>();
+        itemDocs.forEach((docSnap) => {
+            if (docSnap.exists()) {
+                inventoryMap.set(docSnap.id, docSnap);
+            }
+        });
+
+        // 2. VALIDATION PHASE
+        for (const [itemId, adjustment] of stockAdjustments.entries()) {
+            const itemDoc = inventoryMap.get(itemId);
+            if (!itemDoc) {
+                throw new Error(`Item with id ${itemId} was not found.`);
+            }
+            const currentQuantity = itemDoc.data()?.quantity || 0;
+            // The final quantity is the current stock plus the net adjustment
+            if (currentQuantity + adjustment < 0) {
+                throw new Error(`Insufficient stock for item ${itemDoc.data()?.itemName}. Required change would result in negative stock.`);
+            }
+        }
+
+        // 3. WRITE PHASE
+        for (const [itemId, adjustment] of stockAdjustments.entries()) {
+            const itemDoc = inventoryMap.get(itemId)!;
+            const newQuantity = (itemDoc.data()?.quantity || 0) + adjustment;
+            t.update(itemDoc.ref, { quantity: newQuantity });
+        }
+
+        const transactionDocRef = doc(db, 'transactions', id);
+        t.update(transactionDocRef, updatedTransactionData);
     });
-  };
+};
 
 
  const deleteTransaction = async (id: string, transactionToDelete: Transaction) => {
