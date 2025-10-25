@@ -61,7 +61,6 @@ export default function DashboardPage() {
     };
 
     filteredTransactions.forEach(t => {
-      data.totalRevenue += t.totalPrice;
       data.totalTransactions += 1;
       
       if (t.patientType === 'Rawat Jalan' && t.paymentMethod === 'UMUM') {
@@ -94,6 +93,8 @@ export default function DashboardPage() {
       }
     });
 
+    data.totalRevenue = data.revenueRjUmum + data.revenueRiUmum;
+
     return data;
   }, [filteredTransactions]);
 
@@ -111,7 +112,7 @@ export default function DashboardPage() {
           title="Total Pendapatan"
           value={`Rp ${stats.totalRevenue.toLocaleString('id-ID')}`}
           icon={DollarSign}
-          description="Total pendapatan dari semua transaksi"
+          description="Pendapatan dari RJ Umum & RI Umum"
         />
         <StatCard
           title="Total Transaksi"
@@ -138,10 +139,10 @@ export default function DashboardPage() {
           description="Total pendapatan dari Rawat Jalan Umum"
         />
          <StatCard
-          title="Pendapatan RJ BPJS"
+          title="Pengeluaran RJ BPJS"
           value={`Rp ${stats.revenueRjBpjs.toLocaleString('id-ID')}`}
           icon={DollarSign}
-          description="Total pendapatan dari Rawat Jalan BPJS"
+          description="Total pengeluaran dari Rawat Jalan BPJS"
         />
          <StatCard
           title="Pendapatan RI Umum"
@@ -150,10 +151,10 @@ export default function DashboardPage() {
           description="Total pendapatan dari Rawat Inap Umum"
         />
          <StatCard
-          title="Pendapatan RI BPJS"
+          title="Pengeluaran RI BPJS"
           value={`Rp ${stats.revenueRiBpjs.toLocaleString('id-ID')}`}
           icon={DollarSign}
-          description="Total pendapatan dari Rawat Inap BPJS"
+          description="Total pengeluaran dari Rawat Inap BPJS"
         />
       </div>
       
