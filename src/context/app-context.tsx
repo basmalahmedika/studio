@@ -120,8 +120,6 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
     const batch = writeBatch(db);
     const inventoryCollectionRef = collection(db, 'inventory');
     
-    // Fetch all existing inventory items once to create a lookup map.
-    // This is far more efficient than querying inside a loop.
     const inventorySnapshot = await getDocs(inventoryCollectionRef);
     const existingItemsMap = new Map<string, { id: string; quantity: number }>();
     inventorySnapshot.docs.forEach(doc => {
@@ -135,14 +133,11 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
       const existingItem = existingItemsMap.get(key);
 
       if (existingItem) {
-        // If item exists, update its quantity
         const docRef = doc(db, 'inventory', existingItem.id);
         const newQuantity = (existingItem.quantity || 0) + item.quantity;
         batch.update(docRef, { ...item, quantity: newQuantity });
-        // Update the map for subsequent items in the same batch run
         existingItemsMap.set(key, { ...existingItem, quantity: newQuantity });
       } else {
-        // If item is new, add it and update the map
         const newDocRef = doc(inventoryCollectionRef);
         batch.set(newDocRef, item);
         existingItemsMap.set(key, { id: newDocRef.id, quantity: item.quantity });
@@ -168,7 +163,7 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
     await runTransaction(db, async (t) => {
       const transactionItems = transaction.items || [];
       if (transactionItems.length === 0) {
-        throw new Error("Transaction must have at least one item.");
+        throw new Error("Transaksi harus memiliki setidaknya satu item.");
       }
 
       for (const soldItem of transactionItems) {
@@ -176,67 +171,67 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
         const itemDoc = await t.get(itemRef);
 
         if (!itemDoc.exists()) {
-          throw new Error(`Item with id ${soldItem.itemId} does not exist!`);
+          throw new Error(`Item dengan id ${soldItem.itemId} tidak ada!`);
         }
         
         const currentQuantity = itemDoc.data().quantity;
         if (currentQuantity < soldItem.quantity) {
-          throw new Error(`Insufficient stock for item ${itemDoc.data().itemName}. Available: ${currentQuantity}, Required: ${soldItem.quantity}`);
+          throw new Error(`Stok tidak mencukupi untuk item ${itemDoc.data().itemName}. Tersedia: ${currentQuantity}, Dibutuhkan: ${soldItem.quantity}`);
         }
         
         const newQuantity = currentQuantity - soldItem.quantity;
         t.update(itemRef, { quantity: newQuantity });
       }
 
-      const transactionCollection = collection(db, 'transactions');
-      t.set(doc(transactionCollection), transaction);
+      // Create a new document reference in the 'transactions' collection
+      const newTransactionRef = doc(collection(db, 'transactions'));
+      // Use the transaction 'set' method to create the new document
+      t.set(newTransactionRef, transaction);
     });
   };
 
   const updateTransaction = async (id: string, updatedTransactionData: Omit<Transaction, 'id'>, originalTransaction: Transaction) => {
     const db = getDb();
     await runTransaction(db, async (t) => {
-        // Map to store the *net change* in quantity for each item
         const stockAdjustments = new Map<string, number>();
 
-        // Add back the quantities from the original transaction
-        originalTransaction.items?.forEach(item => {
+        (originalTransaction.items || []).forEach(item => {
             stockAdjustments.set(item.itemId, (stockAdjustments.get(item.itemId) || 0) + item.quantity);
         });
 
-        // Subtract the quantities from the new transaction data
-        updatedTransactionData.items?.forEach(item => {
+        (updatedTransactionData.items || []).forEach(item => {
             stockAdjustments.set(item.itemId, (stockAdjustments.get(item.itemId) || 0) - item.quantity);
         });
         
-        // Create a list of item references to fetch
         const itemRefsToFetch = Array.from(stockAdjustments.keys()).map(itemId => doc(db, 'inventory', itemId));
+        if (itemRefsToFetch.length === 0) {
+            const transactionDocRef = doc(db, 'transactions', id);
+            t.update(transactionDocRef, updatedTransactionData);
+            return;
+        }
         
-        // Fetch all required inventory documents in one go
-        const itemDocs = await t.getAll(...itemRefsToFetch);
+        const itemDocs = await Promise.all(itemRefsToFetch.map(ref => t.get(ref)));
         const itemDocsMap = new Map(itemDocs.map(itemDoc => [itemDoc.id, itemDoc]));
 
-        // Process the adjustments
         for (const [itemId, adjustment] of stockAdjustments.entries()) {
-             if (adjustment === 0) continue; // No change, no need to do anything
+             if (adjustment === 0) continue; 
 
              const itemDoc = itemDocsMap.get(itemId);
 
              if (!itemDoc || !itemDoc.exists()) {
-                 throw new Error(`Inventory item with ID ${itemId} not found. Cannot update transaction.`);
+                 throw new Error(`Item inventaris dengan ID ${itemId} tidak ditemukan. Tidak dapat memperbarui transaksi.`);
              }
 
              const currentQuantity = itemDoc.data()?.quantity || 0;
              const newQuantity = currentQuantity + adjustment;
 
              if (newQuantity < 0) {
-                 throw new Error(`Insufficient stock for item ${itemDoc.data()?.itemName}. Required change would result in negative stock.`);
+                 throw new Error(`Stok tidak mencukupi untuk item ${itemDoc.data()?.itemName}. Perubahan yang diperlukan akan menghasilkan stok negatif.`);
              }
              
              t.update(itemDoc.ref, { quantity: newQuantity });
         }
 
-        // Finally, update the transaction document itself
         const transactionDocRef = doc(db, 'transactions', id);
         t.update(transactionDocRef, updatedTransactionData);
     });
@@ -262,7 +257,7 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
               const newQuantity = currentQuantity + itemToRestore.quantity;
               t.update(itemRef, { quantity: newQuantity });
           } else {
-              console.warn(`Inventory item with ID ${itemToRestore.itemId} not found. Cannot restore stock.`);
+              console.warn(`Item inventaris dengan ID ${itemToRestore.itemId} tidak ditemukan. Tidak dapat mengembalikan stok.`);
           }
         }
         
