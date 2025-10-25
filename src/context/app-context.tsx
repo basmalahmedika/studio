@@ -196,33 +196,34 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
   const updateTransaction = async (id: string, updatedTransactionData: Omit<Transaction, 'id'>, originalTransaction: Transaction) => {
     const db = getDb();
     await runTransaction(db, async (t) => {
+        // Map to store the *net change* in quantity for each item
         const stockAdjustments = new Map<string, number>();
 
-        // Calculate stock to be returned from original transaction
+        // Add back the quantities from the original transaction
         originalTransaction.items?.forEach(item => {
             stockAdjustments.set(item.itemId, (stockAdjustments.get(item.itemId) || 0) + item.quantity);
         });
 
-        // Calculate stock to be deducted for the new transaction
+        // Subtract the quantities from the new transaction data
         updatedTransactionData.items?.forEach(item => {
             stockAdjustments.set(item.itemId, (stockAdjustments.get(item.itemId) || 0) - item.quantity);
         });
-
-        // If no items were changed, just update the transaction details
-        if (stockAdjustments.size === 0) {
-            const transactionDocRef = doc(db, 'transactions', id);
-            t.update(transactionDocRef, updatedTransactionData);
-            return;
-        }
         
+        // Create a list of item references to fetch
+        const itemRefsToFetch = Array.from(stockAdjustments.keys()).map(itemId => doc(db, 'inventory', itemId));
+        
+        // Fetch all required inventory documents in one go
+        const itemDocs = await t.getAll(...itemRefsToFetch);
+        const itemDocsMap = new Map(itemDocs.map(itemDoc => [itemDoc.id, itemDoc]));
+
+        // Process the adjustments
         for (const [itemId, adjustment] of stockAdjustments.entries()) {
-             if (adjustment === 0) continue; // Skip items with no net change
+             if (adjustment === 0) continue; // No change, no need to do anything
 
-             const itemRef = doc(db, 'inventory', itemId);
-             const itemDoc = await t.get(itemRef);
+             const itemDoc = itemDocsMap.get(itemId);
 
-             if (!itemDoc.exists()) {
-                 throw new Error(`Item with id ${itemId} was not found.`);
+             if (!itemDoc || !itemDoc.exists()) {
+                 throw new Error(`Inventory item with ID ${itemId} not found. Cannot update transaction.`);
              }
 
              const currentQuantity = itemDoc.data()?.quantity || 0;
@@ -232,9 +233,10 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
                  throw new Error(`Insufficient stock for item ${itemDoc.data()?.itemName}. Required change would result in negative stock.`);
              }
              
-             t.update(itemRef, { quantity: newQuantity });
+             t.update(itemDoc.ref, { quantity: newQuantity });
         }
 
+        // Finally, update the transaction document itself
         const transactionDocRef = doc(db, 'transactions', id);
         t.update(transactionDocRef, updatedTransactionData);
     });
