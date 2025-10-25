@@ -5,9 +5,11 @@ import * as React from 'react';
 import { z } from 'zod';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { PlusCircle, MoreHorizontal, Pen, Trash2, CalendarIcon, X, FileDown } from 'lucide-react';
-import { format } from "date-fns";
+import { PlusCircle, MoreHorizontal, Pen, Trash2, CalendarIcon as CalendarIconLucide, X, FileDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { format, startOfMonth } from "date-fns";
 import * as XLSX from 'xlsx';
+import type { DateRange } from 'react-day-picker';
+
 import {
   Table,
   TableBody,
@@ -17,7 +19,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -57,6 +59,7 @@ import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { DateRangePicker } from '@/components/date-range-picker';
 import { useAppContext } from '@/context/app-context';
 import type { Transaction, InventoryItem, TransactionItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -94,6 +97,10 @@ export function TransactionsDataTable() {
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [itemSearch, setItemSearch] = React.useState('');
   const { toast } = useToast();
+  
+  // Pagination State
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [itemsPerPage, setItemsPerPage] = React.useState(10);
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
@@ -183,12 +190,9 @@ export function TransactionsDataTable() {
 
      const itemsInTransaction = (transaction.items || []).map(item => {
         const inventoryItem = inventory.find(i => i.id === item.itemId);
-        const correctPrice = (transaction.paymentMethod === 'BPJS' || transaction.paymentMethod === 'Lain-lain') && inventoryItem
-          ? inventoryItem.purchasePrice
-          : item.price;
         return {
             ...item,
-            price: correctPrice,
+            price: item.price,
             itemName: inventoryItem?.itemName || 'Unknown Item',
             stock: inventoryItem?.quantity || 0,
         };
@@ -252,6 +256,11 @@ export function TransactionsDataTable() {
     setItemSearch(''); 
   }
 
+  const [date, setDate] = React.useState<DateRange | undefined>({
+    from: startOfMonth(new Date()),
+    to: new Date(),
+  });
+  
   const [filters, setFilters] = React.useState({
     medicationName: '',
     patientType: 'all',
@@ -263,10 +272,24 @@ export function TransactionsDataTable() {
     value: string
   ) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
+    setCurrentPage(1); // Reset to first page on filter change
   };
   
   const flattenedData = React.useMemo(() => {
     const filteredTransactions = transactions.filter((transaction) => {
+       const transactionDate = new Date(transaction.date);
+       transactionDate.setHours(0, 0, 0, 0);
+
+       const fromDate = date?.from ? new Date(date.from) : null;
+       if (fromDate) fromDate.setHours(0, 0, 0, 0);
+      
+       const toDate = date?.to ? new Date(date.to) : null;
+       if (toDate) toDate.setHours(0, 0, 0, 0);
+
+       const isDateInRange = fromDate && toDate 
+        ? transactionDate >= fromDate && transactionDate <= toDate 
+        : true;
+
       const nameMatch = transaction.medicationName
         .toLowerCase()
         .includes(filters.medicationName.toLowerCase());
@@ -274,7 +297,8 @@ export function TransactionsDataTable() {
         filters.patientType === 'all' || transaction.patientType === filters.patientType;
       const paymentMethodMatch =
         filters.paymentMethod === 'all' || transaction.paymentMethod === filters.paymentMethod;
-      return nameMatch && patientTypeMatch && paymentMethodMatch;
+      
+      return isDateInRange && nameMatch && patientTypeMatch && paymentMethodMatch;
     });
 
     return filteredTransactions.flatMap((t) => {
@@ -290,7 +314,7 @@ export function TransactionsDataTable() {
             return {
                 ...t,
                 ...item,
-                price: sellingPrice, // Use the corrected price
+                price: sellingPrice,
                 itemName: inventoryItem?.itemName || 'Unknown Item',
                 purchasePrice,
                 margin,
@@ -299,7 +323,7 @@ export function TransactionsDataTable() {
             };
         });
     });
-  }, [transactions, inventory, filters]);
+  }, [transactions, inventory, filters, date]);
 
   const handleExportData = () => {
     const dataToExport = flattenedData.map(d => ({
@@ -330,6 +354,14 @@ export function TransactionsDataTable() {
   }, [itemSearch, watchedItems, inventory]);
   
   const formatCurrency = (value: number) => `Rp ${value.toLocaleString('id-ID')}`;
+
+  // Pagination Logic
+  const totalItems = flattenedData.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const paginatedData = flattenedData.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   return (
     <div className="space-y-6">
@@ -372,7 +404,7 @@ export function TransactionsDataTable() {
                                     variant={"outline"}
                                     className={cn("w-full pl-3 text-left font-normal",!field.value && "text-muted-foreground")}>
                                     {field.value ? (format(field.value, "PPP")) : (<span>Pick a date</span>)}
-                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                    <CalendarIconLucide className="ml-auto h-4 w-4 opacity-50" />
                                   </Button>
                                 </FormControl>
                               </PopoverTrigger>
@@ -522,18 +554,18 @@ export function TransactionsDataTable() {
             </Dialog>
           </div>
         </div>
-        <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-center">
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Input
             placeholder="Filter by medication..."
             value={filters.medicationName}
             onChange={(e) => handleFilterChange('medicationName', e.target.value)}
-            className="max-w-sm"
+            className="lg:col-span-1"
           />
           <Select
             value={filters.patientType}
             onValueChange={(value) => handleFilterChange('patientType', value)}
           >
-            <SelectTrigger className="w-full md:w-[180px]">
+            <SelectTrigger>
               <SelectValue placeholder="Patient Type" />
             </SelectTrigger>
             <SelectContent>
@@ -547,7 +579,7 @@ export function TransactionsDataTable() {
             value={filters.paymentMethod}
             onValueChange={(value) => handleFilterChange('paymentMethod', value)}
           >
-            <SelectTrigger className="w-full md:w-[180px]">
+            <SelectTrigger>
               <SelectValue placeholder="Payment Method" />
             </SelectTrigger>
             <SelectContent>
@@ -557,6 +589,7 @@ export function TransactionsDataTable() {
               <SelectItem value="Lain-lain">Lain-lain</SelectItem>
             </SelectContent>
           </Select>
+           <DateRangePicker date={date} onDateChange={setDate} />
         </div>
       </CardHeader>
       <CardContent>
@@ -577,8 +610,8 @@ export function TransactionsDataTable() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {flattenedData.length > 0 ? (
-                flattenedData.map((d, index) => (
+              {paginatedData.length > 0 ? (
+                paginatedData.map((d, index) => (
                   <TableRow key={`${d.id}-${d.itemId}-${index}`} className={!d.isFirstItem ? 'bg-muted/50' : ''}>
                      {d.isFirstItem ? (
                       <>
@@ -651,7 +684,61 @@ export function TransactionsDataTable() {
           </Table>
         </div>
       </CardContent>
+       <CardFooter>
+        <div className="flex items-center justify-between w-full text-sm text-muted-foreground">
+          <div className="flex-1">
+            Showing {Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)} to {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} transactions.
+          </div>
+          <div className="flex items-center gap-4">
+             <div className="flex items-center gap-2">
+                <span>Rows per page</span>
+                 <Select
+                    value={`${itemsPerPage}`}
+                    onValueChange={(value) => {
+                      setItemsPerPage(Number(value));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-[70px]">
+                      <SelectValue placeholder={itemsPerPage} />
+                    </SelectTrigger>
+                    <SelectContent side="top">
+                      {[10, 25, 50, 100].map((pageSize) => (
+                        <SelectItem key={pageSize} value={`${pageSize}`}>
+                          {pageSize}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+             </div>
+             <div className="w-20 text-center">
+                Page {currentPage} of {totalPages}
+            </div>
+            <div className="flex gap-2">
+                 <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  <span className="sr-only">Previous Page</span>
+                </Button>
+                 <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                >
+                  <span className="sr-only">Next Page</span>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+            </div>
+          </div>
+        </div>
+      </CardFooter>
     </Card>
     </div>
   );
 }
+
