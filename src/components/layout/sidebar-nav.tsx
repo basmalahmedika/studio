@@ -54,7 +54,7 @@ export default function SidebarNav() {
   return (
     <>
       <SidebarHeader className="p-4">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
            <div className="w-8 h-8 flex items-center justify-center">
             {logo ? (
               <img src={logo} alt="App Logo" className="w-8 h-8 object-contain" />
@@ -62,7 +62,10 @@ export default function SidebarNav() {
               <Boxes className="w-8 h-8 text-primary" />
             )}
           </div>
-          <h1 className="text-xl font-headline font-bold">{appName}</h1>
+          <div>
+            <h1 className="text-xl font-headline font-bold leading-tight">{appName}</h1>
+            <p className="text-xs text-sidebar-foreground/80">Klinik Basmalah Medika</p>
+          </div>
         </div>
       </SidebarHeader>
       <SidebarContent>
