@@ -171,7 +171,9 @@ export function BpjsExpenditureAnalysis({ transactions, inventory }: BpjsExpendi
     const riTransactions = transactions.filter(t => t.patientType === 'Rawat Inap' && t.paymentMethod === 'BPJS');
 
     const calculateAverage = (trans: Transaction[]) => {
-      if (trans.length === 0) return 0;
+      const count = trans.length;
+      if (count === 0) return { average: 0, count: 0 };
+      
       const totalCost = trans.reduce((sum, t) => {
         const transactionCost = (t.items || []).reduce((itemSum, item) => {
            const inventoryItem = inventory.find(inv => inv.id === item.itemId);
@@ -179,7 +181,11 @@ export function BpjsExpenditureAnalysis({ transactions, inventory }: BpjsExpendi
         }, 0);
         return sum + transactionCost;
       }, 0);
-      return totalCost / trans.length;
+      
+      return {
+        average: totalCost / count,
+        count
+      };
     }
     
     return {
@@ -217,13 +223,19 @@ export function BpjsExpenditureAnalysis({ transactions, inventory }: BpjsExpendi
                  <div className="flex flex-row items-center justify-between space-y-0 rounded-lg border p-4">
                     <div className='space-y-0.5'>
                         <p className="text-sm text-muted-foreground">Rata-rata Pengeluaran per Transaksi RJ</p>
-                        <h2 className="text-2xl font-bold">{formatCurrency(bpjsAverages.averageRJ)}</h2>
+                        <h2 className="text-2xl font-bold">{formatCurrency(bpjsAverages.averageRJ.average)}</h2>
+                        <p className="text-xs text-muted-foreground">
+                            dari {bpjsAverages.averageRJ.count} transaksi
+                        </p>
                     </div>
                 </div>
                  <div className="flex flex-row items-center justify-between space-y-0 rounded-lg border p-4">
                     <div className='space-y-0.5'>
                         <p className="text-sm text-muted-foreground">Rata-rata Pengeluaran per Transaksi RI</p>
-                        <h2 className="text-2xl font-bold">{formatCurrency(bpjsAverages.averageRI)}</h2>
+                        <h2 className="text-2xl font-bold">{formatCurrency(bpjsAverages.averageRI.average)}</h2>
+                         <p className="text-xs text-muted-foreground">
+                            dari {bpjsAverages.averageRI.count} transaksi
+                        </p>
                     </div>
                 </div>
             </CardContent>
