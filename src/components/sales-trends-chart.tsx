@@ -7,6 +7,7 @@ import {
   ChartContainer,
   ChartTooltipContent,
 } from '@/components/ui/chart';
+import { ReactNode } from 'react';
 
 interface SalesComparisonData {
   name: string;
@@ -17,6 +18,7 @@ interface SalesComparisonData {
 interface SalesTrendsChartProps {
   title: string;
   data: SalesComparisonData[];
+  footer?: ReactNode;
 }
 
 const chartConfig = {
@@ -30,7 +32,7 @@ const chartConfig = {
   },
 };
 
-export function SalesTrendsChart({ title, data }: SalesTrendsChartProps) {
+export function SalesTrendsChart({ title, data, footer }: SalesTrendsChartProps) {
   return (
     <Card>
       <CardHeader>
@@ -55,7 +57,7 @@ export function SalesTrendsChart({ title, data }: SalesTrendsChartProps) {
                 cursor={false}
                 content={<ChartTooltipContent 
                   formatter={(value, name) => {
-                    const label = name === 'current' ? 'Periode Ini' : 'Periode Lalu';
+                    const label = name === 'current' ? 'Bulan Ini' : 'Bulan Lalu';
                     return (
                         <div className="flex flex-col">
                             <span>{label}</span>
@@ -72,11 +74,13 @@ export function SalesTrendsChart({ title, data }: SalesTrendsChartProps) {
             </BarChart>
         </ChartContainer>
       </CardContent>
-       <CardFooter>
-        <p className="text-sm text-muted-foreground">
-          *Grafik ini membandingkan total nilai dari rentang tanggal yang Anda pilih dengan periode waktu yang sama sebelumnya.
-        </p>
-      </CardFooter>
+       {footer ? footer : (
+         <CardFooter>
+            <p className="text-sm text-muted-foreground">
+            *Grafik membandingkan total dari rentang tanggal yang dipilih dengan periode sebelumnya.
+            </p>
+        </CardFooter>
+       )}
     </Card>
   );
 }

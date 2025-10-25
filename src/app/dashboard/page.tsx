@@ -4,7 +4,7 @@
 import * as React from 'react';
 import type { DateRange } from 'react-day-picker';
 import { startOfMonth, subDays, differenceInDays } from 'date-fns';
-import { DollarSign, ReceiptText, Pill, Stethoscope } from 'lucide-react';
+import { DollarSign, ReceiptText, Pill, Stethoscope, ArrowUp, ArrowDown } from 'lucide-react';
 
 import { StatCard } from '@/components/stat-card';
 import { TopSellingItems } from '@/components/top-selling-items';
@@ -14,6 +14,7 @@ import type { Transaction, InventoryItem } from '@/lib/types';
 import { SalesTrendsChart } from '@/components/sales-trends-chart';
 import { CategoryBreakdownChart } from '@/components/category-breakdown-chart';
 import { TopBpjsExpenditures } from '@/components/top-bpjs-expenditures';
+import { CardFooter } from '@/components/ui/card';
 
 interface DetailedStats {
   revenueRJ: number;
@@ -102,6 +103,31 @@ const calculateStats = (transactions: Transaction[], inventory: InventoryItem[])
 
 const formatCurrency = (value: number) => `Rp ${value.toLocaleString('id-ID')}`;
 
+const AnalysisFooter = ({ title, currentTotal, previousTotal }: { title: string, currentTotal: number, previousTotal: number }) => {
+    const difference = currentTotal - previousTotal;
+    const percentageChange = previousTotal !== 0 ? (difference / previousTotal) * 100 : (currentTotal > 0 ? 100 : 0);
+    const isIncrease = difference >= 0;
+
+    return (
+        <CardFooter>
+            <div className="text-xs text-muted-foreground">
+                <span className="font-bold">{title}</span> bulan ini adalah <span className="font-bold">{formatCurrency(currentTotal)}</span>.
+                {previousTotal > 0 && (
+                    <>
+                        {' Dibandingkan dengan '}
+                        <span className="font-bold">{formatCurrency(previousTotal)}</span>
+                        {' bulan lalu, ada '}
+                        <span className={`font-bold ${isIncrease ? 'text-green-600' : 'text-red-600'}`}>
+                            {isIncrease ? 'kenaikan' : 'penurunan'} sebesar {Math.abs(percentageChange).toFixed(1)}%
+                        </span>
+                        .
+                    </>
+                )}
+            </div>
+        </CardFooter>
+    );
+};
+
 export default function DashboardPage() {
   const { transactions, inventory } = useAppContext();
 
@@ -116,6 +142,8 @@ export default function DashboardPage() {
     expenditureComparisonData,
     categoryChartDataRJ,
     categoryChartDataRI,
+    currentPeriodStats,
+    previousPeriodStats
   } = React.useMemo(() => {
     const filterTransactions = (range: DateRange | undefined): Transaction[] => {
         if (!range || !range.from || !range.to) return [];
@@ -193,11 +221,11 @@ export default function DashboardPage() {
         expenditureComparisonData: calculateMonthlyComparison(currentFiltered, previousFiltered, 'expenditure'),
         categoryChartDataRJ: rjData,
         categoryChartDataRI: riData,
+        currentPeriodStats: currentStats,
+        previousPeriodStats: previousStats,
     };
 
   }, [date, transactions, inventory]);
-  
-  const currentPeriodStats = calculateStats(filteredTransactions, inventory);
 
   return (
     <div className="space-y-6">
@@ -257,8 +285,28 @@ export default function DashboardPage() {
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <SalesTrendsChart title="Grafik Pendapatan (UMUM)" data={revenueComparisonData} />
-        <SalesTrendsChart title="Grafik Pengeluaran (Non-UMUM)" data={expenditureComparisonData} />
+        <SalesTrendsChart 
+            title="Grafik Pendapatan (UMUM)" 
+            data={revenueComparisonData}
+            footer={
+                <AnalysisFooter 
+                    title="Total pendapatan"
+                    currentTotal={currentPeriodStats.totalRevenue}
+                    previousTotal={previousPeriodStats.totalRevenue}
+                />
+            }
+        />
+        <SalesTrendsChart 
+            title="Grafik Pengeluaran (Non-UMUM)" 
+            data={expenditureComparisonData} 
+            footer={
+                 <AnalysisFooter 
+                    title="Total pengeluaran"
+                    currentTotal={currentPeriodStats.totalExpenditure}
+                    previousTotal={previousPeriodStats.totalExpenditure}
+                />
+            }
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

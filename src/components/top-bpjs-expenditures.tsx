@@ -1,7 +1,9 @@
 
 'use client';
 import * as React from 'react';
-import type { Transaction, InventoryItem } from '@/lib/types';
+import * as XLSX from 'xlsx';
+import { FileDown } from 'lucide-react';
+import type { Transaction, InventoryItem, TransactionItem } from '@/lib/types';
 import {
   Card,
   CardContent,
@@ -17,17 +19,22 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Button } from './ui/button';
 
 interface TopBpjsExpendituresProps {
   transactions: Transaction[];
   inventory: InventoryItem[];
 }
 
+interface EnrichedTransactionItem extends TransactionItem {
+  itemName: string;
+}
 interface BpjsTransactionExpenditure {
   id: string;
   date: string;
   mrNumber: string;
   totalCost: number;
+  items: EnrichedTransactionItem[];
 }
 
 const formatCurrency = (value: number) => `Rp ${value.toLocaleString('id-ID')}`;
@@ -40,17 +47,23 @@ export function TopBpjsExpenditures({ transactions, inventory }: TopBpjsExpendit
     transactions.forEach(t => {
       if (t.patientType === 'Rawat Jalan' && t.paymentMethod === 'BPJS' && t.medicalRecordNumber) {
         
-        const totalCost = (t.items || []).reduce((acc, item) => {
+        let totalCost = 0;
+        const enrichedItems: EnrichedTransactionItem[] = (t.items || []).map(item => {
             const inventoryItem = inventory.find(inv => inv.id === item.itemId);
             const purchasePrice = inventoryItem?.purchasePrice || 0;
-            return acc + (purchasePrice * item.quantity);
-        }, 0);
+            totalCost += (purchasePrice * item.quantity);
+            return {
+                ...item,
+                itemName: inventoryItem?.itemName || 'Item tidak dikenal',
+            };
+        });
 
         bpjsRjTransactions.push({
             id: t.id,
             date: t.date,
             mrNumber: t.medicalRecordNumber,
-            totalCost: totalCost
+            totalCost: totalCost,
+            items: enrichedItems,
         });
       }
     });
@@ -61,11 +74,45 @@ export function TopBpjsExpenditures({ transactions, inventory }: TopBpjsExpendit
 
   }, [transactions, inventory]);
 
+  const handleExportData = () => {
+    const dataToExport = topExpenditures.flatMap(t => 
+      t.items.map(item => ({
+        'Tanggal': t.date,
+        'No. Rekam Medis': t.mrNumber,
+        'Nama Item': item.itemName,
+        'Kuantitas': item.quantity,
+        'Harga Beli Satuan': (t.totalCost / t.items.reduce((acc, i) => acc + i.quantity, 1)), // Approximate price
+        'Total Biaya Item': (t.totalCost / t.items.reduce((acc, i) => acc + i.quantity, 1)) * item.quantity,
+      }))
+    );
+
+    if (dataToExport.length === 0) {
+      alert("Tidak ada data untuk diekspor.");
+      return;
+    }
+
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    ws['!cols'] = [
+      { wch: 12 }, { wch: 20 }, { wch: 30 }, { wch: 10 }, { wch: 20 }, { wch: 20 }
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Pengeluaran BPJS RJ Teratas');
+    XLSX.writeFile(wb, 'laporan_pengeluaran_bpjs_rj.xlsx');
+  };
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Transaksi Pengeluaran BPJS RJ Teratas</CardTitle>
-        <CardDescription>Daftar transaksi Rawat Jalan BPJS dengan pengeluaran (berdasarkan harga beli) terbesar.</CardDescription>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="space-y-1.5">
+            <CardTitle>Transaksi Pengeluaran BPJS RJ Teratas</CardTitle>
+            <CardDescription>Daftar transaksi Rawat Jalan BPJS dengan pengeluaran (berdasarkan harga beli) terbesar.</CardDescription>
+          </div>
+          <Button variant="outline" size="sm" onClick={handleExportData}>
+              <FileDown className="mr-2 h-4 w-4" />
+              Ekspor Excel
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto max-h-96">
