@@ -27,16 +27,12 @@ interface MonthlyAverages {
   averageRI: number;
 }
 
+// Optimized function to calculate all monthly averages for a given year in one pass
 const calculateYearlyAverages = (
   transactions: Transaction[],
   year: number,
   inventory: any[]
 ): MonthlyAverages[] => {
-  const yearlyData: MonthlyAverages[] = Array(12).fill(0).map(() => ({
-    averageRJ: 0,
-    averageRI: 0,
-  }));
-
   const monthlyAggregates: {
     [key: number]: {
       rjCost: number; rjCount: number;
@@ -44,20 +40,23 @@ const calculateYearlyAverages = (
     }
   } = {};
 
+  // Initialize aggregates for all 12 months
+  for (let i = 0; i < 12; i++) {
+    monthlyAggregates[i] = { rjCost: 0, rjCount: 0, riCost: 0, riCount: 0 };
+  }
+
   transactions
     .filter(t => {
         try {
             return new Date(t.date).getFullYear() === year && t.paymentMethod === 'BPJS';
         } catch (e) {
+            // Invalid date format, ignore this transaction
             return false;
         }
     })
     .forEach(t => {
       const month = new Date(t.date).getMonth();
-      if (!monthlyAggregates[month]) {
-        monthlyAggregates[month] = { rjCost: 0, rjCount: 0, riCost: 0, riCount: 0 };
-      }
-
+      
       const transactionCost = (t.items || []).reduce((sum, item) => {
         const inventoryItem = inventory.find(inv => inv.id === item.itemId);
         return sum + (inventoryItem?.purchasePrice || 0) * item.quantity;
@@ -72,18 +71,18 @@ const calculateYearlyAverages = (
       }
     });
 
+  const yearlyData: MonthlyAverages[] = [];
   for (let i = 0; i < 12; i++) {
     const data = monthlyAggregates[i];
-    if (data) {
-      yearlyData[i] = {
-        averageRJ: data.rjCount > 0 ? data.rjCost / data.rjCount : 0,
-        averageRI: data.riCount > 0 ? data.riCost / data.riCount : 0,
-      };
-    }
+    yearlyData[i] = {
+      averageRJ: data.rjCount > 0 ? data.rjCost / data.rjCount : 0,
+      averageRI: data.riCount > 0 ? data.riCost / data.riCount : 0,
+    };
   }
 
   return yearlyData;
 };
+
 
 export default function AnalysisPage() {
   const { transactions, inventory } = useAppContext();
@@ -96,33 +95,39 @@ export default function AnalysisPage() {
         try {
             return new Date(t.date).getFullYear();
         } catch(e) {
-            return 0;
+            return 0; // Return an invalid year for invalid dates
         }
-    }).filter(y => y > 0));
+    }).filter(y => y > 0)); // Filter out invalid years
     return Array.from(years).sort((a, b) => b - a);
   }, [transactions]);
 
+  // Calculate data for both years once
+  const selectedYearData = React.useMemo(() => 
+    calculateYearlyAverages(transactions, selectedYear, inventory),
+    [transactions, selectedYear, inventory]
+  );
+  
+  const comparisonYearData = React.useMemo(() =>
+    calculateYearlyAverages(transactions, comparisonYear, inventory),
+    [transactions, comparisonYear, inventory]
+  );
+  
+  // Create chart-specific data from the pre-calculated yearly data
   const chartDataRJ = React.useMemo(() => {
-    const selectedYearData = calculateYearlyAverages(transactions, selectedYear, inventory);
-    const comparisonYearData = calculateYearlyAverages(transactions, comparisonYear, inventory);
-
     return MONTHS.map((month, index) => ({
       name: month,
       current: selectedYearData[index].averageRJ,
       previous: comparisonYearData[index].averageRJ,
     }));
-  }, [transactions, inventory, selectedYear, comparisonYear]);
+  }, [selectedYearData, comparisonYearData]);
   
   const chartDataRI = React.useMemo(() => {
-    const selectedYearData = calculateYearlyAverages(transactions, selectedYear, inventory);
-    const comparisonYearData = calculateYearlyAverages(transactions, comparisonYear, inventory);
-
     return MONTHS.map((month, index) => ({
       name: month,
       current: selectedYearData[index].averageRI,
       previous: comparisonYearData[index].averageRI,
     }));
-  }, [transactions, inventory, selectedYear, comparisonYear]);
+  }, [selectedYearData, comparisonYearData]);
 
 
   return (
