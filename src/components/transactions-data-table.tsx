@@ -262,13 +262,13 @@ export function TransactionsDataTable() {
   });
   
   const [filters, setFilters] = React.useState({
-    medicationName: '',
+    medicalRecordNumber: '',
     patientType: 'all',
     paymentMethod: 'all',
   });
 
   const handleFilterChange = (
-    key: 'medicationName' | 'patientType' | 'paymentMethod',
+    key: 'medicalRecordNumber' | 'patientType' | 'paymentMethod',
     value: string
   ) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -289,16 +289,14 @@ export function TransactionsDataTable() {
        const isDateInRange = fromDate && toDate 
         ? transactionDate >= fromDate && transactionDate <= toDate 
         : true;
-
-      const nameMatch = transaction.medicationName
-        .toLowerCase()
-        .includes(filters.medicationName.toLowerCase());
+      
+      const mrnMatch = transaction.medicalRecordNumber?.toLowerCase().includes(filters.medicalRecordNumber.toLowerCase()) ?? true;
       const patientTypeMatch =
         filters.patientType === 'all' || transaction.patientType === filters.patientType;
       const paymentMethodMatch =
         filters.paymentMethod === 'all' || transaction.paymentMethod === filters.paymentMethod;
       
-      return isDateInRange && nameMatch && patientTypeMatch && paymentMethodMatch;
+      return isDateInRange && mrnMatch && patientTypeMatch && paymentMethodMatch;
     });
 
     return filteredTransactions.flatMap((t) => {
@@ -556,9 +554,9 @@ export function TransactionsDataTable() {
         </div>
         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Input
-            placeholder="Filter berdasarkan obat..."
-            value={filters.medicationName}
-            onChange={(e) => handleFilterChange('medicationName', e.target.value)}
+            placeholder="Filter berdasarkan No. RM..."
+            value={filters.medicalRecordNumber}
+            onChange={(e) => handleFilterChange('medicalRecordNumber', e.target.value)}
             className="lg:col-span-1"
           />
           <Select
