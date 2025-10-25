@@ -24,6 +24,7 @@ type ItemTypeFilter = 'all' | 'Obat' | 'Alkes';
 interface AnalyzedItem {
   name: string;
   totalSales: number;
+  remainingStock: number;
   contributionPercent: number;
   cumulativePercent: number;
   category: AnalysisCategory;
@@ -49,29 +50,40 @@ export function AbcAnalysis({ transactions, itemTypeFilter }: AbcAnalysisProps) 
   const [analyzedItems, setAnalyzedItems] = React.useState<AnalyzedItem[]>([]);
 
   React.useEffect(() => {
-    if (transactions.length === 0 || inventory.length === 0) {
+    if (inventory.length === 0) {
       setAnalyzedItems([]);
       return;
     }
 
-    // 1. Aggregate sales data for each item
-    const salesByItem = transactions.reduce((acc, t) => {
-        if (t.items) {
-            t.items.forEach((item: TransactionItem) => {
-                const inventoryItem = inventory.find(inv => inv.id === item.itemId);
-                if (inventoryItem && (itemTypeFilter === 'all' || inventoryItem.itemType === itemTypeFilter)) {
-                    const itemName = inventoryItem.itemName;
-                    const itemValue = item.price * item.quantity;
-                    acc[itemName] = (acc[itemName] || 0) + itemValue;
-                }
-            });
+    // 1. Aggregate sales and stock data for each item
+    const itemData = inventory.reduce((acc, invItem) => {
+        if (itemTypeFilter === 'all' || invItem.itemType === itemTypeFilter) {
+            if (!acc[invItem.itemName]) {
+                acc[invItem.itemName] = { totalSales: 0, remainingStock: 0 };
+            }
+            acc[invItem.itemName].remainingStock += invItem.quantity;
         }
-      return acc;
-    }, {} as Record<string, number>);
+        return acc;
+    }, {} as Record<string, { totalSales: number; remainingStock: number }>);
+    
+    transactions.forEach(t => {
+      if (t.items) {
+        t.items.forEach((item: TransactionItem) => {
+          const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+          if (inventoryItem && (itemTypeFilter === 'all' || inventoryItem.itemType === itemTypeFilter)) {
+            const itemName = inventoryItem.itemName;
+            if (itemData[itemName]) {
+                 const itemValue = item.price * item.quantity;
+                 itemData[itemName].totalSales += itemValue;
+            }
+          }
+        });
+      }
+    });
 
     // 2. Sort items by total sales in descending order
-    const sortedItems = Object.entries(salesByItem)
-      .map(([name, totalSales]) => ({ name, totalSales }))
+    const sortedItems = Object.entries(itemData)
+      .map(([name, data]) => ({ name, ...data }))
       .sort((a, b) => b.totalSales - a.totalSales);
       
     const totalSalesOverall = sortedItems.reduce((sum, item) => sum + item.totalSales, 0);
@@ -114,6 +126,7 @@ export function AbcAnalysis({ transactions, itemTypeFilter }: AbcAnalysisProps) 
     const dataToExport = analyzedItems.map(item => ({
       'Item Name': item.name,
       'Total Sales': item.totalSales,
+      'Sisa Stok': item.remainingStock,
       'Contribution (%)': item.contributionPercent,
       'Cumulative (%)': item.cumulativePercent,
       'Category': getCategoryLabel(item.category),
@@ -127,6 +140,7 @@ export function AbcAnalysis({ transactions, itemTypeFilter }: AbcAnalysisProps) 
     ws['!cols'] = [
         { wch: 30 }, // Item Name
         { wch: 15 }, // Total Sales
+        { wch: 10 }, // Sisa Stok
         { wch: 15 }, // Contribution
         { wch: 15 }, // Cumulative
         { wch: 15 }, // Category
@@ -157,6 +171,7 @@ export function AbcAnalysis({ transactions, itemTypeFilter }: AbcAnalysisProps) 
             <TableHeader>
                 <TableRow>
                   <TableHead>Item Name</TableHead>
+                  <TableHead className="text-right">Sisa Stok</TableHead>
                   <TableHead className="text-right">Total Sales</TableHead>
                   <TableHead className="text-right">Contribution</TableHead>
                   <TableHead className="text-right">Cumulative</TableHead>
@@ -168,6 +183,7 @@ export function AbcAnalysis({ transactions, itemTypeFilter }: AbcAnalysisProps) 
                     analyzedItems.map((item) => (
                     <TableRow key={item.name}>
                         <TableCell className="font-medium">{item.name}</TableCell>
+                        <TableCell className="text-right">{item.remainingStock}</TableCell>
                         <TableCell className="text-right">Rp {item.totalSales.toLocaleString('id-ID')}</TableCell>
                         <TableCell className="text-right">{item.contributionPercent.toFixed(2)}%</TableCell>
                         <TableCell className="text-right">{item.cumulativePercent.toFixed(2)}%</TableCell>
@@ -178,7 +194,7 @@ export function AbcAnalysis({ transactions, itemTypeFilter }: AbcAnalysisProps) 
                     ))
                 ) : (
                     <TableRow>
-                        <TableCell colSpan={5} className="h-24 text-center">
+                        <TableCell colSpan={6} className="h-24 text-center">
                             No data available for the selected filters.
                         </TableCell>
                     </TableRow>
