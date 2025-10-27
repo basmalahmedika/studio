@@ -86,12 +86,13 @@ const transactionSchema = z.object({
 
 type TransactionFormValues = z.infer<typeof transactionSchema>;
 
-type FlattenedTransaction = Transaction & TransactionItem & {
-  itemName: string;
-  purchasePrice: number;
-  margin: number;
-  subtotal: number;
-  isFirstItem: boolean;
+type GroupedTransaction = Transaction & {
+    enrichedItems: (TransactionItem & {
+        itemName: string;
+        purchasePrice: number;
+        margin: number;
+        subtotal: number;
+    })[]
 };
 
 
@@ -117,7 +118,7 @@ export function TransactionsDataTable() {
     },
   });
   
-  const { fields, append, remove, update } = useFieldArray({
+  const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "items"
   });
@@ -152,7 +153,7 @@ export function TransactionsDataTable() {
       form.setValue('items', updatedItems);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [patientType, paymentMethod, inventory, form.setValue]);
+  }, [patientType, paymentMethod, inventory]);
 
 
   const onSubmit = async (values: TransactionFormValues) => {
@@ -194,11 +195,14 @@ export function TransactionsDataTable() {
 
      const itemsInTransaction = (transaction.items || []).map(item => {
         const inventoryItem = inventory.find(i => i.id === item.itemId);
+        // Calculate the stock available AT THE TIME OF EDITING
+        // Current stock + what was sold in this transaction
+        const stockForEditing = inventoryItem ? (inventoryItem.quantity + (transaction.items?.find(ti => ti.itemId === item.itemId)?.quantity || 0)) : 0;
         return {
             ...item,
             price: item.price,
             itemName: inventoryItem?.itemName || 'Item Tidak Dikenal',
-            stock: inventoryItem ? (inventoryItem.quantity + (transaction.items?.find(ti => ti.itemId === item.itemId)?.quantity || 0)) : 0,
+            stock: stockForEditing
         };
     });
 
@@ -215,14 +219,11 @@ export function TransactionsDataTable() {
 };
   
   const handleDelete = async (transactionId: string) => {
-    const transactionToDelete = transactions.find(t => t.id === transactionId);
-    if (transactionToDelete) {
-        try {
-            await deleteTransaction(transactionId, transactionToDelete);
-            toast({ title: "Sukses", description: "Transaksi telah dihapus." });
-        } catch(error) {
-            toast({ variant: "destructive", title: "Error", description: "Gagal menghapus transaksi." });
-        }
+    try {
+        await deleteTransaction(transactionId);
+        toast({ title: "Sukses", description: "Transaksi telah dihapus." });
+    } catch(error: any) {
+        toast({ variant: "destructive", title: "Error", description: error.message || "Gagal menghapus transaksi." });
     }
   }
 
@@ -279,7 +280,7 @@ export function TransactionsDataTable() {
     setCurrentPage(1); // Reset to first page on filter change
   };
   
-  const flattenedData = React.useMemo(() => {
+  const groupedData = React.useMemo(() => {
     const filteredTransactions = transactions.filter((transaction) => {
        const transactionDate = new Date(transaction.date);
        transactionDate.setHours(0, 0, 0, 0);
@@ -303,43 +304,46 @@ export function TransactionsDataTable() {
       return isDateInRange && mrnMatch && patientTypeMatch && paymentMethodMatch;
     });
 
-    return filteredTransactions.flatMap((t) => {
-        if (!t.items || t.items.length === 0) {
-            return []; // Skip transactions with no items
-        }
-        return t.items.map((item, itemIndex) => {
-            const inventoryItem = inventory.find(inv => inv.id === item.itemId);
-            const purchasePrice = inventoryItem?.purchasePrice || 0;
-            const sellingPrice = (t.paymentMethod === 'BPJS' || t.paymentMethod === 'Lain-lain') ? purchasePrice : item.price;
-            const margin = sellingPrice - purchasePrice;
-            const subtotal = sellingPrice * item.quantity;
-            return {
-                ...t,
-                ...item,
-                price: sellingPrice,
-                itemName: inventoryItem?.itemName || 'Item Tidak Dikenal',
-                purchasePrice,
-                margin,
-                subtotal,
-                isFirstItem: itemIndex === 0,
-            };
-        });
+    return filteredTransactions.map((t): GroupedTransaction => {
+      const enrichedItems = (t.items || []).map(item => {
+        const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+        const purchasePrice = inventoryItem?.purchasePrice || 0;
+        const sellingPrice = (t.paymentMethod === 'BPJS' || t.paymentMethod === 'Lain-lain') ? purchasePrice : item.price;
+        const margin = sellingPrice - purchasePrice;
+        const subtotal = sellingPrice * item.quantity;
+        return {
+          ...item,
+          price: sellingPrice,
+          itemName: inventoryItem?.itemName || 'Item Tidak Dikenal',
+          purchasePrice,
+          margin,
+          subtotal,
+        };
+      });
+      return { ...t, enrichedItems };
     });
   }, [transactions, inventory, filters, date]);
 
   const handleExportData = () => {
-    const dataToExport = flattenedData.map(d => ({
-        'Tanggal': d.date,
-        'No. Rekam Medis': d.medicalRecordNumber,
-        'Tipe Pasien': d.patientType,
-        'Metode Pembayaran': d.paymentMethod,
-        'Nama Item': d.itemName,
-        'Kuantitas': d.quantity,
-        'Harga Beli': d.purchasePrice,
-        'Harga Jual': d.price,
-        'Margin': d.margin,
-        'Subtotal': d.subtotal,
-    }));
+    const dataToExport = groupedData.flatMap(t => 
+        t.enrichedItems.map(item => ({
+            'Tanggal': t.date,
+            'No. Rekam Medis': t.medicalRecordNumber,
+            'Tipe Pasien': t.patientType,
+            'Metode Pembayaran': t.paymentMethod,
+            'Nama Item': item.itemName,
+            'Kuantitas': item.quantity,
+            'Harga Beli': item.purchasePrice,
+            'Harga Jual': item.price,
+            'Margin': item.margin,
+            'Subtotal': item.subtotal,
+        }))
+    );
+
+    if (dataToExport.length === 0) {
+      toast({ variant: 'destructive', title: 'Ekspor Gagal', description: 'Tidak ada data untuk diekspor.'});
+      return;
+    }
 
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
@@ -358,9 +362,9 @@ export function TransactionsDataTable() {
   const formatCurrency = (value: number) => `Rp ${value.toLocaleString('id-ID')}`;
 
   // Pagination Logic
-  const totalItems = flattenedData.length;
+  const totalItems = groupedData.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
-  const paginatedData = flattenedData.slice(
+  const paginatedData = groupedData.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -599,42 +603,28 @@ export function TransactionsDataTable() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Tanggal</TableHead>
-                <TableHead>No. RM</TableHead>
-                <TableHead>Pasien/Pembayaran</TableHead>
-                <TableHead>Nama Item</TableHead>
-                <TableHead className="text-right">Jml</TableHead>
-                <TableHead className="text-right">Harga Beli</TableHead>
-                <TableHead className="text-right">Harga Jual</TableHead>
-                <TableHead className="text-right">Margin</TableHead>
-                <TableHead className="text-right">Subtotal</TableHead>
+                <TableHead className="w-[120px]">Tanggal</TableHead>
+                <TableHead>No. RM / Pasien</TableHead>
+                <TableHead colSpan={5}>Detail Item</TableHead>
                 <TableHead className="text-right">Aksi</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {paginatedData.length > 0 ? (
-                paginatedData.map((d, index) => (
-                  <TableRow key={`${d.id}-${d.itemId}-${index}`} className={!d.isFirstItem ? 'bg-muted/50' : ''}>
-                     {d.isFirstItem ? (
-                      <>
-                        <TableCell rowSpan={d.items?.length}>{d.date}</TableCell>
-                        <TableCell rowSpan={d.items?.length}>{d.medicalRecordNumber}</TableCell>
-                        <TableCell rowSpan={d.items?.length}>
-                            <div>{d.patientType}</div>
-                            <Badge variant={(d.paymentMethod === 'BPJS' || d.paymentMethod === 'Lain-lain') ? 'secondary' : 'outline'}>
-                                {d.paymentMethod}
-                            </Badge>
-                        </TableCell>
-                      </>
-                    ) : null}
-                    <TableCell className="font-medium">{d.itemName}</TableCell>
-                    <TableCell className="text-right">{d.quantity}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(d.purchasePrice)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(d.price)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(d.margin)}</TableCell>
-                    <TableCell className="text-right font-semibold">{formatCurrency(d.subtotal)}</TableCell>
-                    {d.isFirstItem ? (
-                        <TableCell className="text-right" rowSpan={d.items?.length}>
+                paginatedData.map((t) => (
+                  <React.Fragment key={t.id}>
+                    <TableRow className="bg-background hover:bg-background">
+                      <TableCell className="font-medium">{t.date}</TableCell>
+                      <TableCell>
+                        <div>{t.medicalRecordNumber}</div>
+                        <div className="text-xs text-muted-foreground">{t.patientType}</div>
+                      </TableCell>
+                      <TableCell colSpan={5}>
+                        <Badge variant={(t.paymentMethod === 'BPJS' || t.paymentMethod === 'Lain-lain') ? 'secondary' : 'outline'}>
+                            {t.paymentMethod}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
                            <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" className="h-8 w-8 p-0">
@@ -643,7 +633,7 @@ export function TransactionsDataTable() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleEdit(d.id)}>
+                                <DropdownMenuItem onClick={() => handleEdit(t.id)}>
                                   <Pen className="mr-2 h-4 w-4" />
                                   Ubah
                                 </DropdownMenuItem>
@@ -663,7 +653,7 @@ export function TransactionsDataTable() {
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
                                       <AlertDialogCancel>Batal</AlertDialogCancel>
-                                      <AlertDialogAction onClick={() => handleDelete(d.id)} className="bg-destructive hover:bg-destructive/90">
+                                      <AlertDialogAction onClick={() => handleDelete(t.id)} className="bg-destructive hover:bg-destructive/90">
                                         Hapus
                                       </AlertDialogAction>
                                     </AlertDialogFooter>
@@ -671,13 +661,28 @@ export function TransactionsDataTable() {
                                 </AlertDialog>
                               </DropdownMenuContent>
                             </DropdownMenu>
-                        </TableCell>
-                    ) : null}
-                  </TableRow>
+                      </TableCell>
+                    </TableRow>
+                    {t.enrichedItems.map((item, itemIndex) => (
+                        <TableRow key={item.itemId} className="bg-muted/50 hover:bg-muted/80">
+                            <TableCell colSpan={2}></TableCell>
+                            <TableCell className="font-medium">{item.itemName}</TableCell>
+                            <TableCell className="text-right">{item.quantity}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(item.price)}</TableCell>
+                            <TableCell className="text-right font-semibold">{formatCurrency(item.subtotal)}</TableCell>
+                            <TableCell colSpan={2}></TableCell>
+                        </TableRow>
+                    ))}
+                     <TableRow>
+                        <TableCell colSpan={5} className="text-right font-bold">Total Transaksi</TableCell>
+                        <TableCell className="text-right font-bold">{formatCurrency(t.totalPrice)}</TableCell>
+                        <TableCell colSpan={2}></TableCell>
+                    </TableRow>
+                  </React.Fragment>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={10} className="h-24 text-center">
+                  <TableCell colSpan={8} className="h-24 text-center">
                     Tidak ada hasil yang ditemukan.
                   </TableCell>
                 </TableRow>
@@ -743,3 +748,6 @@ export function TransactionsDataTable() {
     </div>
   );
 }
+
+
+    
