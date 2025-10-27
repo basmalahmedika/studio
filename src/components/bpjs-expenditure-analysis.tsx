@@ -72,7 +72,7 @@ const TopExpenditureTable = ({ title, description, data, onExport }: { title: st
               <TableRow>
                   <TableHead>Tanggal</TableHead>
                   <TableHead>No. Rekam Medis</TableHead>
-                  <TableHead className="text-right">Total Pengeluaran (Harga Beli)</TableHead>
+                  <TableHead className="text-right">Total Pengeluaran</TableHead>
               </TableRow>
           </TableHeader>
           <TableBody>
@@ -110,12 +110,13 @@ export function BpjsExpenditureAnalysis({ transactions, inventory }: BpjsExpendi
     transactions.forEach(t => {
       if (t.patientType === patientType && t.paymentMethod === 'BPJS' && t.medicalRecordNumber) {
         
-        let transactionCost = 0;
+        const totalCost = t.totalPrice; // Use the stored total price as the source of truth
+
         const enrichedItems: EnrichedTransactionItem[] = (t.items || []).map(item => {
             const inventoryItem = inventory.find(inv => inv.id === item.itemId);
             const purchasePrice = inventoryItem?.purchasePrice || 0;
-            const subtotal = purchasePrice * item.quantity;
-            transactionCost += subtotal;
+            // Subtotal is based on purchase price, but totalCost for the transaction is t.totalPrice
+            const subtotal = purchasePrice * item.quantity; 
             return {
                 ...item,
                 itemName: inventoryItem?.itemName || 'Item tidak dikenal',
@@ -124,12 +125,12 @@ export function BpjsExpenditureAnalysis({ transactions, inventory }: BpjsExpendi
             };
         });
         
-        if (transactionCost > 0) {
+        if (totalCost > 0) {
             individualTransactions.push({
                 transactionId: t.id,
                 date: t.date,
                 medicalRecordNumber: t.medicalRecordNumber,
-                totalCost: transactionCost,
+                totalCost: totalCost, // Use the definitive totalCost
                 items: enrichedItems,
             });
         }
