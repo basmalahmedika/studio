@@ -325,8 +325,9 @@ export function TransactionsDataTable() {
   }, [transactions, inventory, filters, date]);
 
   const handleExportData = () => {
-    const dataToExport = groupedData.flatMap(t => 
-        t.enrichedItems.map(item => ({
+    const dataToExport = groupedData.flatMap(t => {
+        const recalculatedTotal = t.enrichedItems.reduce((sum, item) => sum + item.subtotal, 0);
+        return t.enrichedItems.map(item => ({
             'Tanggal': t.date,
             'No. Rekam Medis': t.medicalRecordNumber,
             'Tipe Pasien': t.patientType,
@@ -336,9 +337,10 @@ export function TransactionsDataTable() {
             'Harga Beli': item.purchasePrice,
             'Harga Jual': item.price,
             'Margin': item.margin,
-            'Subtotal': item.subtotal,
+            'Subtotal Item': item.subtotal,
+            'Total Transaksi': recalculatedTotal,
         }))
-    );
+    });
 
     if (dataToExport.length === 0) {
       toast({ variant: 'destructive', title: 'Ekspor Gagal', description: 'Tidak ada data untuk diekspor.'});
@@ -611,7 +613,9 @@ export function TransactionsDataTable() {
             </TableHeader>
             <TableBody>
               {paginatedData.length > 0 ? (
-                paginatedData.map((t) => (
+                paginatedData.map((t) => {
+                  const recalculatedTotal = t.enrichedItems.reduce((sum, item) => sum + item.subtotal, 0);
+                  return (
                   <React.Fragment key={t.id}>
                     <TableRow className="bg-background hover:bg-background">
                       <TableCell className="font-medium">{t.date}</TableCell>
@@ -675,11 +679,11 @@ export function TransactionsDataTable() {
                     ))}
                      <TableRow>
                         <TableCell colSpan={5} className="text-right font-bold">Total Transaksi</TableCell>
-                        <TableCell className="text-right font-bold">{formatCurrency(t.totalPrice)}</TableCell>
+                        <TableCell className="text-right font-bold">{formatCurrency(recalculatedTotal)}</TableCell>
                         <TableCell colSpan={2}></TableCell>
                     </TableRow>
                   </React.Fragment>
-                ))
+                )})
               ) : (
                 <TableRow>
                   <TableCell colSpan={8} className="h-24 text-center">
@@ -748,6 +752,3 @@ export function TransactionsDataTable() {
     </div>
   );
 }
-
-
-    
