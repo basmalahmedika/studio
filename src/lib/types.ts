@@ -8,15 +8,11 @@ export type TransactionItem = {
 export type Transaction = {
   id: string;
   date: string;
-  medicationName: string;
-  quantity: number;
-  type: 'IN' | 'OUT';
   patientType: 'Rawat Jalan' | 'Rawat Inap' | 'Lain-lain';
   paymentMethod: 'BPJS' | 'UMUM' | 'Lain-lain';
-  context: string;
   totalPrice: number;
   medicalRecordNumber?: string;
-  items?: TransactionItem[];
+  items: TransactionItem[];
 };
 
 export type Medication = {
