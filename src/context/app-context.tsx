@@ -117,55 +117,52 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
   const bulkAddInventoryItems = async (items: Omit<InventoryItem, 'id'>[]) => {
     const db = getDb();
     const inventoryCollectionRef = collection(db, 'inventory');
-    
-    // Fetch all existing items ONCE to avoid multiple reads inside a loop.
-    const inventorySnapshot = await getDocs(inventoryCollectionRef);
-    const existingItemsMap = new Map<string, { id: string; quantity: number }>();
-    inventorySnapshot.docs.forEach(doc => {
-      const data = doc.data();
-      // A unique key for an item batch is its name + batch number
-      const key = `${data.itemName}_${data.batchNumber}`;
-      existingItemsMap.set(key, { id: doc.id, quantity: data.quantity });
-    });
-
     const batch = writeBatch(db);
-    const newDocsForState: InventoryItem[] = [];
-    const updatedDocsForState: {[id: string]: Partial<InventoryItem>} = {};
 
-    for (const item of items) {
-      const key = `${item.itemName}_${item.batchNumber}`;
-      const existingItem = existingItemsMap.get(key);
+    // Use a function form of setInventory to get the latest state
+    setInventory(prevInventory => {
+      const existingItemsMap = new Map<string, { id: string; quantity: number }>();
+      prevInventory.forEach(item => {
+        const key = `${item.itemName}_${item.batchNumber}`;
+        existingItemsMap.set(key, { id: item.id, quantity: item.quantity });
+      });
 
-      if (existingItem) {
-        // If item exists, update its quantity
-        const docRef = doc(db, 'inventory', existingItem.id);
-        const newQuantity = (existingItem.quantity || 0) + item.quantity;
-        const updatePayload = { ...item, quantity: newQuantity };
-        batch.update(docRef, updatePayload);
-        
-        // Prepare for local state update
-        updatedDocsForState[existingItem.id] = updatePayload;
-        // Update the map for subsequent rows in the same Excel file
-        existingItemsMap.set(key, { ...existingItem, quantity: newQuantity }); 
-      } else {
-        // If item is new, add it
-        const newDocRef = doc(inventoryCollectionRef);
-        batch.set(newDocRef, item);
+      const newDocsForState: InventoryItem[] = [];
+      const updatedDocsForState: { [id: string]: Partial<InventoryItem> } = {};
 
-        // Prepare for local state update
-        const newItemWithId = { id: newDocRef.id, ...item } as InventoryItem;
-        newDocsForState.push(newItemWithId);
-        // Add to map to handle duplicates within the same Excel file
-        existingItemsMap.set(key, { id: newDocRef.id, quantity: item.quantity });
+      for (const item of items) {
+        const key = `${item.itemName}_${item.batchNumber}`;
+        const existingItem = existingItemsMap.get(key);
+
+        if (existingItem) {
+          const docRef = doc(db, 'inventory', existingItem.id);
+          const newQuantity = (existingItem.quantity || 0) + item.quantity;
+          const updatePayload = { ...item, quantity: newQuantity };
+          batch.update(docRef, updatePayload);
+          
+          updatedDocsForState[existingItem.id] = updatePayload;
+          existingItemsMap.set(key, { ...existingItem, quantity: newQuantity });
+        } else {
+          const newDocRef = doc(inventoryCollectionRef);
+          batch.set(newDocRef, item);
+
+          const newItemWithId = { id: newDocRef.id, ...item } as InventoryItem;
+          newDocsForState.push(newItemWithId);
+          existingItemsMap.set(key, { id: newDocRef.id, quantity: item.quantity });
+        }
       }
-    }
-    
-    await batch.commit();
+      
+      batch.commit().then(() => {
+         // This state update needs to be accurate, but the main update is below
+         console.log("Bulk inventory write committed to Firestore.");
+      }).catch(err => {
+         console.error("Failed to commit bulk inventory update:", err);
+         // Optionally revert state changes or show an error
+      });
 
-    // Update local state efficiently
-    setInventory(prev => {
-        const updatedFromBatch = prev.map(i => i.id in updatedDocsForState ? { ...i, ...updatedDocsForState[i.id] } : i);
-        return [...updatedFromBatch, ...newDocsForState].sort((a, b) => a.itemName.localeCompare(b.itemName));
+      // Return the new state optimistically
+      const updatedFromBatch = prevInventory.map(i => i.id in updatedDocsForState ? { ...i, ...updatedDocsForState[i.id] } : i);
+      return [...updatedFromBatch, ...newDocsForState].sort((a, b) => a.itemName.localeCompare(b.itemName));
     });
   };
   
@@ -181,7 +178,7 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
   };
 
   // TRANSACTION MANAGEMENT & STOCK SYNCHRONIZATION
-  const addTransaction = async (transaction: Omit<Transaction, 'id'>) => {
+ const addTransaction = async (transaction: Omit<Transaction, 'id'>) => {
     const db = getDb();
     
     const newDocRef = await runTransaction(db, async (t) => {
@@ -190,13 +187,11 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
         throw new Error("Transaksi harus memiliki setidaknya satu item.");
       }
 
-      // 1. READ phase: Get all inventory items involved
       const itemRefs = transactionItems.map(item => doc(db, 'inventory', item.itemId));
       const itemDocs = await Promise.all(itemRefs.map(ref => t.get(ref)));
 
       const stockAdjustments: { ref: DocumentReference; newQuantity: number; itemName: string }[] = [];
 
-      // 2. VALIDATION phase: Check stock and calculate new quantities
       for (let i = 0; i < transactionItems.length; i++) {
         const soldItem = transactionItems[i];
         const itemDoc = itemDocs[i];
@@ -214,7 +209,7 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
         stockAdjustments.push({ ref: itemDoc.ref, newQuantity, itemName: itemDoc.data().itemName });
       }
 
-      // 3. WRITE phase: Create new transaction and update all stock
+      // Create new transaction document *within* the transaction
       const newTransactionRef = doc(collection(db, "transactions"));
       t.set(newTransactionRef, transaction);
       
@@ -225,7 +220,6 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
       return newTransactionRef;
     });
 
-    // If runTransaction is successful, update local state
     const newTransaction = { id: newDocRef.id, ...transaction } as Transaction;
     setTransactions(prev => [newTransaction, ...prev].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
   
@@ -251,63 +245,54 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
     
     await runTransaction(db, async (t) => {
         // --- 1. READ PHASE ---
-        // Get the original transaction document
         const originalTransactionDoc = await t.get(transactionDocRef);
         if (!originalTransactionDoc.exists()) {
             throw new Error("Transaksi tidak ditemukan.");
         }
         const originalTransaction = originalTransactionDoc.data() as Transaction;
         
-        // Create a map of all unique item IDs from both old and new transaction
         const allItemIds = new Set([
             ...(originalTransaction.items || []).map(item => item.itemId),
             ...(updatedTransactionData.items || []).map(item => item.itemId),
         ]);
         
-        // Read all involved inventory documents at once
         const itemRefs = Array.from(allItemIds).map(itemId => doc(db, 'inventory', itemId));
         const itemDocs = await Promise.all(itemRefs.map(ref => t.get(ref)));
-
-        // --- 2. CALCULATION & VALIDATION PHASE ---
-        const stockChanges: Map<string, number> = new Map();
-        const inventoryDataMap: Map<string, {name: string, currentStock: number}> = new Map();
-
-        // Populate inventory data map and check for missing items
+        const inventoryDataMap: Map<string, { doc: any; name: string, currentStock: number }> = new Map();
+        
         itemDocs.forEach((itemDoc, index) => {
             if (!itemDoc.exists()) {
-                // This is a safeguard, though unlikely if data is consistent
+                // This will cause the transaction to fail, which is correct.
                 throw new Error(`Item inventaris dengan ID ${itemRefs[index].id} tidak ditemukan.`);
             }
             const data = itemDoc.data();
-            inventoryDataMap.set(itemDoc.id, { name: data.itemName, currentStock: data.quantity });
+            inventoryDataMap.set(itemDoc.id, { doc: data, name: data.itemName, currentStock: data.quantity });
         });
 
-        // Calculate the net change for each item's stock
+        // --- 2. CALCULATION & VALIDATION PHASE ---
+        const stockChanges: Map<string, number> = new Map();
         (originalTransaction.items || []).forEach(item => {
-            stockChanges.set(item.itemId, (stockChanges.get(item.itemId) || 0) + item.quantity); // Return to stock
+            stockChanges.set(item.itemId, (stockChanges.get(item.itemId) || 0) + item.quantity);
         });
         (updatedTransactionData.items || []).forEach(item => {
-            stockChanges.set(item.itemId, (stockChanges.get(item.itemId) || 0) - item.quantity); // Take from stock
+            stockChanges.set(item.itemId, (stockChanges.get(item.itemId) || 0) - item.quantity);
         });
         
-        // Validate that the final stock will not be negative
         for (const [itemId, netChange] of stockChanges.entries()) {
             if (netChange === 0) continue;
             
             const invData = inventoryDataMap.get(itemId);
-            if (!invData) {
-                // Should have been caught earlier, but as a safeguard
-                throw new Error(`Data inventaris untuk item ID ${itemId} tidak dapat ditemukan.`);
+             if (!invData) {
+                throw new Error(`Data inventaris untuk item ID ${itemId} tidak dapat ditemukan untuk validasi stok.`);
             }
             const finalStock = invData.currentStock + netChange;
 
             if (finalStock < 0) {
-                throw new Error(`Stok tidak mencukupi untuk item "${invData.name}". Stok saat ini: ${invData.currentStock}, dibutuhkan perubahan: ${-netChange}.`);
+                throw new Error(`Stok tidak mencukupi untuk item "${invData.name}". Stok saat ini: ${invData.currentStock}, dibutuhkan perubahan bersih: ${-netChange}.`);
             }
         }
 
         // --- 3. WRITE PHASE ---
-        // Apply all stock updates
         for (const [itemId, netChange] of stockChanges.entries()) {
             if (netChange === 0) continue;
 
@@ -316,19 +301,16 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
             t.update(itemDocRef, { quantity: currentStock + netChange });
         }
         
-        // Finally, update the transaction document itself
         t.update(transactionDocRef, updatedTransactionData);
     });
 
     // --- 4. LOCAL STATE UPDATE ---
-    // Update local state only after the Firestore transaction is successful
     setTransactions(prev => prev.map(tr => tr.id === id ? { id, ...updatedTransactionData } as Transaction : tr).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
 
     setInventory(prevInventory => {
       const inventoryMap = new Map(prevInventory.map(item => [item.id, { ...item }]));
       const originalTransaction = transactions.find(t => t.id === id);
 
-      // Restore stock from original transaction
       if (originalTransaction) {
         (originalTransaction.items || []).forEach(item => {
           const invItem = inventoryMap.get(item.itemId);
@@ -336,7 +318,6 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
         });
       }
 
-      // Deduct stock for the updated transaction
       (updatedTransactionData.items || []).forEach(item => {
           const invItem = inventoryMap.get(item.itemId);
           if (invItem) invItem.quantity -= item.quantity;
@@ -378,7 +359,6 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
         t.delete(transactionDocRef);
     });
 
-    // Update local state after successful deletion
     setTransactions(prev => prev.filter(tr => tr.id !== id));
     
     setInventory(prevInventory => {
