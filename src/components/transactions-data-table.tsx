@@ -139,11 +139,9 @@ export function TransactionsDataTable() {
             update(index, { ...item, price: newPrice });
         }
     });
-  }, [patientType, paymentMethod, fields, inventory, update]);
+  }, [patientType, paymentMethod, fields, inventory, update, watchedItems]);
   
-  const currentTotal = React.useMemo(() => {
-    return watchedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  }, [watchedItems]);
+  const currentTotal = watchedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
 
   const onSubmit = async (values: TransactionFormValues) => {
