@@ -127,7 +127,11 @@ export function TransactionsDataTable() {
   const paymentMethod = form.watch('paymentMethod');
   
   React.useEffect(() => {
-    const total = watchedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const total = watchedItems.reduce((sum, item) => {
+        const quantity = Number(item.quantity) || 0;
+        const price = Number(item.price) || 0;
+        return sum + (price * quantity);
+    }, 0);
     form.setValue('totalPrice', total);
   }, [watchedItems, form]);
   
@@ -488,33 +492,37 @@ export function TransactionsDataTable() {
                               )}
                            </div>
                            <div className="space-y-2">
-                            {fields.map((item, index) => (
-                              <div key={item.id} className="grid grid-cols-12 items-center gap-2 p-2 rounded-md bg-muted text-sm">
-                                  <div className="col-span-4 font-medium">{item.itemName}</div>
-                                  <div className="col-span-2">
-                                      <FormField
-                                        control={form.control}
-                                        name={`items.${index}.quantity`}
-                                        render={({ field }) => (
-                                          <FormItem>
-                                            <FormControl>
-                                              <Input type="number" {...field} className="h-8 w-full" />
-                                            </FormControl>
-                                          </FormItem>
-                                        )}
-                                      />
-                                  </div>
-                                  <div className="col-span-1 text-center">x</div>
-                                  <div className="col-span-2 text-right">{formatCurrency(item.price)}</div>
-                                  <div className="col-span-1 text-center">=</div>
-                                  <div className="col-span-1 text-right font-semibold">{formatCurrency(item.price * item.quantity)}</div>
-                                  <div className="col-span-1 text-right">
-                                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => remove(index)}>
-                                        <X className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                              </div>
-                            ))}
+                            {fields.map((item, index) => {
+                              const currentItem = watchedItems[index];
+                              const subtotal = (currentItem?.price || 0) * (currentItem?.quantity || 0);
+                              return (
+                                <div key={item.id} className="grid grid-cols-12 items-center gap-2 p-2 rounded-md bg-muted text-sm">
+                                    <div className="col-span-4 font-medium">{item.itemName}</div>
+                                    <div className="col-span-2">
+                                        <FormField
+                                          control={form.control}
+                                          name={`items.${index}.quantity`}
+                                          render={({ field }) => (
+                                            <FormItem>
+                                              <FormControl>
+                                                <Input type="number" {...field} className="h-8 w-full" />
+                                              </FormControl>
+                                            </FormItem>
+                                          )}
+                                        />
+                                    </div>
+                                    <div className="col-span-1 text-center">x</div>
+                                    <div className="col-span-2 text-right">{formatCurrency(item.price)}</div>
+                                    <div className="col-span-1 text-center">=</div>
+                                    <div className="col-span-1 text-right font-semibold">{formatCurrency(subtotal)}</div>
+                                    <div className="col-span-1 text-right">
+                                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => remove(index)}>
+                                          <X className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                </div>
+                              )
+                            })}
                            </div>
                            {form.formState.errors.items && <p className="text-sm font-medium text-destructive">{form.formState.errors.items?.message || (form.formState.errors.items as any)?.root?.message}</p>}
                            <div className="flex justify-end items-center pt-4 border-t">
@@ -698,5 +706,7 @@ export function TransactionsDataTable() {
     </Card>
   );
 }
+
+    
 
     
