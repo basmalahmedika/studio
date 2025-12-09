@@ -116,9 +116,11 @@ export function BpjsExpenditureAnalysis() {
         ? transactionDate >= fromDate && transactionDate <= toDate 
         : true;
       
-      return isDateInRange && t.paymentMethod === 'BPJS';
+      const isPatientTypeMatch = filters.patientType === 'all' || t.patientType === filters.patientType;
+      
+      return isDateInRange && t.paymentMethod === 'BPJS' && isPatientTypeMatch;
     });
-  }, [transactions, filters.date]);
+  }, [transactions, filters]);
 
   const processExpenditures = (patientType: 'Rawat Jalan' | 'Rawat Inap'): TopBpjsExpenditureTransaction[] => {
     const individualTransactions: TopBpjsExpenditureTransaction[] = [];
