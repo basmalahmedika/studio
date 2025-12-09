@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import * as React from 'react';
@@ -252,45 +253,45 @@ export function TransactionsDataTable() {
   }
   
   const groupedData = React.useMemo(() => {
-    const filteredTransactions = transactions.filter((transaction) => {
-       const transactionDate = new Date(transaction.date);
-       transactionDate.setHours(0, 0, 0, 0);
+    return transactions
+      .filter((transaction) => {
+        const transactionDate = new Date(transaction.date);
+        transactionDate.setHours(0, 0, 0, 0);
 
-       const fromDate = filters.date?.from ? new Date(filters.date.from) : null;
-       if (fromDate) fromDate.setHours(0, 0, 0, 0);
-      
-       const toDate = filters.date?.to ? new Date(filters.date.to) : null;
-       if (toDate) toDate.setHours(0, 0, 0, 0);
+        const fromDate = filters.date?.from ? new Date(filters.date.from) : null;
+        if (fromDate) fromDate.setHours(0, 0, 0, 0);
 
-       const isDateInRange = fromDate && toDate 
-        ? transactionDate >= fromDate && transactionDate <= toDate 
-        : true;
-      
-      const mrnMatch = mrnFilter === '' || (transaction.medicalRecordNumber?.toLowerCase().includes(mrnFilter.toLowerCase()) ?? false);
-      const patientTypeMatch = filters.patientType === 'all' || transaction.patientType === filters.patientType;
-      const paymentMethodMatch = filters.paymentMethod === 'all' || transaction.paymentMethod === filters.paymentMethod;
-      
-      return isDateInRange && mrnMatch && patientTypeMatch && paymentMethodMatch;
-    });
+        const toDate = filters.date?.to ? new Date(filters.date.to) : null;
+        if (toDate) toDate.setHours(0, 0, 0, 0);
 
-    return filteredTransactions.map((t): GroupedTransaction => {
-      const enrichedItems = (t.items || []).map(item => {
-        const inventoryItem = inventory.find(inv => inv.id === item.itemId);
-        const purchasePrice = inventoryItem?.purchasePrice || 0;
-        const sellingPrice = (t.paymentMethod === 'BPJS' || t.paymentMethod === 'Lain-lain') ? purchasePrice : item.price;
-        const margin = sellingPrice - purchasePrice;
-        const subtotal = sellingPrice * item.quantity;
-        return {
-          ...item,
-          price: sellingPrice,
-          itemName: inventoryItem?.itemName || 'Item Tidak Dikenal',
-          purchasePrice,
-          margin,
-          subtotal,
-        };
+        const isDateInRange = fromDate && toDate
+          ? transactionDate >= fromDate && transactionDate <= toDate
+          : true;
+
+        const mrnMatch = mrnFilter === '' || (transaction.medicalRecordNumber?.toLowerCase().includes(mrnFilter.toLowerCase()) ?? false);
+        const patientTypeMatch = filters.patientType === 'all' || transaction.patientType === filters.patientType;
+        const paymentMethodMatch = filters.paymentMethod === 'all' || transaction.paymentMethod === filters.paymentMethod;
+        
+        return isDateInRange && mrnMatch && patientTypeMatch && paymentMethodMatch;
+      })
+      .map((t): GroupedTransaction => {
+        const enrichedItems = (t.items || []).map(item => {
+          const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+          const purchasePrice = inventoryItem?.purchasePrice || 0;
+          const sellingPrice = (t.paymentMethod === 'BPJS' || t.paymentMethod === 'Lain-lain') ? purchasePrice : item.price;
+          const margin = sellingPrice - purchasePrice;
+          const subtotal = sellingPrice * item.quantity;
+          return {
+            ...item,
+            price: sellingPrice,
+            itemName: inventoryItem?.itemName || 'Item Tidak Dikenal',
+            purchasePrice,
+            margin,
+            subtotal,
+          };
+        });
+        return { ...t, enrichedItems };
       });
-      return { ...t, enrichedItems };
-    });
   }, [transactions, inventory, filters, mrnFilter]);
 
   const handleExportData = () => {
@@ -488,31 +489,36 @@ export function TransactionsDataTable() {
                            </div>
                            <div className="space-y-2">
                             {fields.map((item, index) => (
-                              <div key={item.id} className="flex items-center justify-between gap-2 p-2 rounded-md bg-muted">
-                                  <div className="flex-1 font-medium">{item.itemName}</div>
-                                  <div className="w-40">
+                              <div key={item.id} className="grid grid-cols-12 items-center gap-2 p-2 rounded-md bg-muted text-sm">
+                                  <div className="col-span-4 font-medium">{item.itemName}</div>
+                                  <div className="col-span-2">
                                       <FormField
                                         control={form.control}
                                         name={`items.${index}.quantity`}
                                         render={({ field }) => (
                                           <FormItem>
                                             <FormControl>
-                                              <Input type="number" {...field} className="h-8" />
+                                              <Input type="number" {...field} className="h-8 w-full" />
                                             </FormControl>
                                           </FormItem>
                                         )}
                                       />
                                   </div>
-                                  <div className="w-32 text-right">Rp {(item.price * item.quantity).toLocaleString('id-ID')}</div>
-                                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => remove(index)}>
-                                    <X className="h-4 w-4" />
-                                  </Button>
+                                  <div className="col-span-1 text-center">x</div>
+                                  <div className="col-span-2 text-right">{formatCurrency(item.price)}</div>
+                                  <div className="col-span-1 text-center">=</div>
+                                  <div className="col-span-1 text-right font-semibold">{formatCurrency(item.price * item.quantity)}</div>
+                                  <div className="col-span-1 text-right">
+                                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => remove(index)}>
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
                               </div>
                             ))}
                            </div>
                            {form.formState.errors.items && <p className="text-sm font-medium text-destructive">{form.formState.errors.items?.message || (form.formState.errors.items as any)?.root?.message}</p>}
                            <div className="flex justify-end items-center pt-4 border-t">
-                             <div className="text-lg font-bold">Total: Rp {form.getValues('totalPrice').toLocaleString('id-ID')}</div>
+                             <div className="text-lg font-bold">Total: {formatCurrency(form.getValues('totalPrice'))}</div>
                            </div>
                         </div>
                       </CardContent>
