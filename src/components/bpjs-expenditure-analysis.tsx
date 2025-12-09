@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { FileDown, TrendingUp } from 'lucide-react';
 import type { Transaction, InventoryItem, TransactionItem } from '@/lib/types';
+import { useAppContext } from '@/context/app-context';
 import {
   Card,
   CardContent,
@@ -24,11 +25,6 @@ import {
 import { Button } from './ui/button';
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 
-
-interface BpjsExpenditureAnalysisProps {
-  transactions: Transaction[];
-  inventory: InventoryItem[];
-}
 
 interface EnrichedTransactionItem extends TransactionItem {
   itemName: string;
@@ -102,7 +98,8 @@ const TopExpenditureTable = ({ title, description, data, onExport }: { title: st
   </Card>
 );
 
-export function BpjsExpenditureAnalysis({ transactions, inventory }: BpjsExpenditureAnalysisProps) {
+export function BpjsExpenditureAnalysis() {
+  const { transactions, inventory } = useAppContext();
 
   const processExpenditures = (patientType: 'Rawat Jalan' | 'Rawat Inap'): TopBpjsExpenditureTransaction[] => {
     const individualTransactions: TopBpjsExpenditureTransaction[] = [];
@@ -110,12 +107,11 @@ export function BpjsExpenditureAnalysis({ transactions, inventory }: BpjsExpendi
     transactions.forEach(t => {
       if (t.patientType === patientType && t.paymentMethod === 'BPJS' && t.medicalRecordNumber) {
         
-        const totalCost = t.totalPrice; // Use the stored total price as the source of truth
+        const totalCost = t.totalPrice; 
 
         const enrichedItems: EnrichedTransactionItem[] = (t.items || []).map(item => {
             const inventoryItem = inventory.find(inv => inv.id === item.itemId);
             const purchasePrice = inventoryItem?.purchasePrice || 0;
-            // Subtotal is based on purchase price, but totalCost for the transaction is t.totalPrice
             const subtotal = purchasePrice * item.quantity; 
             return {
                 ...item,
@@ -130,7 +126,7 @@ export function BpjsExpenditureAnalysis({ transactions, inventory }: BpjsExpendi
                 transactionId: t.id,
                 date: t.date,
                 medicalRecordNumber: t.medicalRecordNumber,
-                totalCost: totalCost, // Use the definitive totalCost
+                totalCost: totalCost,
                 items: enrichedItems,
             });
         }

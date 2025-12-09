@@ -157,7 +157,6 @@ export default function DashboardPage() {
   });
   
   const { 
-    filteredTransactions, 
     revenueComparisonData,
     expenditureComparisonData,
     categoryChartDataRJ,
@@ -236,7 +235,6 @@ export default function DashboardPage() {
     ];
       
     return {
-        filteredTransactions: currentFiltered,
         revenueComparisonData: calculateMonthlyComparison(currentFiltered, previousFiltered, 'revenue'),
         expenditureComparisonData: calculateMonthlyComparison(currentFiltered, previousFiltered, 'expenditure'),
         categoryChartDataRJ: rjData,
@@ -318,7 +316,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      <BpjsExpenditureAnalysis transactions={filteredTransactions} inventory={inventory} />
+      <BpjsExpenditureAnalysis />
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <SalesTrendsChart 
