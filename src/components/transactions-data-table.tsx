@@ -5,10 +5,9 @@ import * as React from 'react';
 import { z } from 'zod';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { PlusCircle, MoreHorizontal, Pen, Trash2, CalendarIcon as CalendarIconLucide, X, FileDown, ChevronLeft, ChevronRight } from 'lucide-react';
-import { format, startOfMonth } from "date-fns";
+import { PlusCircle, MoreHorizontal, Pen, Trash2, CalendarIcon as CalendarIconLucide, X, FileDown, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { format } from "date-fns";
 import * as XLSX from 'xlsx';
-import type { DateRange } from 'react-day-picker';
 
 import {
   Table,
@@ -59,7 +58,6 @@ import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { DateRangePicker } from '@/components/date-range-picker';
 import { useAppContext } from '@/context/app-context';
 import type { Transaction, InventoryItem, TransactionItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -97,12 +95,12 @@ type GroupedTransaction = Transaction & {
 
 
 export function TransactionsDataTable() {
-  const { transactions, inventory, addTransaction, updateTransaction, deleteTransaction } = useAppContext();
+  const { transactions, inventory, addTransaction, updateTransaction, deleteTransaction, filters } = useAppContext();
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [itemSearch, setItemSearch] = React.useState('');
+  const [mrnFilter, setMrnFilter] = React.useState('');
   const { toast } = useToast();
   
-  // Pagination State
   const [currentPage, setCurrentPage] = React.useState(1);
   const [itemsPerPage, setItemsPerPage] = React.useState(10);
 
@@ -127,13 +125,11 @@ export function TransactionsDataTable() {
   const patientType = form.watch('patientType');
   const paymentMethod = form.watch('paymentMethod');
   
-  // Update total price whenever items change
   React.useEffect(() => {
     const total = watchedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     form.setValue('totalPrice', total);
   }, [watchedItems, form]);
   
-  // Update item prices when patient type or payment method changes
   React.useEffect(() => {
     const currentItems = form.getValues('items');
     if (currentItems.length > 0) {
@@ -191,8 +187,6 @@ export function TransactionsDataTable() {
 
      const itemsInTransaction = (transaction.items || []).map(item => {
         const inventoryItem = inventory.find(i => i.id === item.itemId);
-        // Calculate the stock available AT THE TIME OF EDITING
-        // Current stock + what was sold in this transaction
         const stockForEditing = inventoryItem ? (inventoryItem.quantity + (transaction.items?.find(ti => ti.itemId === item.itemId)?.quantity || 0)) : 0;
         return {
             ...item,
@@ -256,46 +250,25 @@ export function TransactionsDataTable() {
     }
     setItemSearch(''); 
   }
-
-  const [date, setDate] = React.useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: new Date(),
-  });
-  
-  const [filters, setFilters] = React.useState({
-    medicalRecordNumber: '',
-    patientType: 'all',
-    paymentMethod: 'all',
-  });
-
-  const handleFilterChange = (
-    key: 'medicalRecordNumber' | 'patientType' | 'paymentMethod',
-    value: string
-  ) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
-    setCurrentPage(1); // Reset to first page on filter change
-  };
   
   const groupedData = React.useMemo(() => {
     const filteredTransactions = transactions.filter((transaction) => {
        const transactionDate = new Date(transaction.date);
        transactionDate.setHours(0, 0, 0, 0);
 
-       const fromDate = date?.from ? new Date(date.from) : null;
+       const fromDate = filters.date?.from ? new Date(filters.date.from) : null;
        if (fromDate) fromDate.setHours(0, 0, 0, 0);
       
-       const toDate = date?.to ? new Date(date.to) : null;
+       const toDate = filters.date?.to ? new Date(filters.date.to) : null;
        if (toDate) toDate.setHours(0, 0, 0, 0);
 
        const isDateInRange = fromDate && toDate 
         ? transactionDate >= fromDate && transactionDate <= toDate 
         : true;
       
-      const mrnMatch = transaction.medicalRecordNumber?.toLowerCase().includes(filters.medicalRecordNumber.toLowerCase()) ?? true;
-      const patientTypeMatch =
-        filters.patientType === 'all' || transaction.patientType === filters.patientType;
-      const paymentMethodMatch =
-        filters.paymentMethod === 'all' || transaction.paymentMethod === filters.paymentMethod;
+      const mrnMatch = mrnFilter === '' || (transaction.medicalRecordNumber?.toLowerCase().includes(mrnFilter.toLowerCase()) ?? false);
+      const patientTypeMatch = filters.patientType === 'all' || transaction.patientType === filters.patientType;
+      const paymentMethodMatch = filters.paymentMethod === 'all' || transaction.paymentMethod === filters.paymentMethod;
       
       return isDateInRange && mrnMatch && patientTypeMatch && paymentMethodMatch;
     });
@@ -318,7 +291,7 @@ export function TransactionsDataTable() {
       });
       return { ...t, enrichedItems };
     });
-  }, [transactions, inventory, filters, date]);
+  }, [transactions, inventory, filters, mrnFilter]);
 
   const handleExportData = () => {
     const dataToExport = groupedData.flatMap(t => {
@@ -368,7 +341,6 @@ export function TransactionsDataTable() {
   );
 
   return (
-    <div className="space-y-6">
     <Card>
       <CardHeader>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -558,43 +530,16 @@ export function TransactionsDataTable() {
             </Dialog>
           </div>
         </div>
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Input
-            placeholder="Filter berdasarkan No. RM..."
-            value={filters.medicalRecordNumber}
-            onChange={(e) => handleFilterChange('medicalRecordNumber', e.target.value)}
-            className="lg:col-span-1"
-          />
-          <Select
-            value={filters.patientType}
-            onValueChange={(value) => handleFilterChange('patientType', value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Tipe Pasien" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Tipe Pasien</SelectItem>
-              <SelectItem value="Rawat Jalan">Rawat Jalan</SelectItem>
-              <SelectItem value="Rawat Inap">Rawat Inap</SelectItem>
-              <SelectItem value="Lain-lain">Lain-lain</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select
-            value={filters.paymentMethod}
-            onValueChange={(value) => handleFilterChange('paymentMethod', value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Metode Pembayaran" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Metode Pembayaran</SelectItem>
-              <SelectItem value="BPJS">BPJS</SelectItem>
-              <SelectItem value="UMUM">UMUM</SelectItem>
-              <SelectItem value="Lain-lain">Lain-lain</SelectItem>
-            </SelectContent>
-          </Select>
-           <DateRangePicker date={date} onDateChange={setDate} />
-        </div>
+         <div className="relative mt-4">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Cari berdasarkan No. Rekam Medis..."
+              className="w-full rounded-lg bg-background pl-8 md:w-[300px]"
+              value={mrnFilter}
+              onChange={(e) => setMrnFilter(e.target.value)}
+            />
+          </div>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
@@ -694,7 +639,7 @@ export function TransactionsDataTable() {
        <CardFooter>
         <div className="flex items-center justify-between w-full text-sm text-muted-foreground">
           <div className="flex-1">
-            Menampilkan {Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)} sampai {Math.min(currentPage * itemsPerPage, totalItems)} dari {totalItems} transaksi.
+            Menampilkan {paginatedData.length > 0 ? Math.min((currentPage - 1) * itemsPerPage + 1, totalItems) : 0} sampai {Math.min(currentPage * itemsPerPage, totalItems)} dari {totalItems} transaksi.
           </div>
           <div className="flex items-center gap-4">
              <div className="flex items-center gap-2">
@@ -745,6 +690,7 @@ export function TransactionsDataTable() {
         </div>
       </CardFooter>
     </Card>
-    </div>
   );
 }
+
+    

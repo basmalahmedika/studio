@@ -3,12 +3,11 @@
 
 import * as React from 'react';
 import type { DateRange } from 'react-day-picker';
-import { startOfMonth, subDays, differenceInDays } from 'date-fns';
+import { subDays, differenceInDays } from 'date-fns';
 import { DollarSign, ReceiptText, Pill, Stethoscope } from 'lucide-react';
 
 import { StatCard } from '@/components/stat-card';
 import { TopSellingItems } from '@/components/top-selling-items';
-import { DateRangePicker } from '@/components/date-range-picker';
 import { useAppContext } from '@/context/app-context';
 import type { Transaction, InventoryItem } from '@/lib/types';
 import { SalesTrendsChart } from '@/components/sales-trends-chart';
@@ -149,42 +148,43 @@ const AnalysisFooter = ({ title, currentTotal, previousTotal }: { title: string,
 };
 
 export default function DashboardPage() {
-  const { transactions, inventory } = useAppContext();
+  const { transactions, inventory, filters } = useAppContext();
 
-  const [date, setDate] = React.useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: new Date(),
-  });
-  
   const { 
     revenueComparisonData,
     expenditureComparisonData,
     categoryChartDataRJ,
     categoryChartDataRI,
     currentPeriodStats,
-    previousPeriodStats
+    previousPeriodStats,
+    filteredTransactions,
   } = React.useMemo(() => {
-    const filterTransactions = (range: DateRange | undefined): Transaction[] => {
+    const filterTransactionsByRange = (trans: Transaction[], range: DateRange | undefined, patientType: string, paymentMethod: string): Transaction[] => {
         if (!range || !range.from || !range.to) return [];
-        return transactions.filter(t => {
+        return trans.filter(t => {
             const transactionDate = new Date(t.date);
             transactionDate.setHours(0, 0, 0, 0);
             const fromDate = new Date(range.from!);
             fromDate.setHours(0, 0, 0, 0);
             const toDate = new Date(range.to!);
             toDate.setHours(0, 0, 0, 0);
-            return transactionDate >= fromDate && transactionDate <= toDate;
+
+            const isDateInRange = transactionDate >= fromDate && transactionDate <= toDate;
+            const isPatientTypeMatch = patientType === 'all' || t.patientType === patientType;
+            const isPaymentMethodMatch = paymentMethod === 'all' || t.paymentMethod === paymentMethod;
+            
+            return isDateInRange && isPatientTypeMatch && isPaymentMethodMatch;
         });
     };
 
-    const currentFiltered = filterTransactions(date);
+    const currentFiltered = filterTransactionsByRange(transactions, filters.date, filters.patientType, filters.paymentMethod);
     
-    const duration = date?.from && date.to ? differenceInDays(date.to, date.from) : 30;
+    const duration = filters.date?.from && filters.date.to ? differenceInDays(filters.date.to, filters.date.from) : 30;
     const prevDate = {
-      from: date?.from ? subDays(date.from, duration + 1) : subDays(new Date(), (duration * 2) + 1),
-      to: date?.from ? subDays(date.from, 1) : subDays(new Date(), duration + 1),
+      from: filters.date?.from ? subDays(filters.date.from, duration + 1) : subDays(new Date(), (duration * 2) + 1),
+      to: filters.date?.from ? subDays(filters.date.from, 1) : subDays(new Date(), duration + 1),
     };
-    const previousFiltered = filterTransactions(prevDate);
+    const previousFiltered = filterTransactionsByRange(transactions, prevDate, filters.patientType, filters.paymentMethod);
     
     const currentStats = calculateStats(currentFiltered, inventory);
     const previousStats = calculateStats(previousFiltered, inventory);
@@ -241,17 +241,18 @@ export default function DashboardPage() {
         categoryChartDataRI: riData,
         currentPeriodStats: currentStats,
         previousPeriodStats: previousStats,
+        filteredTransactions: currentFiltered,
     };
 
-  }, [date, transactions, inventory]);
+  }, [filters, transactions, inventory]);
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="space-y-2">
         <h1 className="text-3xl font-headline font-bold tracking-tight">Dasbor</h1>
-        <div className="w-full md:w-auto">
-           <DateRangePicker date={date} onDateChange={setDate} align="end" />
-        </div>
+        <p className="text-muted-foreground">
+            Ringkasan data berdasarkan filter global yang dipilih.
+        </p>
       </div>
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -359,14 +360,14 @@ export default function DashboardPage() {
        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <TopSellingItems 
           title="Obat Terlaris (Penjualan UMUM)"
-          transactions={transactions.filter(t => t.paymentMethod === 'UMUM')}
+          transactions={filteredTransactions.filter(t => t.paymentMethod === 'UMUM')}
           inventory={inventory}
           itemType="Obat"
           icon={Pill}
         />
         <TopSellingItems 
           title="Alkes Terlaris (Penjualan UMUM)"
-          transactions={transactions.filter(t => t.paymentMethod === 'UMUM')}
+          transactions={filteredTransactions.filter(t => t.paymentMethod === 'UMUM')}
           inventory={inventory}
           itemType="Alkes"
           icon={Stethoscope}
@@ -375,3 +376,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    

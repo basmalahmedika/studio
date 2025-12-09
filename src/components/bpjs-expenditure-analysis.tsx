@@ -99,20 +99,38 @@ const TopExpenditureTable = ({ title, description, data, onExport }: { title: st
 );
 
 export function BpjsExpenditureAnalysis() {
-  const { transactions, inventory } = useAppContext();
+  const { transactions, inventory, filters } = useAppContext();
+
+  const filteredBpjsTransactions = React.useMemo(() => {
+    return transactions.filter(t => {
+      const transactionDate = new Date(t.date);
+      transactionDate.setHours(0, 0, 0, 0);
+
+      const fromDate = filters.date?.from ? new Date(filters.date.from) : null;
+      if (fromDate) fromDate.setHours(0, 0, 0, 0);
+      
+      const toDate = filters.date?.to ? new Date(filters.date.to) : null;
+      if (toDate) toDate.setHours(0, 0, 0, 0);
+
+      const isDateInRange = fromDate && toDate 
+        ? transactionDate >= fromDate && transactionDate <= toDate 
+        : true;
+      
+      return isDateInRange && t.paymentMethod === 'BPJS';
+    });
+  }, [transactions, filters.date]);
 
   const processExpenditures = (patientType: 'Rawat Jalan' | 'Rawat Inap'): TopBpjsExpenditureTransaction[] => {
     const individualTransactions: TopBpjsExpenditureTransaction[] = [];
 
-    transactions.forEach(t => {
-      if (t.patientType === patientType && t.paymentMethod === 'BPJS' && t.medicalRecordNumber) {
-        
+    filteredBpjsTransactions.forEach(t => {
+      if (t.patientType === patientType && t.medicalRecordNumber) {
         const totalCost = t.totalPrice; 
 
         const enrichedItems: EnrichedTransactionItem[] = (t.items || []).map(item => {
             const inventoryItem = inventory.find(inv => inv.id === item.itemId);
             const purchasePrice = inventoryItem?.purchasePrice || 0;
-            const subtotal = purchasePrice * item.quantity; 
+            const subtotal = purchasePrice * item.quantity;
             return {
                 ...item,
                 itemName: inventoryItem?.itemName || 'Item tidak dikenal',
@@ -138,8 +156,8 @@ export function BpjsExpenditureAnalysis() {
       .slice(0, 10);
   };
   
-  const topExpendituresRJ = React.useMemo(() => processExpenditures('Rawat Jalan'), [transactions, inventory]);
-  const topExpendituresRI = React.useMemo(() => processExpenditures('Rawat Inap'), [transactions, inventory]);
+  const topExpendituresRJ = React.useMemo(() => processExpenditures('Rawat Jalan'), [filteredBpjsTransactions, inventory]);
+  const topExpendituresRI = React.useMemo(() => processExpenditures('Rawat Inap'), [filteredBpjsTransactions, inventory]);
 
   const handleExportData = (data: TopBpjsExpenditureTransaction[], sheetName: string, fileName: string) => {
     const dataToExport: any[] = [];
@@ -172,9 +190,8 @@ export function BpjsExpenditureAnalysis() {
   };
 
   const { overallAverages, monthlyAveragesChartData } = React.useMemo(() => {
-    const bpjsTransactions = transactions.filter(t => t.paymentMethod === 'BPJS');
+    const bpjsTransactions = filteredBpjsTransactions;
     
-    // --- Overall Average Calculation ---
     const rjTransactions = bpjsTransactions.filter(t => t.patientType === 'Rawat Jalan');
     const riTransactions = bpjsTransactions.filter(t => t.patientType === 'Rawat Inap');
     
@@ -182,13 +199,7 @@ export function BpjsExpenditureAnalysis() {
       const count = trans.length;
       if (count === 0) return { average: 0, count: 0 };
       
-      const totalCost = trans.reduce((sum, t) => {
-        const transactionCost = (t.items || []).reduce((itemSum, item) => {
-           const inventoryItem = inventory.find(inv => inv.id === item.itemId);
-           return itemSum + (inventoryItem?.purchasePrice || 0) * item.quantity;
-        }, 0);
-        return sum + transactionCost;
-      }, 0);
+      const totalCost = trans.reduce((sum, t) => sum + t.totalPrice, 0);
       
       return { average: totalCost / count, count };
     };
@@ -198,7 +209,6 @@ export function BpjsExpenditureAnalysis() {
       averageRI: calculateAverage(riTransactions),
     };
 
-    // --- Monthly Average Calculation ---
     const monthlyData: Record<string, { rjCost: number, rjCount: number, riCost: number, riCount: number }> = {};
     bpjsTransactions.forEach(t => {
       const month = new Date(t.date).toLocaleString('default', { month: 'short', year: 'numeric' });
@@ -206,16 +216,11 @@ export function BpjsExpenditureAnalysis() {
         monthlyData[month] = { rjCost: 0, rjCount: 0, riCost: 0, riCount: 0 };
       }
 
-      const transactionCost = (t.items || []).reduce((itemSum, item) => {
-        const inventoryItem = inventory.find(inv => inv.id === item.itemId);
-        return itemSum + (inventoryItem?.purchasePrice || 0) * item.quantity;
-      }, 0);
-
       if (t.patientType === 'Rawat Jalan') {
-        monthlyData[month].rjCost += transactionCost;
+        monthlyData[month].rjCost += t.totalPrice;
         monthlyData[month].rjCount += 1;
       } else if (t.patientType === 'Rawat Inap') {
-        monthlyData[month].riCost += transactionCost;
+        monthlyData[month].riCost += t.totalPrice;
         monthlyData[month].riCount += 1;
       }
     });
@@ -228,7 +233,7 @@ export function BpjsExpenditureAnalysis() {
 
     return { overallAverages, monthlyAveragesChartData: chartData };
 
-  }, [transactions, inventory]);
+  }, [filteredBpjsTransactions]);
 
   return (
     <div className='space-y-6'>
@@ -238,7 +243,7 @@ export function BpjsExpenditureAnalysis() {
                     <TrendingUp className="h-5 w-5" />
                     Analisis Rata-rata Pengeluaran BPJS
                 </CardTitle>
-                <CardDescription className='text-white/80'>Rata-rata biaya per transaksi untuk layanan BPJS. Data ditampilkan berdasarkan filter tanggal utama di atas.</CardDescription>
+                <CardDescription className='text-white/80'>Rata-rata biaya per transaksi untuk layanan BPJS, berdasarkan filter global.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-6 md:grid-cols-2">
                  <div className="flex flex-row items-center justify-between space-y-0 rounded-lg border border-white/20 bg-white/10 p-4">
@@ -289,7 +294,7 @@ export function BpjsExpenditureAnalysis() {
             </CardContent>
             <CardFooter>
                 <p className="text-xs text-white/80">
-                    Rata-rata dihitung dengan rumus: (Total Harga Beli dari semua transaksi BPJS) / (Jumlah transaksi BPJS).
+                    Rata-rata dihitung dengan rumus: (Total Harga dari semua transaksi BPJS) / (Jumlah transaksi BPJS).
                 </p>
             </CardFooter>
         </Card>
@@ -310,3 +315,5 @@ export function BpjsExpenditureAnalysis() {
     </div>
   );
 }
+
+    

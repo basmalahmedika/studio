@@ -3,19 +3,15 @@
 
 import * as React from 'react';
 import type { DateRange } from 'react-day-picker';
-import { startOfMonth } from 'date-fns';
 import * as XLSX from 'xlsx';
 import { FileDown } from 'lucide-react';
 
 import { useAppContext } from '@/context/app-context';
 import type { Transaction, InventoryItem } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DateRangePicker } from '@/components/date-range-picker';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 
-type PatientType = 'all' | 'Rawat Jalan' | 'Rawat Inap' | 'Lain-lain';
 type PaymentMethod = 'UMUM' | 'BPJS' | 'Lain-lain';
 
 interface ItemUsageData {
@@ -30,7 +26,7 @@ const calculateUsageData = (
   transactions: Transaction[],
   inventory: InventoryItem[],
   date: DateRange | undefined,
-  patientType: PatientType,
+  patientType: string,
   paymentMethod: PaymentMethod
 ): ItemUsageData[] => {
   const filteredTransactions = transactions.filter(t => {
@@ -61,7 +57,6 @@ const calculateUsageData = (
       if (inventoryItem) {
         const currentUsage = usageMap.get(item.itemId) || { totalStockOut: 0, totalNominal: 0 };
         currentUsage.totalStockOut += item.quantity;
-        // CORRECTED LOGIC: Always use purchasePrice from inventory for nominal calculation
         currentUsage.totalNominal += inventoryItem.purchasePrice * item.quantity;
         usageMap.set(item.itemId, currentUsage);
       }
@@ -87,26 +82,21 @@ const calculateUsageData = (
 
 
 export default function ItemUsagePage() {
-  const { transactions, inventory } = useAppContext();
-  const [date, setDate] = React.useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: new Date(),
-  });
-  const [patientType, setPatientType] = React.useState<PatientType>('all');
+  const { transactions, inventory, filters } = useAppContext();
   
   const itemUsageDataUmum = React.useMemo(() => 
-    calculateUsageData(transactions, inventory, date, patientType, 'UMUM'),
-    [date, patientType, transactions, inventory]
+    calculateUsageData(transactions, inventory, filters.date, filters.patientType, 'UMUM'),
+    [filters, transactions, inventory]
   );
   
   const itemUsageDataBpjs = React.useMemo(() => 
-    calculateUsageData(transactions, inventory, date, patientType, 'BPJS'),
-    [date, patientType, transactions, inventory]
+    calculateUsageData(transactions, inventory, filters.date, filters.patientType, 'BPJS'),
+    [filters, transactions, inventory]
   );
 
   const itemUsageDataLain = React.useMemo(() => 
-    calculateUsageData(transactions, inventory, date, patientType, 'Lain-lain'),
-    [date, patientType, transactions, inventory]
+    calculateUsageData(transactions, inventory, filters.date, filters.patientType, 'Lain-lain'),
+    [filters, transactions, inventory]
   );
 
   const handleExportData = () => {
@@ -183,40 +173,18 @@ export default function ItemUsagePage() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-headline font-bold tracking-tight">Laporan Pemakaian Item</h1>
-        <p className="text-muted-foreground">
-          Pantau item yang terjual berdasarkan metode pembayaran dan filter yang dipilih.
-        </p>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="space-y-2">
+            <h1 className="text-3xl font-headline font-bold tracking-tight">Laporan Pemakaian Item</h1>
+            <p className="text-muted-foreground">
+            Pantau item yang terjual berdasarkan metode pembayaran dan filter global yang dipilih.
+            </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={handleExportData}>
+            <FileDown className="mr-2 h-4 w-4" />
+            Ekspor Excel
+        </Button>
       </div>
-      
-      <Card>
-        <CardHeader>
-             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <CardTitle>Filter & Ekspor</CardTitle>
-                <Button variant="outline" size="sm" onClick={handleExportData}>
-                    <FileDown className="mr-2 h-4 w-4" />
-                    Ekspor Excel
-                </Button>
-            </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <DateRangePicker date={date} onDateChange={setDate} />
-            <Select value={patientType} onValueChange={(value) => setPatientType(value as PatientType)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Pilih Tipe Pasien" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua Tipe Pasien</SelectItem>
-                <SelectItem value="Rawat Jalan">Rawat Jalan</SelectItem>
-                <SelectItem value="Rawat Inap">Rawat Inap</SelectItem>
-                 <SelectItem value="Lain-lain">Lain-lain</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ItemUsageTable title="Pemakaian Item (UMUM)" data={itemUsageDataUmum} />
@@ -228,3 +196,5 @@ export default function ItemUsagePage() {
     </div>
   );
 }
+
+    

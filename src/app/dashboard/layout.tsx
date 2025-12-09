@@ -3,21 +3,26 @@
 
 import type { ReactNode } from 'react';
 import * as React from 'react';
+import { usePathname } from 'next/navigation';
 import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar';
 import SidebarNav from '@/components/layout/sidebar-nav';
 import Header from '@/components/layout/header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAppContext } from '@/context/app-context';
-
+import { GlobalFilters } from '@/components/global-filters';
 
 function DashboardContent({ children }: { children: ReactNode }) {
   const { loading: appLoading } = useAppContext();
+  const pathname = usePathname();
+
+  const showGlobalFilters = !['/dashboard/inventory', '/dashboard/reports', '/dashboard/settings'].includes(pathname);
   
   if (appLoading) {
     return (
       <div className="flex flex-col min-h-screen">
         <Header />
-        <main className="flex-1 p-4 md:p-6 lg:p-8">
+        <main className="flex-1 p-4 md:p-6 lg:p-8 space-y-6">
+           <Skeleton className="h-40 w-full" />
            <div className="space-y-4">
               <Skeleton className="h-8 w-1/4" />
               <Skeleton className="h-4 w-1/2" />
@@ -37,7 +42,8 @@ function DashboardContent({ children }: { children: ReactNode }) {
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
-      <main className="flex-1 p-4 md:p-6 lg:p-8">
+      <main className="flex-1 p-4 md:p-6 lg:p-8 space-y-6">
+        {showGlobalFilters && <GlobalFilters />}
         {children}
       </main>
     </div>
@@ -163,3 +169,5 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     </SidebarProvider>
   );
 }
+
+    

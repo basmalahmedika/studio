@@ -1,23 +1,17 @@
+
 'use client';
 
 import * as React from 'react';
-import type { DateRange } from 'react-day-picker';
-import { startOfMonth } from 'date-fns';
 import * as XLSX from 'xlsx';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { DollarSign, FileDown, Printer } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DateRangePicker } from '@/components/date-range-picker';
 import { Button } from '@/components/ui/button';
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 import { useAppContext } from '@/context/app-context';
 import type { Transaction } from '@/lib/types';
 import { StatCard } from './stat-card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-
-type PatientType = 'all' | 'Rawat Jalan' | 'Rawat Inap' | 'Lain-lain';
-type PaymentMethod = 'all' | 'UMUM' | 'BPJS' | 'Lain-lain';
 
 const chartConfig = {
   revenue: { label: 'Pendapatan', color: 'hsl(var(--chart-2))' },
@@ -26,13 +20,7 @@ const chartConfig = {
 };
 
 export function ProfitAnalysisReport() {
-  const { transactions, inventory } = useAppContext();
-  const [date, setDate] = React.useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: new Date(),
-  });
-  const [patientType, setPatientType] = React.useState<PatientType>('all');
-  const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethod>('all');
+  const { transactions, inventory, filters } = useAppContext();
   const [filteredTransactions, setFilteredTransactions] = React.useState<Transaction[]>([]);
   const reportRef = React.useRef<HTMLDivElement>(null);
 
@@ -42,23 +30,23 @@ export function ProfitAnalysisReport() {
       const transactionDate = new Date(t.date);
       transactionDate.setHours(0, 0, 0, 0);
 
-      const fromDate = date?.from ? new Date(date.from) : null;
+      const fromDate = filters.date?.from ? new Date(filters.date.from) : null;
       if (fromDate) fromDate.setHours(0, 0, 0, 0);
       
-      const toDate = date?.to ? new Date(date.to) : null;
+      const toDate = filters.date?.to ? new Date(filters.date.to) : null;
       if (toDate) toDate.setHours(0, 0, 0, 0);
 
       const isDateInRange = fromDate && toDate 
         ? transactionDate >= fromDate && transactionDate <= toDate 
         : true;
         
-      const isPatientTypeMatch = patientType === 'all' || t.patientType === patientType;
-      const isPaymentMethodMatch = paymentMethod === 'all' || t.paymentMethod === paymentMethod;
+      const isPatientTypeMatch = filters.patientType === 'all' || t.patientType === filters.patientType;
+      const isPaymentMethodMatch = filters.paymentMethod === 'all' || t.paymentMethod === filters.paymentMethod;
 
       return isDateInRange && isPatientTypeMatch && isPaymentMethodMatch;
     });
     setFilteredTransactions(filtered);
-  }, [date, transactions, patientType, paymentMethod]);
+  }, [filters, transactions]);
   
   const analysisData = React.useMemo(() => {
     const data = {
@@ -75,8 +63,6 @@ export function ProfitAnalysisReport() {
         if (inventoryItem) {
           
           let itemRevenue;
-          // Revenue for UMUM is based on the transaction item's price.
-          // For BPJS/Lain-lain, revenue is considered equal to cost (purchase price) as there's no profit.
           if (t.paymentMethod === 'UMUM') {
             itemRevenue = item.price * item.quantity;
           } else {
@@ -129,37 +115,18 @@ export function ProfitAnalysisReport() {
 
   const handlePrint = () => {
     const printContents = reportRef.current?.innerHTML;
-    const originalContents = document.body.innerHTML;
     
     if (printContents) {
       const printWindow = window.open('', '', 'height=600,width=800');
       if (printWindow) {
         printWindow.document.write('<html><head><title>Cetak Laporan</title>');
-        // Simple styling for print
-        printWindow.document.write(`
-          <style>
-            body { font-family: Arial, sans-serif; }
-            .card { border: 1px solid #ccc; border-radius: 8px; margin-bottom: 20px; }
-            .card-header { padding: 16px; border-bottom: 1px solid #ccc; }
-            .card-title { font-size: 1.5rem; font-weight: bold; }
-            .card-description { color: #555; }
-            .card-content { padding: 16px; }
-            .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-            .stat-card { border: 1px solid #eee; padding: 12px; border-radius: 6px; }
-            h4 { font-size: 1.2rem; font-weight: bold; }
-            dl { display: grid; grid-template-columns: 1fr 2fr; gap: 4px; }
-            dt { color: #777; }
-            dd { font-weight: bold; }
-            /* Hide chart for printing as it might not render well */
-            .chart-container { display: none; }
-          </style>
-        `);
+        printWindow.document.write('<style>body { font-family: Arial, sans-serif; } .card { border: 1px solid #ccc; border-radius: 8px; margin-bottom: 20px; } .card-header { padding: 16px; border-bottom: 1px solid #ccc; } .card-title { font-size: 1.5rem; font-weight: bold; } .card-description { color: #555; } .card-content { padding: 16px; } .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; } .stat-card { border: 1px solid #eee; padding: 12px; border-radius: 6px; } h4 { font-size: 1.2rem; font-weight: bold; } dl { display: grid; grid-template-columns: 1fr 2fr; gap: 4px; } dt { color: #777; } dd { font-weight: bold; } .chart-container, .print-hide { display: none; } </style>');
         printWindow.document.write('</head><body>');
         printWindow.document.write(printContents);
         printWindow.document.write('</body></html>');
         printWindow.document.close();
         printWindow.focus();
-        setTimeout(() => { // Timeout needed for some browsers to load content
+        setTimeout(() => {
           printWindow.print();
           printWindow.close();
         }, 500);
@@ -179,7 +146,7 @@ export function ProfitAnalysisReport() {
               Analisis Profit & Biaya
             </CardTitle>
             <CardDescription>
-              Analisis pendapatan, biaya, dan profit dari penjualan berdasarkan filter yang dipilih.
+              Analisis pendapatan, biaya, dan profit dari penjualan berdasarkan filter global yang dipilih.
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2 print-hide">
@@ -193,31 +160,6 @@ export function ProfitAnalysisReport() {
             </Button>
           </div>
         </div>
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4 print-hide">
-            <DateRangePicker date={date} onDateChange={setDate} />
-            <Select value={patientType} onValueChange={(value) => setPatientType(value as PatientType)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Pilih Tipe Pasien" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua Tipe Pasien</SelectItem>
-                <SelectItem value="Rawat Jalan">Rawat Jalan</SelectItem>
-                <SelectItem value="Rawat Inap">Rawat Inap</SelectItem>
-                <SelectItem value="Lain-lain">Lain-lain</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={paymentMethod} onValueChange={(value) => setPaymentMethod(value as PaymentMethod)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Pilih Metode Pembayaran" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua Metode Pembayaran</SelectItem>
-                <SelectItem value="UMUM">UMUM</SelectItem>
-                <SelectItem value="BPJS">BPJS</SelectItem>
-                 <SelectItem value="Lain-lain">Lain-lain</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
       </CardHeader>
       <CardContent ref={reportRef} className="space-y-6">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -226,7 +168,7 @@ export function ProfitAnalysisReport() {
            <StatCard title="Total Profit" value={formatCurrency(analysisData.obat.profit + analysisData.alkes.profit)} icon={DollarSign} description="Total profit bersih" />
         </div>
         <div className="grid gap-6 md:grid-cols-2">
-            <Card className="chart-container print-hide">
+            <Card className="chart-container">
                 <CardHeader>
                     <CardTitle>Grafik Analisis</CardTitle>
                     <CardDescription>Visualisasi Pendapatan, Biaya, dan Profit</CardDescription>
@@ -289,3 +231,5 @@ export function ProfitAnalysisReport() {
     </Card>
   );
 }
+
+    

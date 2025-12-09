@@ -19,12 +19,25 @@ import {
   type Firestore,
   type DocumentReference,
 } from 'firebase/firestore';
+import { startOfMonth } from 'date-fns';
+import type { DateRange } from 'react-day-picker';
 import type { InventoryItem, Transaction } from '@/lib/types';
+
+type PatientTypeFilter = 'all' | 'Rawat Jalan' | 'Rawat Inap' | 'Lain-lain';
+type PaymentMethodFilter = 'all' | 'UMUM' | 'BPJS' | 'Lain-lain';
+
+interface AppFilters {
+  date: DateRange | undefined;
+  patientType: PatientTypeFilter;
+  paymentMethod: PaymentMethodFilter;
+}
 
 interface AppContextType {
   inventory: InventoryItem[];
   transactions: Transaction[];
   loading: boolean;
+  filters: AppFilters;
+  setFilters: (filters: Partial<AppFilters>) => void;
   addInventoryItem: (item: Omit<InventoryItem, 'id'>) => Promise<DocumentReference>;
   updateInventoryItem: (id: string, updatedItem: Partial<Omit<InventoryItem, 'id'>>) => Promise<void>;
   deleteInventoryItem: (id: string) => Promise<void>;
@@ -46,7 +59,19 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
   const [inventory, setInventory] = React.useState<InventoryItem[]>([]);
   const [transactions, setTransactions] = React.useState<Transaction[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [filters, setFiltersState] = React.useState<AppFilters>({
+    date: {
+      from: startOfMonth(new Date()),
+      to: new Date(),
+    },
+    patientType: 'all',
+    paymentMethod: 'all',
+  });
   const dbInstanceRef = React.useRef<Firestore | null>(null);
+
+  const setFilters = (newFilters: Partial<AppFilters>) => {
+    setFiltersState(prev => ({...prev, ...newFilters}));
+  };
 
   React.useEffect(() => {
     if (!firebaseApp) {
@@ -119,7 +144,6 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
     const inventoryCollectionRef = collection(db, 'inventory');
     const batch = writeBatch(db);
 
-    // Use a function form of setInventory to get the latest state
     setInventory(prevInventory => {
       const existingItemsMap = new Map<string, { id: string; quantity: number }>();
       prevInventory.forEach(item => {
@@ -153,14 +177,11 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
       }
       
       batch.commit().then(() => {
-         // This state update needs to be accurate, but the main update is below
          console.log("Bulk inventory write committed to Firestore.");
       }).catch(err => {
          console.error("Failed to commit bulk inventory update:", err);
-         // Optionally revert state changes or show an error
       });
 
-      // Return the new state optimistically
       const updatedFromBatch = prevInventory.map(i => i.id in updatedDocsForState ? { ...i, ...updatedDocsForState[i.id] } : i);
       return [...updatedFromBatch, ...newDocsForState].sort((a, b) => a.itemName.localeCompare(b.itemName));
     });
@@ -197,7 +218,7 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
         const itemDoc = itemDocs[i];
 
         if (!itemDoc.exists()) {
-          throw new Error(`Item "${soldItem.itemName}" tidak ada di inventaris!`);
+          throw new Error(`Item dengan ID "${soldItem.itemId}" tidak ada di inventaris!`);
         }
         
         const currentQuantity = itemDoc.data().quantity;
@@ -209,7 +230,6 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
         stockAdjustments.push({ ref: itemDoc.ref, newQuantity, itemName: itemDoc.data().itemName });
       }
 
-      // Create new transaction document *within* the transaction
       const newTransactionRef = doc(collection(db, "transactions"));
       t.set(newTransactionRef, transaction);
       
@@ -244,7 +264,6 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
     const transactionDocRef = doc(db, 'transactions', id);
     
     await runTransaction(db, async (t) => {
-        // --- 1. READ PHASE ---
         const originalTransactionDoc = await t.get(transactionDocRef);
         if (!originalTransactionDoc.exists()) {
             throw new Error("Transaksi tidak ditemukan.");
@@ -258,18 +277,15 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
         
         const itemRefs = Array.from(allItemIds).map(itemId => doc(db, 'inventory', itemId));
         const itemDocs = await Promise.all(itemRefs.map(ref => t.get(ref)));
-        const inventoryDataMap: Map<string, { doc: any; name: string, currentStock: number }> = new Map();
+        const inventoryDataMap: Map<string, { name: string, currentStock: number }> = new Map();
         
-        itemDocs.forEach((itemDoc, index) => {
-            if (!itemDoc.exists()) {
-                // This will cause the transaction to fail, which is correct.
-                throw new Error(`Item inventaris dengan ID ${itemRefs[index].id} tidak ditemukan.`);
+        itemDocs.forEach((itemDoc) => {
+            if (itemDoc.exists()) {
+                const data = itemDoc.data();
+                inventoryDataMap.set(itemDoc.id, { name: data.itemName, currentStock: data.quantity });
             }
-            const data = itemDoc.data();
-            inventoryDataMap.set(itemDoc.id, { doc: data, name: data.itemName, currentStock: data.quantity });
         });
 
-        // --- 2. CALCULATION & VALIDATION PHASE ---
         const stockChanges: Map<string, number> = new Map();
         (originalTransaction.items || []).forEach(item => {
             stockChanges.set(item.itemId, (stockChanges.get(item.itemId) || 0) + item.quantity);
@@ -292,7 +308,6 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
             }
         }
 
-        // --- 3. WRITE PHASE ---
         for (const [itemId, netChange] of stockChanges.entries()) {
             if (netChange === 0) continue;
 
@@ -304,7 +319,6 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
         t.update(transactionDocRef, updatedTransactionData);
     });
 
-    // --- 4. LOCAL STATE UPDATE ---
     setTransactions(prev => prev.map(tr => tr.id === id ? { id, ...updatedTransactionData } as Transaction : tr).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
 
     setInventory(prevInventory => {
@@ -377,6 +391,8 @@ export function AppProvider({ children, firebaseApp }: AppProviderProps) {
     inventory,
     transactions,
     loading,
+    filters,
+    setFilters,
     addInventoryItem,
     updateInventoryItem,
     deleteInventoryItem,
@@ -397,3 +413,5 @@ export function useAppContext() {
   }
   return context;
 }
+
+    

@@ -27,11 +27,12 @@ interface MonthlyAverages {
   averageRI: number;
 }
 
-// Optimized function to calculate all monthly averages for a given year in one pass
 const calculateYearlyAverages = (
   transactions: Transaction[],
   year: number,
-  inventory: any[]
+  inventory: any[],
+  patientTypeFilter: string,
+  paymentMethodFilter: string
 ): MonthlyAverages[] => {
   const monthlyAggregates: {
     [key: number]: {
@@ -40,7 +41,6 @@ const calculateYearlyAverages = (
     }
   } = {};
 
-  // Initialize aggregates for all 12 months
   for (let i = 0; i < 12; i++) {
     monthlyAggregates[i] = { rjCost: 0, rjCount: 0, riCost: 0, riCount: 0 };
   }
@@ -48,9 +48,12 @@ const calculateYearlyAverages = (
   transactions
     .filter(t => {
         try {
-            return new Date(t.date).getFullYear() === year && t.paymentMethod === 'BPJS';
+            const transactionDate = new Date(t.date);
+            const isYearMatch = transactionDate.getFullYear() === year;
+            const isPatientTypeMatch = patientTypeFilter === 'all' || t.patientType === patientTypeFilter;
+            const isPaymentMethodMatch = paymentMethodFilter === 'all' || t.paymentMethod === paymentMethodFilter;
+            return isYearMatch && t.paymentMethod === 'BPJS' && isPatientTypeMatch && isPaymentMethodMatch;
         } catch (e) {
-            // Invalid date format, ignore this transaction
             return false;
         }
     })
@@ -85,7 +88,7 @@ const calculateYearlyAverages = (
 
 
 export default function AnalysisPage() {
-  const { transactions, inventory } = useAppContext();
+  const { transactions, inventory, filters } = useAppContext();
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = React.useState(currentYear);
   const [comparisonYear, setComparisonYear] = React.useState(currentYear - 1);
@@ -95,24 +98,22 @@ export default function AnalysisPage() {
         try {
             return new Date(t.date).getFullYear();
         } catch(e) {
-            return 0; // Return an invalid year for invalid dates
+            return 0;
         }
-    }).filter(y => y > 0)); // Filter out invalid years
+    }).filter(y => y > 0));
     return Array.from(years).sort((a, b) => b - a);
   }, [transactions]);
 
-  // Calculate data for both years once
   const selectedYearData = React.useMemo(() => 
-    calculateYearlyAverages(transactions, selectedYear, inventory),
-    [transactions, selectedYear, inventory]
+    calculateYearlyAverages(transactions, selectedYear, inventory, filters.patientType, filters.paymentMethod),
+    [transactions, selectedYear, inventory, filters]
   );
   
   const comparisonYearData = React.useMemo(() =>
-    calculateYearlyAverages(transactions, comparisonYear, inventory),
-    [transactions, comparisonYear, inventory]
+    calculateYearlyAverages(transactions, comparisonYear, inventory, filters.patientType, filters.paymentMethod),
+    [transactions, comparisonYear, inventory, filters]
   );
   
-  // Create chart-specific data from the pre-calculated yearly data
   const chartDataRJ = React.useMemo(() => {
     return MONTHS.map((month, index) => ({
       name: month,
@@ -133,17 +134,17 @@ export default function AnalysisPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-3xl font-headline font-bold tracking-tight">Analisis</h1>
+        <h1 className="text-3xl font-headline font-bold tracking-tight">Analisis Lanjutan</h1>
         <p className="text-muted-foreground">
-          Analisis mendalam mengenai profit, klasifikasi item, dan perbandingan performa.
+          Analisis mendalam mengenai profit, klasifikasi item, dan perbandingan performa tahunan.
         </p>
       </div>
 
       <Card>
-        <CardContent className="p-4">
+        <CardContent className="p-4 pt-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Pilih Tahun</label>
+              <label className="text-sm font-medium">Pilih Tahun Utama</label>
               <Select
                 value={selectedYear.toString()}
                 onValueChange={(value) => setSelectedYear(Number(value))}
@@ -206,3 +207,5 @@ export default function AnalysisPage() {
     </div>
   );
 }
+
+    
