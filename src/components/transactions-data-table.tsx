@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import * as React from 'react';
@@ -127,34 +126,42 @@ export function TransactionsDataTable() {
   const paymentMethod = form.watch('paymentMethod');
   
   React.useEffect(() => {
+    const currentItems = form.getValues('items');
+    
+    const updatedItems = currentItems.map(cartItem => {
+      const inventoryItem = inventory.find(i => i.id === cartItem.itemId);
+      if (inventoryItem) {
+        let newPrice;
+        if (paymentMethod === 'BPJS' || paymentMethod === 'Lain-lain') {
+          newPrice = inventoryItem.purchasePrice;
+        } else {
+          newPrice = patientType === 'Rawat Inap' ? inventoryItem.sellingPriceRI : inventoryItem.sellingPriceRJ;
+        }
+        return { ...cartItem, price: newPrice };
+      }
+      return cartItem;
+    });
+
+    const newTotal = updatedItems.reduce((sum, item) => {
+        const quantity = Number(item.quantity) || 0;
+        const price = Number(item.price) || 0;
+        return sum + (price * quantity);
+    }, 0);
+    
+    // Set both items and totalPrice in one go to ensure synchronization
+    form.setValue('items', updatedItems, { shouldValidate: true });
+    form.setValue('totalPrice', newTotal);
+
+  }, [patientType, paymentMethod, inventory, form]);
+
+  React.useEffect(() => {
     const total = watchedItems.reduce((sum, item) => {
         const quantity = Number(item.quantity) || 0;
         const price = Number(item.price) || 0;
         return sum + (price * quantity);
     }, 0);
     form.setValue('totalPrice', total);
-  }, [watchedItems, patientType, paymentMethod, form]);
-  
-  React.useEffect(() => {
-    const currentItems = form.getValues('items');
-    if (currentItems.length > 0) {
-      const updatedItems = currentItems.map(cartItem => {
-        const inventoryItem = inventory.find(i => i.id === cartItem.itemId);
-        if (inventoryItem) {
-          let newPrice;
-          if (paymentMethod === 'BPJS' || paymentMethod === 'Lain-lain') {
-            newPrice = inventoryItem.purchasePrice;
-          } else {
-            newPrice = patientType === 'Rawat Inap' ? inventoryItem.sellingPriceRI : inventoryItem.sellingPriceRJ;
-          }
-          return { ...cartItem, price: newPrice };
-        }
-        return cartItem;
-      });
-      form.setValue('items', updatedItems);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [patientType, paymentMethod, inventory]);
+  }, [watchedItems, form]);
 
 
   const onSubmit = async (values: TransactionFormValues) => {
@@ -706,7 +713,6 @@ export function TransactionsDataTable() {
     </Card>
   );
 }
-
     
 
     
