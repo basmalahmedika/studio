@@ -126,9 +126,7 @@ export function TransactionsDataTable() {
   const paymentMethod = form.watch('paymentMethod');
   
   React.useEffect(() => {
-    const currentItems = form.getValues('items');
-    
-    const updatedItems = currentItems.map(cartItem => {
+    const updatedItems = watchedItems.map(cartItem => {
       const inventoryItem = inventory.find(i => i.id === cartItem.itemId);
       if (inventoryItem) {
         let newPrice;
@@ -147,22 +145,11 @@ export function TransactionsDataTable() {
         const price = Number(item.price) || 0;
         return sum + (price * quantity);
     }, 0);
-    
-    // Set both items and totalPrice in one go to ensure synchronization
+
     form.setValue('items', updatedItems, { shouldValidate: true });
     form.setValue('totalPrice', newTotal);
 
-  }, [patientType, paymentMethod, inventory, form]);
-
-  React.useEffect(() => {
-    const total = watchedItems.reduce((sum, item) => {
-        const quantity = Number(item.quantity) || 0;
-        const price = Number(item.price) || 0;
-        return sum + (price * quantity);
-    }, 0);
-    form.setValue('totalPrice', total);
-  }, [watchedItems, form]);
-
+  }, [patientType, paymentMethod, inventory]);
 
   const onSubmit = async (values: TransactionFormValues) => {
     const transactionData = {
@@ -716,3 +703,4 @@ export function TransactionsDataTable() {
     
 
     
+
