@@ -160,10 +160,6 @@ export function TransactionsDataTable() {
     const transactionData = {
       ...values, 
       date: format(values.date, "yyyy-MM-dd"),
-      medicationName: values.items.map(i => `${i.itemName} (x${i.quantity})`).join(', '),
-      quantity: values.items.reduce((sum, item) => sum + item.quantity, 0),
-      type: 'OUT' as const,
-      context: `MRN: ${values.medicalRecordNumber}`, 
       items: values.items.map(({ itemId, quantity, price }) => ({ itemId, quantity, price })),
     };
 
