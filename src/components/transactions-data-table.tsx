@@ -133,7 +133,7 @@ export function TransactionsDataTable() {
         return sum + (price * quantity);
     }, 0);
     form.setValue('totalPrice', total);
-  }, [watchedItems, form]);
+  }, [watchedItems, patientType, paymentMethod, form]);
   
   React.useEffect(() => {
     const currentItems = form.getValues('items');
