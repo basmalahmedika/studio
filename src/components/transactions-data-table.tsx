@@ -126,6 +126,19 @@ export function TransactionsDataTable() {
   const paymentMethod = form.watch('paymentMethod');
   
   React.useEffect(() => {
+    const newTotal = watchedItems.reduce((sum, item) => {
+        const quantity = Number(item.quantity) || 0;
+        const price = Number(item.price) || 0;
+        return sum + (price * quantity);
+    }, 0);
+    if (newTotal !== form.getValues('totalPrice')) {
+      form.setValue('totalPrice', newTotal);
+    }
+  }, [watchedItems, form]);
+  
+  React.useEffect(() => {
+    if (watchedItems.length === 0) return;
+
     const updatedItems = watchedItems.map(cartItem => {
       const inventoryItem = inventory.find(i => i.id === cartItem.itemId);
       if (inventoryItem) {
@@ -140,16 +153,16 @@ export function TransactionsDataTable() {
       return cartItem;
     });
 
-    const newTotal = updatedItems.reduce((sum, item) => {
-        const quantity = Number(item.quantity) || 0;
-        const price = Number(item.price) || 0;
-        return sum + (price * quantity);
-    }, 0);
+    const newTotal = updatedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    
+    // Check if an update is actually needed to prevent infinite loops
+    const needsUpdate = JSON.stringify(updatedItems) !== JSON.stringify(watchedItems);
 
-    form.setValue('items', updatedItems, { shouldValidate: true });
-    form.setValue('totalPrice', newTotal);
-
-  }, [patientType, paymentMethod, inventory]);
+    if (needsUpdate) {
+        form.setValue('items', updatedItems, { shouldValidate: true });
+        form.setValue('totalPrice', newTotal);
+    }
+  }, [patientType, paymentMethod, inventory, form, watchedItems]);
 
   const onSubmit = async (values: TransactionFormValues) => {
     const transactionData = {
@@ -486,12 +499,12 @@ export function TransactionsDataTable() {
                               )}
                            </div>
                            <div className="space-y-2">
-                            {fields.map((item, index) => {
+                            {fields.map((field, index) => {
                               const currentItem = watchedItems[index];
                               const subtotal = (currentItem?.price || 0) * (currentItem?.quantity || 0);
                               return (
-                                <div key={item.id} className="grid grid-cols-12 items-center gap-2 p-2 rounded-md bg-muted text-sm">
-                                    <div className="col-span-4 font-medium">{item.itemName}</div>
+                                <div key={field.id} className="grid grid-cols-12 items-center gap-2 p-2 rounded-md bg-muted text-sm">
+                                    <div className="col-span-4 font-medium">{currentItem.itemName}</div>
                                     <div className="col-span-2">
                                         <FormField
                                           control={form.control}
@@ -506,7 +519,7 @@ export function TransactionsDataTable() {
                                         />
                                     </div>
                                     <div className="col-span-1 text-center">x</div>
-                                    <div className="col-span-2 text-right">{formatCurrency(item.price)}</div>
+                                    <div className="col-span-2 text-right">{formatCurrency(currentItem.price)}</div>
                                     <div className="col-span-1 text-center">=</div>
                                     <div className="col-span-1 text-right font-semibold">{formatCurrency(subtotal)}</div>
                                     <div className="col-span-1 text-right">
@@ -703,4 +716,3 @@ export function TransactionsDataTable() {
     
 
     
-
