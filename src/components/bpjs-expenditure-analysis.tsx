@@ -127,12 +127,13 @@ export function BpjsExpenditureAnalysis() {
 
     filteredBpjsTransactions.forEach(t => {
       if (t.patientType === patientType && t.medicalRecordNumber) {
-        const totalCost = t.totalPrice; 
+        let totalCost = 0;
 
         const enrichedItems: EnrichedTransactionItem[] = (t.items || []).map(item => {
             const inventoryItem = inventory.find(inv => inv.id === item.itemId);
             const purchasePrice = inventoryItem?.purchasePrice || 0;
             const subtotal = purchasePrice * item.quantity;
+            totalCost += subtotal; // Accumulate the cost from purchase price
             return {
                 ...item,
                 itemName: inventoryItem?.itemName || 'Item tidak dikenal',
@@ -146,7 +147,7 @@ export function BpjsExpenditureAnalysis() {
                 transactionId: t.id,
                 date: t.date,
                 medicalRecordNumber: t.medicalRecordNumber,
-                totalCost: totalCost,
+                totalCost: totalCost, // Use the correctly calculated cost
                 items: enrichedItems,
             });
         }
@@ -201,7 +202,13 @@ export function BpjsExpenditureAnalysis() {
       const count = trans.length;
       if (count === 0) return { average: 0, count: 0 };
       
-      const totalCost = trans.reduce((sum, t) => sum + t.totalPrice, 0);
+      const totalCost = trans.reduce((sum, t) => {
+        const transactionCost = (t.items || []).reduce((itemSum, item) => {
+          const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+          return itemSum + (inventoryItem?.purchasePrice || 0) * item.quantity;
+        }, 0);
+        return sum + transactionCost;
+      }, 0);
       
       return { average: totalCost / count, count };
     };
@@ -218,11 +225,16 @@ export function BpjsExpenditureAnalysis() {
         monthlyData[month] = { rjCost: 0, rjCount: 0, riCost: 0, riCount: 0 };
       }
 
+      const transactionCost = (t.items || []).reduce((itemSum, item) => {
+        const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+        return itemSum + (inventoryItem?.purchasePrice || 0) * item.quantity;
+      }, 0);
+
       if (t.patientType === 'Rawat Jalan') {
-        monthlyData[month].rjCost += t.totalPrice;
+        monthlyData[month].rjCost += transactionCost;
         monthlyData[month].rjCount += 1;
       } else if (t.patientType === 'Rawat Inap') {
-        monthlyData[month].riCost += t.totalPrice;
+        monthlyData[month].riCost += transactionCost;
         monthlyData[month].riCount += 1;
       }
     });
@@ -235,7 +247,7 @@ export function BpjsExpenditureAnalysis() {
 
     return { overallAverages, monthlyAveragesChartData: chartData };
 
-  }, [filteredBpjsTransactions]);
+  }, [filteredBpjsTransactions, inventory]);
 
   return (
     <div className='space-y-6'>
@@ -318,4 +330,3 @@ export function BpjsExpenditureAnalysis() {
   );
 }
 
-    
