@@ -122,21 +122,28 @@ export function TransactionsDataTable() {
   const watchedItems = form.watch('items');
   const patientType = form.watch('patientType');
   const paymentMethod = form.watch('paymentMethod');
+
+  React.useEffect(() => {
+    watchedItems.forEach((item, index) => {
+        const inventoryItem = inventory.find(i => i.id === item.itemId);
+        if (!inventoryItem) return;
+
+        let newPrice;
+        if (paymentMethod === 'BPJS' || paymentMethod === 'Lain-lain') {
+            newPrice = inventoryItem.purchasePrice;
+        } else {
+            newPrice = patientType === 'Rawat Inap' ? inventoryItem.sellingPriceRI : inventoryItem.sellingPriceRJ;
+        }
+
+        if (item.price !== newPrice) {
+            update(index, { ...item, price: newPrice });
+        }
+    });
+  }, [patientType, paymentMethod, fields, inventory, update]);
   
   const currentTotal = React.useMemo(() => {
-    return watchedItems.reduce((sum, item) => {
-        const inventoryItem = inventory.find(i => i.id === item.itemId);
-        if (!inventoryItem) return sum;
-
-        let price;
-        if (paymentMethod === 'BPJS' || paymentMethod === 'Lain-lain') {
-            price = inventoryItem.purchasePrice;
-        } else {
-            price = patientType === 'Rawat Inap' ? inventoryItem.sellingPriceRI : inventoryItem.sellingPriceRJ;
-        }
-        return sum + (price * item.quantity);
-    }, 0);
-  }, [watchedItems, patientType, paymentMethod, inventory]);
+    return watchedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  }, [watchedItems]);
 
 
   const onSubmit = async (values: TransactionFormValues) => {
@@ -491,16 +498,7 @@ export function TransactionsDataTable() {
                            <div className="space-y-2">
                             {fields.map((field, index) => {
                               const currentItem = watchedItems[index];
-                              const inventoryItem = inventory.find(i => i.id === currentItem.itemId);
-                              let price = 0;
-                              if (inventoryItem) {
-                                if (paymentMethod === 'BPJS' || paymentMethod === 'Lain-lain') {
-                                    price = inventoryItem.purchasePrice;
-                                } else {
-                                    price = patientType === 'Rawat Inap' ? inventoryItem.sellingPriceRI : inventoryItem.sellingPriceRJ;
-                                }
-                              }
-                              const subtotal = price * currentItem.quantity;
+                              const subtotal = currentItem.price * currentItem.quantity;
                               return (
                                 <div key={field.id} className="grid grid-cols-12 items-center gap-2 p-2 rounded-md bg-muted text-sm">
                                     <div className="col-span-4 font-medium">{currentItem.itemName}</div>
@@ -518,7 +516,7 @@ export function TransactionsDataTable() {
                                         />
                                     </div>
                                     <div className="col-span-1 text-center">x</div>
-                                    <div className="col-span-2 text-right">{formatCurrency(price)}</div>
+                                    <div className="col-span-2 text-right">{formatCurrency(currentItem.price)}</div>
                                     <div className="col-span-1 text-center">=</div>
                                     <div className="col-span-1 text-right font-semibold">{formatCurrency(subtotal)}</div>
                                     <div className="col-span-1 text-right">
