@@ -78,7 +78,6 @@ const transactionSchema = z.object({
   patientType: z.enum(['Rawat Jalan', 'Rawat Inap', 'Lain-lain']),
   paymentMethod: z.enum(['UMUM', 'BPJS', 'Lain-lain']),
   items: z.array(transactionItemSchema).min(1, 'Minimal satu item harus ditambahkan'),
-  totalPrice: z.number(),
 });
 
 
@@ -111,7 +110,6 @@ export function TransactionsDataTable() {
       items: [],
       patientType: 'Rawat Jalan',
       paymentMethod: 'UMUM',
-      totalPrice: 0,
       medicalRecordNumber: '',
     },
   });
@@ -207,7 +205,6 @@ export function TransactionsDataTable() {
         patientType: transaction.patientType,
         paymentMethod: transaction.paymentMethod,
         items: itemsInTransaction,
-        totalPrice: transaction.totalPrice,
     });
     setIsDialogOpen(true);
 };
@@ -227,7 +224,6 @@ export function TransactionsDataTable() {
       items: [],
       patientType: 'Rawat Jalan',
       paymentMethod: 'UMUM',
-      totalPrice: 0,
       medicalRecordNumber: '',
     });
     setIsDialogOpen(true);
