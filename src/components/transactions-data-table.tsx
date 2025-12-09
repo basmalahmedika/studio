@@ -116,7 +116,7 @@ export function TransactionsDataTable() {
     },
   });
   
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, update } = useFieldArray({
     control: form.control,
     name: "items"
   });
@@ -126,49 +126,41 @@ export function TransactionsDataTable() {
   const paymentMethod = form.watch('paymentMethod');
   
   React.useEffect(() => {
-    const newTotal = watchedItems.reduce((sum, item) => {
-        const quantity = Number(item.quantity) || 0;
-        const price = Number(item.price) || 0;
-        return sum + (price * quantity);
-    }, 0);
-    if (newTotal !== form.getValues('totalPrice')) {
-      form.setValue('totalPrice', newTotal);
-    }
-  }, [watchedItems, form]);
-  
-  React.useEffect(() => {
-    if (watchedItems.length === 0) return;
-
     const updatedItems = watchedItems.map(cartItem => {
-      const inventoryItem = inventory.find(i => i.id === cartItem.itemId);
-      if (inventoryItem) {
-        let newPrice;
-        if (paymentMethod === 'BPJS' || paymentMethod === 'Lain-lain') {
-          newPrice = inventoryItem.purchasePrice;
-        } else {
-          newPrice = patientType === 'Rawat Inap' ? inventoryItem.sellingPriceRI : inventoryItem.sellingPriceRJ;
+        const inventoryItem = inventory.find(i => i.id === cartItem.itemId);
+        if (inventoryItem) {
+            let newPrice;
+            if (paymentMethod === 'BPJS' || paymentMethod === 'Lain-lain') {
+                newPrice = inventoryItem.purchasePrice;
+            } else {
+                newPrice = patientType === 'Rawat Inap' ? inventoryItem.sellingPriceRI : inventoryItem.sellingPriceRJ;
+            }
+            // Only update if the price is different
+            if (newPrice !== cartItem.price) {
+                return { ...cartItem, price: newPrice };
+            }
         }
-        return { ...cartItem, price: newPrice };
-      }
-      return cartItem;
+        return cartItem;
     });
 
-    const newTotal = updatedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    
     // Check if an update is actually needed to prevent infinite loops
-    const needsUpdate = JSON.stringify(updatedItems) !== JSON.stringify(watchedItems);
-
-    if (needsUpdate) {
-        form.setValue('items', updatedItems, { shouldValidate: true });
-        form.setValue('totalPrice', newTotal);
+    if (JSON.stringify(updatedItems) !== JSON.stringify(watchedItems)) {
+        form.setValue('items', updatedItems, { shouldValidate: true, shouldDirty: true });
     }
+
   }, [patientType, paymentMethod, inventory, form, watchedItems]);
 
+  const currentTotal = React.useMemo(() => {
+    return watchedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  }, [watchedItems]);
+
   const onSubmit = async (values: TransactionFormValues) => {
+    const finalTotal = values.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const transactionData = {
       ...values, 
       date: format(values.date, "yyyy-MM-dd"),
       items: values.items.map(({ itemId, quantity, price }) => ({ itemId, quantity, price })),
+      totalPrice: finalTotal,
     };
 
     try {
@@ -533,7 +525,7 @@ export function TransactionsDataTable() {
                            </div>
                            {form.formState.errors.items && <p className="text-sm font-medium text-destructive">{form.formState.errors.items?.message || (form.formState.errors.items as any)?.root?.message}</p>}
                            <div className="flex justify-end items-center pt-4 border-t">
-                             <div className="text-lg font-bold">Total: {formatCurrency(form.getValues('totalPrice'))}</div>
+                             <div className="text-lg font-bold">Total: {formatCurrency(currentTotal)}</div>
                            </div>
                         </div>
                       </CardContent>
@@ -713,6 +705,5 @@ export function TransactionsDataTable() {
     </Card>
   );
 }
-    
 
     
