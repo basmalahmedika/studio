@@ -301,7 +301,47 @@ export function TransactionsDataTable() {
   }, [transactions, inventory, filters, mrnFilter]);
 
   const handleExportData = () => {
-    const dataToExport = groupedData.flatMap(t => {
+    const dataForExport = transactions
+      .filter((transaction) => {
+        const transactionDate = new Date(transaction.date);
+        transactionDate.setHours(0, 0, 0, 0);
+
+        const fromDate = filters.date?.from ? new Date(filters.date.from) : null;
+        if (fromDate) fromDate.setHours(0, 0, 0, 0);
+
+        const toDate = filters.date?.to ? new Date(filters.date.to) : null;
+        if (toDate) toDate.setHours(0, 0, 0, 0);
+
+        const isDateInRange = fromDate && toDate
+          ? transactionDate >= fromDate && transactionDate <= toDate
+          : true;
+        
+        // This export logic intentionally ignores the local mrnFilter to match dashboard totals
+        const patientTypeMatch = filters.patientType === 'all' || transaction.patientType === filters.patientType;
+        const paymentMethodMatch = filters.paymentMethod === 'all' || transaction.paymentMethod === filters.paymentMethod;
+        
+        return isDateInRange && patientTypeMatch && paymentMethodMatch;
+      })
+      .map((t): GroupedTransaction => {
+        const enrichedItems = (t.items || []).map(item => {
+          const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+          const purchasePrice = inventoryItem?.purchasePrice || 0;
+          const sellingPrice = (t.paymentMethod === 'BPJS' || t.paymentMethod === 'Lain-lain') ? purchasePrice : item.price;
+          const margin = sellingPrice - purchasePrice;
+          const subtotal = sellingPrice * item.quantity;
+          return {
+            ...item,
+            price: sellingPrice,
+            itemName: inventoryItem?.itemName || 'Item Tidak Dikenal',
+            purchasePrice,
+            margin,
+            subtotal,
+          };
+        });
+        return { ...t, enrichedItems };
+      });
+
+    const flattenedData = dataForExport.flatMap(t => {
         const recalculatedTotal = t.enrichedItems.reduce((sum, item) => sum + item.subtotal, 0);
         return t.enrichedItems.map(item => ({
             'Tanggal': t.date,
@@ -318,12 +358,12 @@ export function TransactionsDataTable() {
         }))
     });
 
-    if (dataToExport.length === 0) {
+    if (flattenedData.length === 0) {
       toast({ variant: 'destructive', title: 'Ekspor Gagal', description: 'Tidak ada data untuk diekspor.'});
       return;
     }
 
-    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const ws = XLSX.utils.json_to_sheet(flattenedData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Transaksi');
     XLSX.writeFile(wb, 'riwayat_transaksi.xlsx');
@@ -527,9 +567,7 @@ export function TransactionsDataTable() {
                             })}
                            </div>
                            {form.formState.errors.items && <p className="text-sm font-medium text-destructive">{form.formState.errors.items?.message || (form.formState.errors.items as any)?.root?.message}</p>}
-                           <div className="flex justify-end items-center pt-4 border-t">
-                             <div className="text-lg font-bold">Total: {formatCurrency(currentTotal)}</div>
-                           </div>
+                           
                         </div>
                       </CardContent>
                     </Card>
