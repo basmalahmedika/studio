@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -122,6 +121,8 @@ export function TransactionsDataTable() {
   const watchedItems = form.watch('items');
   const patientType = form.watch('patientType');
   const paymentMethod = form.watch('paymentMethod');
+  
+  const currentTotal = watchedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
   React.useEffect(() => {
     watchedItems.forEach((item, index) => {
@@ -140,8 +141,6 @@ export function TransactionsDataTable() {
         }
     });
   }, [patientType, paymentMethod, fields, inventory, update, watchedItems]);
-  
-  const currentTotal = watchedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
 
   const onSubmit = async (values: TransactionFormValues) => {
@@ -258,7 +257,7 @@ export function TransactionsDataTable() {
     setItemSearch(''); 
   }
   
-  const groupedData = React.useMemo(() => {
+  const globallyFilteredData = React.useMemo(() => {
     return transactions
       .filter((transaction) => {
         const transactionDate = new Date(transaction.date);
@@ -274,49 +273,6 @@ export function TransactionsDataTable() {
           ? transactionDate >= fromDate && transactionDate <= toDate
           : true;
 
-        const mrnMatch = mrnFilter === '' || (transaction.medicalRecordNumber?.toLowerCase().includes(mrnFilter.toLowerCase()) ?? false);
-        const patientTypeMatch = filters.patientType === 'all' || transaction.patientType === filters.patientType;
-        const paymentMethodMatch = filters.paymentMethod === 'all' || transaction.paymentMethod === filters.paymentMethod;
-        
-        return isDateInRange && mrnMatch && patientTypeMatch && paymentMethodMatch;
-      })
-      .map((t): GroupedTransaction => {
-        const enrichedItems = (t.items || []).map(item => {
-          const inventoryItem = inventory.find(inv => inv.id === item.itemId);
-          const purchasePrice = inventoryItem?.purchasePrice || 0;
-          const sellingPrice = (t.paymentMethod === 'BPJS' || t.paymentMethod === 'Lain-lain') ? purchasePrice : item.price;
-          const margin = sellingPrice - purchasePrice;
-          const subtotal = sellingPrice * item.quantity;
-          return {
-            ...item,
-            price: sellingPrice,
-            itemName: inventoryItem?.itemName || 'Item Tidak Dikenal',
-            purchasePrice,
-            margin,
-            subtotal,
-          };
-        });
-        return { ...t, enrichedItems };
-      });
-  }, [transactions, inventory, filters, mrnFilter]);
-
-  const handleExportData = () => {
-    const dataForExport = transactions
-      .filter((transaction) => {
-        const transactionDate = new Date(transaction.date);
-        transactionDate.setHours(0, 0, 0, 0);
-
-        const fromDate = filters.date?.from ? new Date(filters.date.from) : null;
-        if (fromDate) fromDate.setHours(0, 0, 0, 0);
-
-        const toDate = filters.date?.to ? new Date(filters.date.to) : null;
-        if (toDate) toDate.setHours(0, 0, 0, 0);
-
-        const isDateInRange = fromDate && toDate
-          ? transactionDate >= fromDate && transactionDate <= toDate
-          : true;
-        
-        // This export logic intentionally ignores the local mrnFilter to match dashboard totals
         const patientTypeMatch = filters.patientType === 'all' || transaction.patientType === filters.patientType;
         const paymentMethodMatch = filters.paymentMethod === 'all' || transaction.paymentMethod === filters.paymentMethod;
         
@@ -340,8 +296,19 @@ export function TransactionsDataTable() {
         });
         return { ...t, enrichedItems };
       });
+  }, [transactions, inventory, filters]);
 
-    const flattenedData = dataForExport.flatMap(t => {
+  const groupedData = React.useMemo(() => {
+    if (!mrnFilter) {
+      return globallyFilteredData;
+    }
+    return globallyFilteredData.filter(transaction =>
+      transaction.medicalRecordNumber?.toLowerCase().includes(mrnFilter.toLowerCase())
+    );
+  }, [globallyFilteredData, mrnFilter]);
+
+  const handleExportData = () => {
+    const flattenedData = globallyFilteredData.flatMap(t => {
         const recalculatedTotal = t.enrichedItems.reduce((sum, item) => sum + item.subtotal, 0);
         return t.enrichedItems.map(item => ({
             'Tanggal': t.date,
@@ -570,6 +537,11 @@ export function TransactionsDataTable() {
                            
                         </div>
                       </CardContent>
+                      <CardFooter>
+                        <div className="flex justify-end w-full font-bold text-lg">
+                          <span>Total: {formatCurrency(currentTotal)}</span>
+                        </div>
+                      </CardFooter>
                     </Card>
 
                     <DialogFooter>
