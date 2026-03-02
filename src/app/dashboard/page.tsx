@@ -159,7 +159,7 @@ export default function DashboardPage() {
     previousPeriodStats,
     filteredTransactions,
   } = React.useMemo(() => {
-    const filterTransactionsByRange = (trans: Transaction[], range: DateRange | undefined, patientType: string, paymentMethod: string): Transaction[] => {
+    const filterTransactions = (trans: Transaction[], range: DateRange | undefined, patientType: string, paymentMethod: string): Transaction[] => {
         if (!range || !range.from || !range.to) return [];
         return trans.filter(t => {
             const transactionDate = new Date(t.date);
@@ -177,14 +177,14 @@ export default function DashboardPage() {
         });
     };
 
-    const currentFiltered = filterTransactionsByRange(transactions, filters.date, filters.patientType, filters.paymentMethod);
+    const currentFiltered = filterTransactions(transactions, filters.date, filters.patientType, filters.paymentMethod);
     
     const duration = filters.date?.from && filters.date.to ? differenceInDays(filters.date.to, filters.date.from) : 30;
     const prevDate = {
       from: filters.date?.from ? subDays(filters.date.from, duration + 1) : subDays(new Date(), (duration * 2) + 1),
       to: filters.date?.from ? subDays(filters.date.from, 1) : subDays(new Date(), duration + 1),
     };
-    const previousFiltered = filterTransactionsByRange(transactions, prevDate, filters.patientType, filters.paymentMethod);
+    const previousFiltered = filterTransactions(transactions, prevDate, filters.patientType, filters.paymentMethod);
     
     const currentStats = calculateStats(currentFiltered, inventory);
     const previousStats = calculateStats(previousFiltered, inventory);
@@ -376,4 +376,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
