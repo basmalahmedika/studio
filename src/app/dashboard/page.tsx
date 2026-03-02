@@ -55,41 +55,9 @@ export default function DashboardPage() {
     previousPeriodStats,
     filteredTransactions,
     transactionsForStats,
-} = React.useMemo(() => {
-    const filterTransactions = (trans: Transaction[], range: DateRange | undefined): Transaction[] => {
-        if (!range || !range.from || !range.to) return [];
-        const fromDate = new Date(range.from);
-        fromDate.setHours(0, 0, 0, 0);
-        const toDate = new Date(range.to);
-        toDate.setHours(0, 0, 0, 0);
-
-        return trans.filter(t => {
-            const transactionDate = new Date(t.date);
-            transactionDate.setHours(0, 0, 0, 0);
-            return transactionDate >= fromDate && transactionDate <= toDate;
-        });
-    };
+  } = React.useMemo(() => {
     
-    const currentFilteredByDate = filterTransactions(transactions, filters.date);
-    
-    const duration = filters.date?.from && filters.date.to ? differenceInDays(filters.date.to, filters.date.from) : 30;
-    const prevDateRange = {
-        from: filters.date?.from ? subDays(filters.date.from, duration + 1) : subDays(new Date(), (duration * 2) + 1),
-        to: filters.date?.from ? subDays(filters.date.from, 1) : subDays(new Date(), duration + 1),
-    };
-    const previousFilteredByDate = filterTransactions(transactions, prevDateRange);
-    
-    const applyGlobalFilters = (trans: Transaction[]) => {
-      return trans.filter(t => {
-          const isPatientTypeMatch = filters.patientType === 'all' || t.patientType === filters.patientType;
-          const isPaymentMethodMatch = filters.paymentMethod === 'all' || t.paymentMethod === filters.paymentMethod;
-          return isPatientTypeMatch && isPaymentMethodMatch;
-      });
-    };
-
-    const globallyFilteredCurrent = applyGlobalFilters(currentFilteredByDate);
-    const globallyFilteredPrevious = applyGlobalFilters(previousFilteredByDate);
-
+    // Helper functions
     const getRevenue = (trans: Transaction[]) => trans.reduce((sum, t) => sum + t.totalPrice, 0);
     const getExpenditure = (trans: Transaction[]) => trans.reduce((sum, t) => {
         return sum + (t.items || []).reduce((itemSum, item) => {
@@ -98,101 +66,152 @@ export default function DashboardPage() {
         }, 0);
     }, 0);
 
-    const calculateMonthlyComparison = (currentTrans: Transaction[], previousTrans: Transaction[], type: 'revenue' | 'expenditure') => {
+    // --- 1. Create the Single Source of Truth for the CURRENT period ---
+    // This logic is now identical to the transaction page for consistency.
+    const filteredTransactions = transactions.filter(t => {
+      const transactionDate = new Date(t.date);
+      transactionDate.setHours(0, 0, 0, 0);
+
+      const fromDate = filters.date?.from ? new Date(filters.date.from) : null;
+      if (fromDate) fromDate.setHours(0, 0, 0, 0);
+      
+      const toDate = filters.date?.to ? new Date(filters.date.to) : null;
+      if (toDate) toDate.setHours(0, 0, 0, 0);
+
+      const isDateInRange = fromDate && toDate 
+        ? transactionDate >= fromDate && transactionDate <= toDate 
+        : true;
+        
+      const isPatientTypeMatch = filters.patientType === 'all' || t.patientType === filters.patientType;
+      const isPaymentMethodMatch = filters.paymentMethod === 'all' || t.paymentMethod === filters.paymentMethod;
+
+      return isDateInRange && isPatientTypeMatch && isPaymentMethodMatch;
+    });
+
+    // --- 2. Create the Single Source of Truth for the PREVIOUS period ---
+    const duration = filters.date?.from && filters.date.to ? differenceInDays(filters.date.to, filters.date.from) : 30;
+    const prevDateRange = {
+        from: filters.date?.from ? subDays(filters.date.from, duration + 1) : subDays(new Date(), (duration * 2) + 1),
+        to: filters.date?.from ? subDays(filters.date.from, 1) : subDays(new Date(), duration + 1),
+    };
+    const previousFilteredTransactions = transactions.filter(t => {
+        const transactionDate = new Date(t.date);
+        transactionDate.setHours(0, 0, 0, 0);
+        const fromDate = new Date(prevDateRange.from); fromDate.setHours(0, 0, 0, 0);
+        const toDate = new Date(prevDateRange.to); toDate.setHours(0, 0, 0, 0);
+        
+        const isDateInRange = transactionDate >= fromDate && transactionDate <= toDate;
+        const isPatientTypeMatch = filters.patientType === 'all' || t.patientType === filters.patientType;
+        const isPaymentMethodMatch = filters.paymentMethod === 'all' || t.paymentMethod === filters.paymentMethod;
+
+        return isDateInRange && isPatientTypeMatch && isPaymentMethodMatch;
+    });
+
+    // --- 3. Calculate all stats and chart data directly from the filtered sources ---
+
+    // Stat Card Data
+    const allUmumCurrent = filteredTransactions.filter(t => t.paymentMethod === 'UMUM');
+    const allNonUmumCurrent = filteredTransactions.filter(t => t.paymentMethod !== 'UMUM');
+    
+    const rjUmumCurrent = allUmumCurrent.filter(t => t.patientType === 'Rawat Jalan');
+    const riUmumCurrent = allUmumCurrent.filter(t => t.patientType === 'Rawat Inap');
+    
+    const allBpjsCurrent = filteredTransactions.filter(t => t.paymentMethod === 'BPJS');
+    const rjBpjsCurrent = allBpjsCurrent.filter(t => t.patientType === 'Rawat Jalan');
+    const riBpjsCurrent = allBpjsCurrent.filter(t => t.patientType === 'Rawat Inap');
+    
+    const currentPeriodStats = {
+      totalRevenue: getRevenue(allUmumCurrent),
+      revenueRJ: getRevenue(rjUmumCurrent),
+      revenueRI: getRevenue(riUmumCurrent),
+      totalExpenditure: getExpenditure(allNonUmumCurrent),
+      countRjUmum: rjUmumCurrent.length,
+      countRiUmum: riUmumCurrent.length,
+      countRjBpjs: rjBpjsCurrent.length,
+      countRiBpjs: riBpjsCurrent.length,
+    };
+
+    const transactionsForStats = {
+        rjUmum: rjUmumCurrent,
+        riUmum: riUmumCurrent,
+        rjBpjs: rjBpjsCurrent,
+        riBpjs: riBpjsCurrent,
+    };
+    
+    // Previous Period Stats
+    const previousPeriodStats = {
+        totalRevenue: getRevenue(previousFilteredTransactions.filter(t => t.paymentMethod === 'UMUM')),
+        totalExpenditure: getExpenditure(previousFilteredTransactions.filter(t => t.paymentMethod !== 'UMUM')),
+    };
+
+    // Monthly Comparison Chart Data
+    const calculateMonthlyComparison = (currentTrans: Transaction[], previousTrans: Transaction[]) => {
         const currentSales: Record<string, number> = {};
         const previousSales: Record<string, number> = {};
 
-        const processTransactions = (trans: Transaction[], salesMap: Record<string, number>) => {
-            const relevantTrans = type === 'revenue'
-                ? trans.filter(t => t.paymentMethod === 'UMUM')
-                : trans.filter(t => t.paymentMethod !== 'UMUM');
-
-            relevantTrans.forEach(t => {
+        const process = (trans: Transaction[], salesMap: Record<string, number>, type: 'revenue' | 'expenditure') => {
+            trans.forEach(t => {
                 const month = new Date(t.date).toLocaleString('default', { month: 'short', year: 'numeric' });
                 let monthTotal = 0;
-                if (type === 'revenue') {
+                if (type === 'revenue' && t.paymentMethod === 'UMUM') {
                     monthTotal = t.totalPrice;
-                } else {
-                    monthTotal = (t.items || []).reduce((itemSum, item) => {
-                        const inventoryItem = inventory.find(inv => inv.id === item.itemId);
-                        return itemSum + (inventoryItem?.purchasePrice || 0) * item.quantity;
-                    }, 0);
+                } else if (type === 'expenditure' && t.paymentMethod !== 'UMUM') {
+                    monthTotal = getExpenditure([t]);
                 }
-                salesMap[month] = (salesMap[month] || 0) + monthTotal;
+                if (monthTotal > 0) salesMap[month] = (salesMap[month] || 0) + monthTotal;
             });
         };
 
-        processTransactions(currentTrans, currentSales);
-        processTransactions(previousTrans, previousSales);
-        
-        const allMonths = new Set([...Object.keys(currentSales), ...Object.keys(previousSales)]);
+        const allMonths = new Set<string>();
+        [...currentTrans, ...previousTrans].forEach(t => allMonths.add(new Date(t.date).toLocaleString('default', { month: 'short', year: 'numeric' })));
         const sortedMonths = Array.from(allMonths).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
 
-        return sortedMonths.map(month => ({
-            name: month,
-            current: currentSales[month] || 0,
-            previous: previousSales[month] || 0,
-        }));
+        const getComparisonData = (type: 'revenue' | 'expenditure') => {
+            const currentSales: Record<string, number> = {};
+            const previousSales: Record<string, number> = {};
+            process(currentTrans, currentSales, type);
+            process(previousTrans, previousSales, type);
+            return sortedMonths.map(month => ({
+                name: month,
+                current: currentSales[month] || 0,
+                previous: previousSales[month] || 0,
+            }));
+        };
+
+        return {
+            revenue: getComparisonData('revenue'),
+            expenditure: getComparisonData('expenditure'),
+        };
     };
-
-    const currentUmumTrans = globallyFilteredCurrent.filter(t => t.paymentMethod === 'UMUM');
-    const currentRjUmumTrans = currentUmumTrans.filter(t => t.patientType === 'Rawat Jalan');
-    const currentRiUmumTrans = currentUmumTrans.filter(t => t.patientType === 'Rawat Inap');
-
-    const currentBpjsTrans = globallyFilteredCurrent.filter(t => t.paymentMethod === 'BPJS');
-    const currentRjBpjsTrans = currentBpjsTrans.filter(t => t.patientType === 'Rawat Jalan');
-    const currentRiBpjsTrans = currentBpjsTrans.filter(t => t.patientType === 'Rawat Inap');
     
-    const currentNonUmumTrans = globallyFilteredCurrent.filter(t => t.paymentMethod !== 'UMUM');
-    const currentNonUmumRj = currentNonUmumTrans.filter(t => t.patientType === 'Rawat Jalan');
-    const currentNonUmumRi = currentNonUmumTrans.filter(t => t.patientType === 'Rawat Inap');
+    const comparisonData = calculateMonthlyComparison(filteredTransactions, previousFilteredTransactions);
+    const revenueComparisonData = comparisonData.revenue;
+    const expenditureComparisonData = comparisonData.expenditure;
 
-    const previousUmumTrans = globallyFilteredPrevious.filter(t => t.paymentMethod === 'UMUM');
-    const previousNonUmumTrans = globallyFilteredPrevious.filter(t => t.paymentMethod !== 'UMUM');
+    // Category Breakdown Chart Data
+    const previousRjUmum = previousFilteredTransactions.filter(t => t.patientType === 'Rawat Jalan' && t.paymentMethod === 'UMUM');
+    const previousRiUmum = previousFilteredTransactions.filter(t => t.patientType === 'Rawat Inap' && t.paymentMethod === 'UMUM');
+    const previousRjBpjs = previousFilteredTransactions.filter(t => t.patientType === 'Rawat Jalan' && t.paymentMethod === 'BPJS');
+    const previousRiBpjs = previousFilteredTransactions.filter(t => t.patientType === 'Rawat Inap' && t.paymentMethod === 'BPJS');
 
-    const breakdownRjUmumCurrent = getRevenue(currentRjUmumTrans);
-    const breakdownRiUmumCurrent = getRevenue(currentRiUmumTrans);
-    const breakdownRjBpjsCurrent = getExpenditure(currentRjBpjsTrans);
-    const breakdownRiBpjsCurrent = getExpenditure(currentRiBpjsTrans);
-    
-    const breakdownRjUmumPrevious = getRevenue(globallyFilteredPrevious.filter(t => t.paymentMethod === 'UMUM' && t.patientType === 'Rawat Jalan'));
-    const breakdownRiUmumPrevious = getRevenue(globallyFilteredPrevious.filter(t => t.paymentMethod === 'UMUM' && t.patientType === 'Rawat Inap'));
-    const breakdownRjBpjsPrevious = getExpenditure(globallyFilteredPrevious.filter(t => t.paymentMethod === 'BPJS' && t.patientType === 'Rawat Jalan'));
-    const breakdownRiBpjsPrevious = getExpenditure(globallyFilteredPrevious.filter(t => t.paymentMethod === 'BPJS' && t.patientType === 'Rawat Inap'));
-
+    const categoryChartDataRJ = [
+        { name: 'Periode Ini', umum: getRevenue(rjUmumCurrent), bpjs: getExpenditure(rjBpjsCurrent) },
+        { name: 'Periode Lalu', umum: getRevenue(previousRjUmum), bpjs: getExpenditure(previousRjBpjs) }
+    ];
+    const categoryChartDataRI = [
+        { name: 'Periode Ini', umum: getRevenue(riUmumCurrent), bpjs: getExpenditure(riBpjsCurrent) },
+        { name: 'Periode Lalu', umum: getRevenue(previousRiUmum), bpjs: getExpenditure(previousRiBpjs) }
+    ];
 
     return {
-        revenueComparisonData: calculateMonthlyComparison(globallyFilteredCurrent, globallyFilteredPrevious, 'revenue'),
-        expenditureComparisonData: calculateMonthlyComparison(globallyFilteredCurrent, globallyFilteredPrevious, 'expenditure'),
-        categoryChartDataRJ: [
-            { name: 'Periode Ini', umum: breakdownRjUmumCurrent, bpjs: breakdownRjBpjsCurrent },
-            { name: 'Periode Lalu', umum: breakdownRjUmumPrevious, bpjs: breakdownRjBpjsPrevious }
-        ],
-        categoryChartDataRI: [
-            { name: 'Periode Ini', umum: breakdownRiUmumCurrent, bpjs: breakdownRiBpjsCurrent },
-            { name: 'Periode Lalu', umum: breakdownRiUmumPrevious, bpjs: breakdownRiBpjsPrevious }
-        ],
-        currentPeriodStats: {
-            totalRevenue: getRevenue(currentUmumTrans),
-            revenueRJ: breakdownRjUmumCurrent,
-            revenueRI: breakdownRiUmumCurrent,
-            totalExpenditure: getExpenditure(currentNonUmumTrans),
-            countRjUmum: currentRjUmumTrans.length,
-            countRiUmum: currentRiUmumTrans.length,
-            countRjBpjs: currentRjBpjsTrans.length,
-            countRiBpjs: currentRiBpjsTrans.length,
-        },
-        previousPeriodStats: {
-            totalRevenue: getRevenue(previousUmumTrans),
-            totalExpenditure: getExpenditure(previousNonUmumTrans),
-        },
-        filteredTransactions: globallyFilteredCurrent,
-        transactionsForStats: {
-            rjUmum: currentRjUmumTrans,
-            riUmum: currentRiUmumTrans,
-            rjBpjs: currentRjBpjsTrans,
-            riBpjs: currentRiBpjsTrans,
-        }
+        revenueComparisonData,
+        expenditureComparisonData,
+        categoryChartDataRJ,
+        categoryChartDataRI,
+        currentPeriodStats,
+        previousPeriodStats,
+        filteredTransactions,
+        transactionsForStats,
     };
   }, [filters, transactions, inventory]);
 
