@@ -15,111 +15,6 @@ import { CategoryBreakdownChart } from '@/components/category-breakdown-chart';
 import { CardFooter } from '@/components/ui/card';
 import { BpjsExpenditureAnalysis } from '@/components/bpjs-expenditure-analysis';
 
-
-interface DetailedStats {
-  revenueRJ: number;
-  revenueRI: number;
-  expenditureRJ: number;
-  expenditureRI: number;
-}
-
-interface CategoryBreakdown {
-  rjUmum: number;
-  rjBpjs: number;
-  riUmum: number;
-  riBpjs: number;
-}
-
-interface TransactionCounts {
-  rjUmum: number;
-  rjBpjs: number;
-  riUmum: number;
-  riBpjs: number;
-}
-
-interface AllStats {
-  totalRevenue: number;
-  transactionCounts: TransactionCounts;
-  details: DetailedStats;
-  categoryBreakdown: CategoryBreakdown;
-  totalExpenditure: number; 
-}
-
-const calculateStats = (transactions: Transaction[], inventory: InventoryItem[]): AllStats => {
-    const stats: AllStats = {
-      totalRevenue: 0,
-      transactionCounts: {
-        rjUmum: 0,
-        rjBpjs: 0,
-        riUmum: 0,
-        riBpjs: 0,
-      },
-      details: {
-        revenueRJ: 0,
-        revenueRI: 0,
-        expenditureRJ: 0,
-        expenditureRI: 0,
-      },
-      categoryBreakdown: {
-        rjUmum: 0,
-        rjBpjs: 0,
-        riUmum: 0,
-        riBpjs: 0,
-      },
-      totalExpenditure: 0,
-    };
-
-    const uniqueTransactionIds = new Set<string>();
-
-    transactions.forEach(t => {
-      // Count transactions based on type and payment method
-      if (!uniqueTransactionIds.has(t.id)) {
-         if (t.patientType === 'Rawat Jalan') {
-            if (t.paymentMethod === 'UMUM') stats.transactionCounts.rjUmum += 1;
-            else if (t.paymentMethod === 'BPJS') stats.transactionCounts.rjBpjs += 1;
-         } else if (t.patientType === 'Rawat Inap') {
-            if (t.paymentMethod === 'UMUM') stats.transactionCounts.riUmum += 1;
-            else if (t.paymentMethod === 'BPJS') stats.transactionCounts.riBpjs += 1;
-         }
-        uniqueTransactionIds.add(t.id);
-      }
-      
-      const isRJ = t.patientType === 'Rawat Jalan';
-      const isRI = t.patientType === 'Rawat Inap';
-
-      if (t.paymentMethod === 'UMUM') {
-        stats.totalRevenue += t.totalPrice;
-        if (isRJ) {
-            stats.details.revenueRJ += t.totalPrice;
-            stats.categoryBreakdown.rjUmum += t.totalPrice;
-        } else if (isRI) {
-            stats.details.revenueRI += t.totalPrice;
-            stats.categoryBreakdown.riUmum += t.totalPrice;
-        }
-      } else { 
-        let transactionCost = 0;
-        t.items?.forEach(item => {
-          const inventoryItem = inventory.find(inv => inv.id === item.itemId);
-          transactionCost += (inventoryItem?.purchasePrice || 0) * item.quantity;
-        });
-
-        stats.totalExpenditure += transactionCost;
-
-        if(t.paymentMethod === 'BPJS') {
-             if (isRJ) {
-                stats.details.expenditureRJ += transactionCost;
-                stats.categoryBreakdown.rjBpjs += transactionCost;
-            } else if (isRI) {
-                stats.details.expenditureRI += transactionCost;
-                stats.categoryBreakdown.riBpjs += transactionCost;
-            }
-        }
-      }
-    });
-
-    return stats;
-};
-
 const formatCurrency = (value: number) => `Rp ${value.toLocaleString('id-ID')}`;
 
 const AnalysisFooter = ({ title, currentTotal, previousTotal }: { title: string, currentTotal: number, previousTotal: number }) => {
@@ -177,6 +72,44 @@ export default function DashboardPage() {
         });
     };
 
+    const calculateAllStats = (filteredTrans: Transaction[]) => {
+        const getRevenue = (trans: Transaction[]) => trans.reduce((sum, t) => sum + t.totalPrice, 0);
+        
+        const getExpenditure = (trans: Transaction[]) => trans.reduce((sum, t) => {
+            const transactionCost = (t.items || []).reduce((itemSum, item) => {
+                const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+                return itemSum + (inventoryItem?.purchasePrice || 0) * item.quantity;
+            }, 0);
+            return sum + transactionCost;
+        }, 0);
+
+        const umumTrans = filteredTrans.filter(t => t.paymentMethod === 'UMUM');
+        const nonUmumTrans = filteredTrans.filter(t => t.paymentMethod !== 'UMUM');
+        const bpjsTrans = filteredTrans.filter(t => t.paymentMethod === 'BPJS');
+        
+        const rjUmumTrans = umumTrans.filter(t => t.patientType === 'Rawat Jalan');
+        const riUmumTrans = umumTrans.filter(t => t.patientType === 'Rawat Inap');
+        const rjBpjsTrans = bpjsTrans.filter(t => t.patientType === 'Rawat Jalan');
+        const riBpjsTrans = bpjsTrans.filter(t => t.patientType === 'Rawat Inap');
+
+        return {
+            totalRevenue: getRevenue(umumTrans),
+            totalExpenditure: getExpenditure(nonUmumTrans),
+            revenueRJ: getRevenue(rjUmumTrans),
+            revenueRI: getRevenue(riUmumTrans),
+            expenditureRJ: getExpenditure(nonUmumTrans.filter(t => t.patientType === 'Rawat Jalan')),
+            expenditureRI: getExpenditure(nonUmumTrans.filter(t => t.patientType === 'Rawat Inap')),
+            countRjUmum: rjUmumTrans.length,
+            countRiUmum: riUmumTrans.length,
+            countRjBpjs: rjBpjsTrans.length,
+            countRiBpjs: riBpjsTrans.length,
+            breakdownRjUmum: getRevenue(rjUmumTrans),
+            breakdownRiUmum: getRevenue(riUmumTrans),
+            breakdownRjBpjs: getExpenditure(rjBpjsTrans),
+            breakdownRiBpjs: getExpenditure(riBpjsTrans),
+        };
+    };
+
     const currentFiltered = filterTransactions(transactions, filters.date, filters.patientType, filters.paymentMethod);
     
     const duration = filters.date?.from && filters.date.to ? differenceInDays(filters.date.to, filters.date.from) : 30;
@@ -186,21 +119,25 @@ export default function DashboardPage() {
     };
     const previousFiltered = filterTransactions(transactions, prevDate, filters.patientType, filters.paymentMethod);
     
-    const currentStats = calculateStats(currentFiltered, inventory);
-    const previousStats = calculateStats(previousFiltered, inventory);
-
+    const currentStats = calculateAllStats(currentFiltered);
+    const previousStats = calculateAllStats(previousFiltered);
+    
     const calculateMonthlyComparison = (currentTrans: Transaction[], previousTrans: Transaction[], type: 'revenue' | 'expenditure') => {
         const currentSales: Record<string, number> = {};
         const previousSales: Record<string, number> = {};
 
         const processTransactions = (trans: Transaction[], salesMap: Record<string, number>) => {
-            trans.forEach(t => {
+            const relevantTrans = type === 'revenue' 
+                ? trans.filter(t => t.paymentMethod === 'UMUM')
+                : trans.filter(t => t.paymentMethod !== 'UMUM');
+
+            relevantTrans.forEach(t => {
                 const month = new Date(t.date).toLocaleString('default', { month: 'short', year: 'numeric' });
                 let monthTotal = 0;
                 
-                if (type === 'revenue' && t.paymentMethod === 'UMUM') {
+                if (type === 'revenue') {
                     monthTotal = t.totalPrice;
-                } else if (type === 'expenditure' && t.paymentMethod !== 'UMUM') {
+                } else {
                     let transactionCost = 0;
                     t.items?.forEach(item => {
                         const inventoryItem = inventory.find(inv => inv.id === item.itemId);
@@ -224,16 +161,16 @@ export default function DashboardPage() {
             previous: previousSales[month] || 0,
         }));
     };
-
+    
     const rjData = [
-        { name: 'Periode Ini', umum: currentStats.categoryBreakdown.rjUmum, bpjs: currentStats.categoryBreakdown.rjBpjs },
-        { name: 'Periode Lalu', umum: previousStats.categoryBreakdown.rjUmum, bpjs: previousStats.categoryBreakdown.rjBpjs }
+        { name: 'Periode Ini', umum: currentStats.breakdownRjUmum, bpjs: currentStats.breakdownRjBpjs },
+        { name: 'Periode Lalu', umum: previousStats.breakdownRjUmum, bpjs: previousStats.breakdownRjBpjs }
     ];
     const riData = [
-        { name: 'Periode Ini', umum: currentStats.categoryBreakdown.riUmum, bpjs: currentStats.categoryBreakdown.riBpjs },
-        { name: 'Periode Lalu', umum: previousStats.categoryBreakdown.riUmum, bpjs: previousStats.categoryBreakdown.riBpjs }
+        { name: 'Periode Ini', umum: currentStats.breakdownRiUmum, bpjs: currentStats.breakdownRiBpjs },
+        { name: 'Periode Lalu', umum: previousStats.breakdownRiUmum, bpjs: previousStats.breakdownRiBpjs }
     ];
-      
+
     return {
         revenueComparisonData: calculateMonthlyComparison(currentFiltered, previousFiltered, 'revenue'),
         expenditureComparisonData: calculateMonthlyComparison(currentFiltered, previousFiltered, 'expenditure'),
@@ -265,14 +202,14 @@ export default function DashboardPage() {
         />
         <StatCard
           title="Pendapatan RJ (UMUM)"
-          value={formatCurrency(currentPeriodStats.details.revenueRJ)}
+          value={formatCurrency(currentPeriodStats.revenueRJ)}
           icon={Pill}
           description="Pendapatan dari pasien Rawat Jalan UMUM"
           className="bg-green-600/90 text-white"
         />
         <StatCard
           title="Pendapatan RI (UMUM)"
-          value={formatCurrency(currentPeriodStats.details.revenueRI)}
+          value={formatCurrency(currentPeriodStats.revenueRI)}
           icon={Pill}
           description="Pendapatan dari pasien Rawat Inap UMUM"
           className="bg-green-600/90 text-white"
@@ -289,28 +226,28 @@ export default function DashboardPage() {
        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Transaksi RJ (UMUM)"
-          value={currentPeriodStats.transactionCounts.rjUmum.toString()}
+          value={currentPeriodStats.countRjUmum.toString()}
           icon={ReceiptText}
           description="Jml. transaksi Rawat Jalan UMUM"
           className="bg-blue-600/90 text-white"
         />
          <StatCard
           title="Transaksi RJ (BPJS)"
-          value={currentPeriodStats.transactionCounts.rjBpjs.toString()}
+          value={currentPeriodStats.countRjBpjs.toString()}
           icon={ReceiptText}
           description="Jml. transaksi Rawat Jalan BPJS"
           className="bg-blue-600/90 text-white"
         />
         <StatCard
           title="Transaksi RI (UMUM)"
-          value={currentPeriodStats.transactionCounts.riUmum.toString()}
+          value={currentPeriodStats.countRiUmum.toString()}
           icon={ReceiptText}
           description="Jml. transaksi Rawat Inap UMUM"
           className="bg-blue-600/90 text-white"
         />
          <StatCard
           title="Transaksi RI (BPJS)"
-          value={currentPeriodStats.transactionCounts.riBpjs.toString()}
+          value={currentPeriodStats.countRiBpjs.toString()}
           icon={ReceiptText}
           description="Jml. transaksi Rawat Inap BPJS"
           className="bg-blue-600/90 text-white"
