@@ -256,8 +256,6 @@ export function TransactionsDataTable() {
 
   // --- START: CENTRALIZED DATA PROCESSING LOGIC ---
 
-  // 1. A single source of truth for globally filtered data.
-  // This uses robust UTC date logic to ensure consistency.
   const globallyFilteredTransactions = React.useMemo(() => {
     const parseDateUTC = (date: Date) => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
     const parseStringUTC = (dateString: string) => {
@@ -285,28 +283,37 @@ export function TransactionsDataTable() {
     });
   }, [transactions, filters]);
 
-  // 2. Export function now uses the centralized source of truth directly.
   const handleExportData = () => {
-    const dataForExport = globallyFilteredTransactions.flatMap(t => {
-        const enrichedItems = (t.items || []).map(item => {
-          const inventoryItem = inventory.find(inv => inv.id === item.itemId);
-          const purchasePrice = inventoryItem?.purchasePrice || 0;
-          const sellingPrice = (t.paymentMethod === 'BPJS' || t.paymentMethod === 'Lain-lain') ? purchasePrice : item.price;
-          const margin = sellingPrice - purchasePrice;
-          const subtotal = sellingPrice * item.quantity;
-          return {
-            ...item,
-            price: sellingPrice,
-            itemName: inventoryItem?.itemName || 'Item Tidak Dikenal',
-            purchasePrice,
-            margin,
-            subtotal,
-          };
-        });
+    if (globallyFilteredTransactions.length === 0) {
+      toast({ variant: 'destructive', title: 'Ekspor Gagal', description: 'Tidak ada data untuk diekspor berdasarkan filter yang dipilih.'});
+      return;
+    }
+    
+    const dataForExport: any[] = [];
 
-        const recalculatedTotal = enrichedItems.reduce((sum, item) => sum + item.subtotal, 0);
-        
-        return enrichedItems.map(item => ({
+    globallyFilteredTransactions.forEach(t => {
+      const transactionItems = t.items || [];
+      const enrichedItems = transactionItems.map(item => {
+        const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+        const purchasePrice = inventoryItem?.purchasePrice || 0;
+        const sellingPrice = (t.paymentMethod === 'BPJS' || t.paymentMethod === 'Lain-lain') ? purchasePrice : item.price;
+        const margin = sellingPrice - purchasePrice;
+        const subtotal = sellingPrice * item.quantity;
+        return {
+          ...item,
+          price: sellingPrice,
+          itemName: inventoryItem?.itemName || 'Item Tidak Dikenal',
+          purchasePrice,
+          margin,
+          subtotal,
+        };
+      });
+      
+      const recalculatedTotal = enrichedItems.reduce((sum, item) => sum + item.subtotal, 0);
+
+      if (enrichedItems.length > 0) {
+        enrichedItems.forEach(item => {
+          dataForExport.push({
             'Tanggal': t.date,
             'No. Rekam Medis': t.medicalRecordNumber,
             'Tipe Pasien': t.patientType,
@@ -318,13 +325,25 @@ export function TransactionsDataTable() {
             'Margin': item.margin,
             'Subtotal Item': item.subtotal,
             'Total Transaksi': recalculatedTotal,
-        }));
+          });
+        });
+      } else {
+        // Handle transactions with no items, ensuring they are included in the export
+        dataForExport.push({
+            'Tanggal': t.date,
+            'No. Rekam Medis': t.medicalRecordNumber,
+            'Tipe Pasien': t.patientType,
+            'Metode Pembayaran': t.paymentMethod,
+            'Nama Item': '',
+            'Kuantitas': 0,
+            'Harga Beli': 0,
+            'Harga Jual': 0,
+            'Margin': 0,
+            'Subtotal Item': 0,
+            'Total Transaksi': t.totalPrice,
+        });
+      }
     });
-
-    if (dataForExport.length === 0) {
-      toast({ variant: 'destructive', title: 'Ekspor Gagal', description: 'Tidak ada data untuk diekspor berdasarkan filter yang dipilih.'});
-      return;
-    }
 
     const ws = XLSX.utils.json_to_sheet(dataForExport);
     const wb = XLSX.utils.book_new();
@@ -332,7 +351,6 @@ export function TransactionsDataTable() {
     XLSX.writeFile(wb, 'riwayat_transaksi.xlsx');
   };
 
-  // 3. Data for UI display is derived from the centralized source of truth, with local filters applied.
   const groupedData = React.useMemo(() => {
     return globallyFilteredTransactions
       .filter(transaction => {
