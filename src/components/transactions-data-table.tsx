@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -7,6 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { PlusCircle, MoreHorizontal, Pen, Trash2, CalendarIcon as CalendarIconLucide, X, FileDown, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { format } from "date-fns";
 import * as XLSX from 'xlsx';
+import type { DateRange } from 'react-day-picker';
 
 import {
   Table,
@@ -254,8 +256,6 @@ export function TransactionsDataTable() {
     setItemSearch(''); 
   }
 
-  // --- START: CENTRALIZED DATA PROCESSING LOGIC ---
-
   const globallyFilteredTransactions = React.useMemo(() => {
     const parseDateUTC = (date: Date) => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
     const parseStringUTC = (dateString: string) => {
@@ -328,7 +328,6 @@ export function TransactionsDataTable() {
           });
         });
       } else {
-        // Handle transactions with no items, ensuring they are included in the export
         dataForExport.push({
             'Tanggal': t.date,
             'No. Rekam Medis': t.medicalRecordNumber,
@@ -377,9 +376,6 @@ export function TransactionsDataTable() {
       });
   }, [globallyFilteredTransactions, mrnFilter, inventory]);
 
-  // --- END: CENTRALIZED DATA PROCESSING LOGIC ---
-
-
   const filteredInventory = React.useMemo(() => {
     if (!itemSearch) return [];
     return inventory.filter(item => 
@@ -390,7 +386,6 @@ export function TransactionsDataTable() {
   
   const formatCurrency = (value: number) => `Rp ${value.toLocaleString('id-ID')}`;
 
-  // Pagination Logic - uses `groupedData` for display.
   const totalItems = groupedData.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const paginatedData = groupedData.slice(
@@ -402,7 +397,12 @@ export function TransactionsDataTable() {
     <Card>
       <CardHeader>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <CardTitle>Riwayat Transaksi</CardTitle>
+          <div>
+            <CardTitle>Riwayat Transaksi</CardTitle>
+            <CardDescription className="mt-1">
+              Menampilkan {globallyFilteredTransactions.length} transaksi yang cocok dengan filter global.
+            </CardDescription>
+          </div>
           <div className="flex flex-wrap gap-2">
              <Button variant="outline" onClick={handleExportData}>
               <FileDown className="mr-2 h-4 w-4" />
@@ -705,7 +705,7 @@ export function TransactionsDataTable() {
        <CardFooter>
         <div className="flex items-center justify-between w-full text-sm text-muted-foreground">
           <div className="flex-1">
-            Menampilkan {paginatedData.length > 0 ? Math.min((currentPage - 1) * itemsPerPage + 1, totalItems) : 0} sampai {Math.min(currentPage * itemsPerPage, totalItems)} dari {totalItems} transaksi.
+            Menampilkan {paginatedData.length > 0 ? Math.min((currentPage - 1) * itemsPerPage + 1, totalItems) : 0} sampai {Math.min(currentPage * itemsPerPage, totalItems)} dari {totalItems} transaksi (hasil pencarian lokal).
           </div>
           <div className="flex items-center gap-4">
              <div className="flex items-center gap-2">
@@ -758,3 +758,5 @@ export function TransactionsDataTable() {
     </Card>
   );
 }
+
+    

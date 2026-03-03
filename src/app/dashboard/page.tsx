@@ -53,10 +53,64 @@ export default function DashboardPage() {
     categoryChartDataRI,
     currentPeriodStats,
     previousPeriodStats,
-    filteredTransactions,
     transactionsForStats,
   } = React.useMemo(() => {
+
+    const parseDateUTC = (date: Date) => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+    const parseStringUTC = (dateString: string) => {
+        const parts = dateString.split('-').map(Number);
+        if (parts.length !== 3 || parts.some(isNaN)) return 0;
+        const [year, month, day] = parts;
+        return Date.UTC(year, month - 1, day);
+    };
+
+    const filterTransactionsByCriteria = (
+        data: Transaction[], 
+        dateRange: DateRange | undefined, 
+        patientType: string, 
+        paymentMethod: string
+    ) => {
+        const fromDateUTC = dateRange?.from ? parseDateUTC(dateRange.from) : null;
+        const toDateUTC = dateRange?.to ? parseDateUTC(dateRange.to) : null;
+
+        return data.filter(t => {
+            const transactionDateUTC = parseStringUTC(t.date);
+            if (transactionDateUTC === 0) return false;
+
+            const isDateInRange = fromDateUTC && toDateUTC
+                ? transactionDateUTC >= fromDateUTC && transactionDateUTC <= toDateUTC
+                : true;
+            
+            const isPatientTypeMatch = patientType === 'all' || t.patientType === patientType;
+            const isPaymentMethodMatch = paymentMethod === 'all' || t.paymentMethod === paymentMethod;
+
+            return isDateInRange && isPatientTypeMatch && isPaymentMethodMatch;
+        });
+    };
     
+    // --- 1. Filter for CURRENT period ---
+    const filteredTransactions = filterTransactionsByCriteria(
+        transactions,
+        filters.date,
+        filters.patientType,
+        filters.paymentMethod
+    );
+
+    // --- 2. Filter for PREVIOUS period ---
+    const duration = filters.date?.from && filters.date.to ? differenceInDays(filters.date.to, filters.date.from) : 30;
+    const prevDateRange: DateRange = {
+        from: filters.date?.from ? subDays(filters.date.from, duration + 1) : subDays(new Date(), (duration * 2) + 1),
+        to: filters.date?.from ? subDays(filters.date.from, 1) : subDays(new Date(), duration + 1),
+    };
+    const previousFilteredTransactions = filterTransactionsByCriteria(
+        transactions,
+        prevDateRange,
+        filters.patientType,
+        filters.paymentMethod
+    );
+    
+    // --- 3. Calculate all stats and chart data directly from the filtered sources ---
+
     // Helper functions
     const getRevenue = (trans: Transaction[]) => trans.reduce((sum, t) => sum + t.totalPrice, 0);
     const getExpenditure = (trans: Transaction[]) => trans.reduce((sum, t) => {
@@ -65,49 +119,6 @@ export default function DashboardPage() {
             return itemSum + (inventoryItem?.purchasePrice || 0) * item.quantity;
         }, 0);
     }, 0);
-
-    // --- 1. Create the Single Source of Truth for the CURRENT period ---
-    // This logic is now identical to the transaction page for consistency.
-    const filteredTransactions = transactions.filter(t => {
-      const transactionDate = new Date(t.date);
-      transactionDate.setHours(0, 0, 0, 0);
-
-      const fromDate = filters.date?.from ? new Date(filters.date.from) : null;
-      if (fromDate) fromDate.setHours(0, 0, 0, 0);
-      
-      const toDate = filters.date?.to ? new Date(filters.date.to) : null;
-      if (toDate) toDate.setHours(0, 0, 0, 0);
-
-      const isDateInRange = fromDate && toDate 
-        ? transactionDate >= fromDate && transactionDate <= toDate 
-        : true;
-        
-      const isPatientTypeMatch = filters.patientType === 'all' || t.patientType === filters.patientType;
-      const isPaymentMethodMatch = filters.paymentMethod === 'all' || t.paymentMethod === filters.paymentMethod;
-
-      return isDateInRange && isPatientTypeMatch && isPaymentMethodMatch;
-    });
-
-    // --- 2. Create the Single Source of Truth for the PREVIOUS period ---
-    const duration = filters.date?.from && filters.date.to ? differenceInDays(filters.date.to, filters.date.from) : 30;
-    const prevDateRange = {
-        from: filters.date?.from ? subDays(filters.date.from, duration + 1) : subDays(new Date(), (duration * 2) + 1),
-        to: filters.date?.from ? subDays(filters.date.from, 1) : subDays(new Date(), duration + 1),
-    };
-    const previousFilteredTransactions = transactions.filter(t => {
-        const transactionDate = new Date(t.date);
-        transactionDate.setHours(0, 0, 0, 0);
-        const fromDate = new Date(prevDateRange.from); fromDate.setHours(0, 0, 0, 0);
-        const toDate = new Date(prevDateRange.to); toDate.setHours(0, 0, 0, 0);
-        
-        const isDateInRange = transactionDate >= fromDate && transactionDate <= toDate;
-        const isPatientTypeMatch = filters.patientType === 'all' || t.patientType === filters.patientType;
-        const isPaymentMethodMatch = filters.paymentMethod === 'all' || t.paymentMethod === filters.paymentMethod;
-
-        return isDateInRange && isPatientTypeMatch && isPaymentMethodMatch;
-    });
-
-    // --- 3. Calculate all stats and chart data directly from the filtered sources ---
 
     // Stat Card Data
     const allUmumCurrent = filteredTransactions.filter(t => t.paymentMethod === 'UMUM');
@@ -210,7 +221,6 @@ export default function DashboardPage() {
         categoryChartDataRI,
         currentPeriodStats,
         previousPeriodStats,
-        filteredTransactions,
         transactionsForStats,
     };
   }, [filters, transactions, inventory]);
@@ -337,14 +347,14 @@ export default function DashboardPage() {
        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <TopSellingItems 
           title="Obat Terlaris (Penjualan UMUM)"
-          transactions={filteredTransactions.filter(t => t.paymentMethod === 'UMUM')}
+          transactions={transactionsForStats.rjUmum.concat(transactionsForStats.riUmum)}
           inventory={inventory}
           itemType="Obat"
           icon={Pill}
         />
         <TopSellingItems 
           title="Alkes Terlaris (Penjualan UMUM)"
-          transactions={filteredTransactions.filter(t => t.paymentMethod === 'UMUM')}
+          transactions={transactionsForStats.rjUmum.concat(transactionsForStats.riUmum)}
           inventory={inventory}
           itemType="Alkes"
           icon={Stethoscope}
@@ -353,3 +363,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    

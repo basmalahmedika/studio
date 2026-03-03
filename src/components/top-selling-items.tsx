@@ -63,7 +63,7 @@ export function TopSellingItems({ title, icon: Icon, transactions, inventory, it
             <Icon className="h-5 w-5 text-muted-foreground" />
             {title}
         </CardTitle>
-        <CardDescription>5 item terlaris dari penjualan UMUM.</CardDescription>
+        <CardDescription>5 item terlaris dari penjualan UMUM dalam periode yang dipilih.</CardDescription>
       </CardHeader>
       <CardContent>
         <Table>
