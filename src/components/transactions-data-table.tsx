@@ -257,6 +257,7 @@ export function TransactionsDataTable() {
     setItemSearch(''); 
   }
   
+  // SOURCE OF TRUTH 1: Data filtered by global filters ONLY. This is used for export.
   const globallyFilteredData = React.useMemo(() => {
     return transactions
       .filter((transaction) => {
@@ -298,15 +299,7 @@ export function TransactionsDataTable() {
       });
   }, [transactions, inventory, filters]);
 
-  const groupedData = React.useMemo(() => {
-    if (!mrnFilter) {
-      return globallyFilteredData;
-    }
-    return globallyFilteredData.filter(transaction =>
-      transaction.medicalRecordNumber?.toLowerCase().includes(mrnFilter.toLowerCase())
-    );
-  }, [globallyFilteredData, mrnFilter]);
-
+  // The export function now SOLELY depends on `globallyFilteredData`.
   const handleExportData = () => {
     const flattenedData = globallyFilteredData.flatMap(t => {
         const recalculatedTotal = t.enrichedItems.reduce((sum, item) => sum + item.subtotal, 0);
@@ -336,6 +329,16 @@ export function TransactionsDataTable() {
     XLSX.writeFile(wb, 'riwayat_transaksi.xlsx');
   };
 
+  // SOURCE OF TRUTH 2: Data for display, derived from global data + local MRN filter.
+  const groupedData = React.useMemo(() => {
+    if (!mrnFilter) {
+      return globallyFilteredData;
+    }
+    return globallyFilteredData.filter(transaction =>
+      transaction.medicalRecordNumber?.toLowerCase().includes(mrnFilter.toLowerCase())
+    );
+  }, [globallyFilteredData, mrnFilter]);
+
   const filteredInventory = React.useMemo(() => {
     if (!itemSearch) return [];
     return inventory.filter(item => 
@@ -346,7 +349,7 @@ export function TransactionsDataTable() {
   
   const formatCurrency = (value: number) => `Rp ${value.toLocaleString('id-ID')}`;
 
-  // Pagination Logic
+  // Pagination Logic - uses `groupedData` for display.
   const totalItems = groupedData.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const paginatedData = groupedData.slice(
