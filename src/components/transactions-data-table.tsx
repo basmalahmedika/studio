@@ -258,20 +258,27 @@ export function TransactionsDataTable() {
   }
   
   const handleExportData = () => {
-    // Perform all filtering and data processing from scratch to ensure accuracy.
+    // This function performs a completely independent filtering and processing of the raw
+    // transaction data. This ensures the export is always accurate according to the
+    // global filters, regardless of any local UI filters (like the MRN search).
+    
+    // Robust date parsing to avoid timezone issues.
+    const parseDateUTC = (date: Date) => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+    const parseStringUTC = (dateString: string) => {
+        const [year, month, day] = dateString.split('-').map(Number);
+        return Date.UTC(year, month - 1, day);
+    };
+
+    const fromDateUTC = filters.date?.from ? parseDateUTC(filters.date.from) : null;
+    const toDateUTC = filters.date?.to ? parseDateUTC(filters.date.to) : null;
+
     const dataForExport = transactions
       .filter((transaction) => {
-        const transactionDate = new Date(transaction.date);
-        transactionDate.setHours(0, 0, 0, 0);
+        // Apply global filters from scratch
+        const transactionDateUTC = parseStringUTC(transaction.date);
 
-        const fromDate = filters.date?.from ? new Date(filters.date.from) : null;
-        if (fromDate) fromDate.setHours(0, 0, 0, 0);
-
-        const toDate = filters.date?.to ? new Date(filters.date.to) : null;
-        if (toDate) toDate.setHours(0, 0, 0, 0);
-
-        const isDateInRange = fromDate && toDate
-          ? transactionDate >= fromDate && transactionDate <= toDate
+        const isDateInRange = fromDateUTC && toDateUTC
+          ? transactionDateUTC >= fromDateUTC && transactionDateUTC <= toDateUTC
           : true;
 
         const patientTypeMatch = filters.patientType === 'all' || transaction.patientType === filters.patientType;
@@ -279,7 +286,7 @@ export function TransactionsDataTable() {
         
         return isDateInRange && patientTypeMatch && paymentMethodMatch;
       })
-      .map((t): GroupedTransaction => {
+      .flatMap(t => { // Enrich and flatten data in one go
         const enrichedItems = (t.items || []).map(item => {
           const inventoryItem = inventory.find(inv => inv.id === item.itemId);
           const purchasePrice = inventoryItem?.purchasePrice || 0;
@@ -295,12 +302,10 @@ export function TransactionsDataTable() {
             subtotal,
           };
         });
-        return { ...t, enrichedItems };
-      });
-      
-    const flattenedData = dataForExport.flatMap(t => {
-        const recalculatedTotal = t.enrichedItems.reduce((sum, item) => sum + item.subtotal, 0);
-        return t.enrichedItems.map(item => ({
+
+        const recalculatedTotal = enrichedItems.reduce((sum, item) => sum + item.subtotal, 0);
+        
+        return enrichedItems.map(item => ({
             'Tanggal': t.date,
             'No. Rekam Medis': t.medicalRecordNumber,
             'Tipe Pasien': t.patientType,
@@ -312,15 +317,15 @@ export function TransactionsDataTable() {
             'Margin': item.margin,
             'Subtotal Item': item.subtotal,
             'Total Transaksi': recalculatedTotal,
-        }))
+        }));
     });
 
-    if (flattenedData.length === 0) {
-      toast({ variant: 'destructive', title: 'Ekspor Gagal', description: 'Tidak ada data untuk diekspor.'});
+    if (dataForExport.length === 0) {
+      toast({ variant: 'destructive', title: 'Ekspor Gagal', description: 'Tidak ada data untuk diekspor berdasarkan filter yang dipilih.'});
       return;
     }
 
-    const ws = XLSX.utils.json_to_sheet(flattenedData);
+    const ws = XLSX.utils.json_to_sheet(dataForExport);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Transaksi');
     XLSX.writeFile(wb, 'riwayat_transaksi.xlsx');
