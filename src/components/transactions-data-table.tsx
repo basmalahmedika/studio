@@ -122,8 +122,6 @@ export function TransactionsDataTable() {
   const patientType = form.watch('patientType');
   const paymentMethod = form.watch('paymentMethod');
   
-  const currentTotal = watchedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-
   React.useEffect(() => {
     watchedItems.forEach((item, index) => {
         const inventoryItem = inventory.find(i => i.id === item.itemId);
@@ -144,7 +142,6 @@ export function TransactionsDataTable() {
 
 
   const onSubmit = async (values: TransactionFormValues) => {
-    // Recalculate prices and total right before submission to ensure accuracy
     const finalItems = values.items.map(item => {
         const inventoryItem = inventory.find(i => i.id === item.itemId);
         if (!inventoryItem) throw new Error(`Item ${item.itemName} tidak ditemukan di inventaris.`);
@@ -256,37 +253,41 @@ export function TransactionsDataTable() {
     }
     setItemSearch(''); 
   }
-  
-  const handleExportData = () => {
-    // This function performs a completely independent filtering and processing of the raw
-    // transaction data. This ensures the export is always accurate according to the
-    // global filters, regardless of any local UI filters (like the MRN search).
-    
-    // Robust date parsing to avoid timezone issues.
+
+  // --- START: CENTRALIZED DATA PROCESSING LOGIC ---
+
+  // 1. A single source of truth for globally filtered data.
+  // This uses robust UTC date logic to ensure consistency.
+  const globallyFilteredTransactions = React.useMemo(() => {
     const parseDateUTC = (date: Date) => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
     const parseStringUTC = (dateString: string) => {
-        const [year, month, day] = dateString.split('-').map(Number);
+        const parts = dateString.split('-').map(Number);
+        if (parts.length !== 3 || parts.some(isNaN)) return 0;
+        const [year, month, day] = parts;
         return Date.UTC(year, month - 1, day);
     };
 
     const fromDateUTC = filters.date?.from ? parseDateUTC(filters.date.from) : null;
     const toDateUTC = filters.date?.to ? parseDateUTC(filters.date.to) : null;
 
-    const dataForExport = transactions
-      .filter((transaction) => {
-        // Apply global filters from scratch
+    return transactions.filter(transaction => {
         const transactionDateUTC = parseStringUTC(transaction.date);
+        if (transactionDateUTC === 0) return false;
 
         const isDateInRange = fromDateUTC && toDateUTC
-          ? transactionDateUTC >= fromDateUTC && transactionDateUTC <= toDateUTC
-          : true;
+            ? transactionDateUTC >= fromDateUTC && transactionDateUTC <= toDateUTC
+            : true;
 
         const patientTypeMatch = filters.patientType === 'all' || transaction.patientType === filters.patientType;
         const paymentMethodMatch = filters.paymentMethod === 'all' || transaction.paymentMethod === filters.paymentMethod;
         
         return isDateInRange && patientTypeMatch && paymentMethodMatch;
-      })
-      .flatMap(t => { // Enrich and flatten data in one go
+    });
+  }, [transactions, filters]);
+
+  // 2. Export function now uses the centralized source of truth directly.
+  const handleExportData = () => {
+    const dataForExport = globallyFilteredTransactions.flatMap(t => {
         const enrichedItems = (t.items || []).map(item => {
           const inventoryItem = inventory.find(inv => inv.id === item.itemId);
           const purchasePrice = inventoryItem?.purchasePrice || 0;
@@ -331,28 +332,12 @@ export function TransactionsDataTable() {
     XLSX.writeFile(wb, 'riwayat_transaksi.xlsx');
   };
 
-  // Data for UI display
+  // 3. Data for UI display is derived from the centralized source of truth, with local filters applied.
   const groupedData = React.useMemo(() => {
-    return transactions
-      .filter((transaction) => {
-        const transactionDate = new Date(transaction.date);
-        transactionDate.setHours(0, 0, 0, 0);
-
-        const fromDate = filters.date?.from ? new Date(filters.date.from) : null;
-        if (fromDate) fromDate.setHours(0, 0, 0, 0);
-
-        const toDate = filters.date?.to ? new Date(filters.date.to) : null;
-        if (toDate) toDate.setHours(0, 0, 0, 0);
-
-        const isDateInRange = fromDate && toDate
-          ? transactionDate >= fromDate && transactionDate <= toDate
-          : true;
-
-        const patientTypeMatch = filters.patientType === 'all' || transaction.patientType === filters.patientType;
-        const paymentMethodMatch = filters.paymentMethod === 'all' || transaction.paymentMethod === filters.paymentMethod;
+    return globallyFilteredTransactions
+      .filter(transaction => {
         const mrnMatch = !mrnFilter || transaction.medicalRecordNumber?.toLowerCase().includes(mrnFilter.toLowerCase());
-        
-        return isDateInRange && patientTypeMatch && paymentMethodMatch && mrnMatch;
+        return mrnMatch;
       })
       .map((t): GroupedTransaction => {
         const enrichedItems = (t.items || []).map(item => {
@@ -372,7 +357,10 @@ export function TransactionsDataTable() {
         });
         return { ...t, enrichedItems };
       });
-  }, [transactions, inventory, filters, mrnFilter]);
+  }, [globallyFilteredTransactions, mrnFilter, inventory]);
+
+  // --- END: CENTRALIZED DATA PROCESSING LOGIC ---
+
 
   const filteredInventory = React.useMemo(() => {
     if (!itemSearch) return [];
