@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -58,10 +57,16 @@ export default function DashboardPage() {
 
     const parseDateUTC = (date: Date) => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
     const parseStringUTC = (dateString: string) => {
-        const parts = dateString.split('-').map(Number);
-        if (parts.length !== 3 || parts.some(isNaN)) return 0;
-        const [year, month, day] = parts;
-        return Date.UTC(year, month - 1, day);
+        try {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) throw new Error();
+            return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+        } catch (e) {
+            const parts = dateString.split('-').map(Number);
+            if (parts.length !== 3 || parts.some(isNaN)) return 0;
+            const [year, month, day] = parts;
+            return Date.UTC(year, month - 1, day);
+        }
     };
 
     const filterTransactionsByCriteria = (
@@ -266,7 +271,7 @@ export default function DashboardPage() {
       </div>
 
        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <TransactionDetailsDialog transactions={transactionsForStats.rjUmum} title="Detail Transaksi RJ (UMUM)">
+        <TransactionDetailsDialog transactions={transactionsForStats.rjUmum} inventory={inventory} title="Detail Transaksi RJ (UMUM)">
           <StatCard
             title="Transaksi RJ (UMUM)"
             value={currentPeriodStats.countRjUmum.toString()}
@@ -275,7 +280,7 @@ export default function DashboardPage() {
             className="bg-blue-600/90 text-white hover:bg-blue-600/80 cursor-pointer"
           />
         </TransactionDetailsDialog>
-        <TransactionDetailsDialog transactions={transactionsForStats.rjBpjs} title="Detail Transaksi RJ (BPJS)">
+        <TransactionDetailsDialog transactions={transactionsForStats.rjBpjs} inventory={inventory} title="Detail Transaksi RJ (BPJS)">
           <StatCard
             title="Transaksi RJ (BPJS)"
             value={currentPeriodStats.countRjBpjs.toString()}
@@ -284,7 +289,7 @@ export default function DashboardPage() {
             className="bg-blue-600/90 text-white hover:bg-blue-600/80 cursor-pointer"
           />
         </TransactionDetailsDialog>
-        <TransactionDetailsDialog transactions={transactionsForStats.riUmum} title="Detail Transaksi RI (UMUM)">
+        <TransactionDetailsDialog transactions={transactionsForStats.riUmum} inventory={inventory} title="Detail Transaksi RI (UMUM)">
           <StatCard
             title="Transaksi RI (UMUM)"
             value={currentPeriodStats.countRiUmum.toString()}
@@ -293,7 +298,7 @@ export default function DashboardPage() {
             className="bg-blue-600/90 text-white hover:bg-blue-600/80 cursor-pointer"
           />
         </TransactionDetailsDialog>
-        <TransactionDetailsDialog transactions={transactionsForStats.riBpjs} title="Detail Transaksi RI (BPJS)">
+        <TransactionDetailsDialog transactions={transactionsForStats.riBpjs} inventory={inventory} title="Detail Transaksi RI (BPJS)">
           <StatCard
             title="Transaksi RI (BPJS)"
             value={currentPeriodStats.countRiBpjs.toString()}
@@ -363,5 +368,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    

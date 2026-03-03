@@ -1,10 +1,9 @@
-
 'use client';
 
 import * as React from 'react';
 import * as XLSX from 'xlsx';
 import { FileDown } from 'lucide-react';
-import type { Transaction } from '@/lib/types';
+import type { Transaction, InventoryItem } from '@/lib/types';
 import {
   Dialog,
   DialogContent,
@@ -25,18 +24,28 @@ import { Button } from '@/components/ui/button';
 
 interface TransactionDetailsDialogProps {
   transactions: Transaction[];
+  inventory: InventoryItem[];
   title: string;
   children: React.ReactNode;
 }
 
-export function TransactionDetailsDialog({ transactions, title, children }: TransactionDetailsDialogProps) {
+export function TransactionDetailsDialog({ transactions, inventory, title, children }: TransactionDetailsDialogProps) {
   const [isOpen, setIsOpen] = React.useState(false);
+
+  const calculateTotal = (transaction: Transaction): number => {
+    return (transaction.items || []).reduce((sum, item) => {
+        const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+        const purchasePrice = inventoryItem?.purchasePrice || 0;
+        const priceToUse = (transaction.paymentMethod === 'BPJS' || transaction.paymentMethod === 'Lain-lain') ? purchasePrice : item.price;
+        return sum + (priceToUse * item.quantity);
+    }, 0);
+  };
 
   const handleExport = () => {
     const dataToExport = transactions.map(t => ({
       'No. Rekam Medis': t.medicalRecordNumber,
       'Tanggal': t.date,
-      'Total Transaksi': t.totalPrice,
+      'Total Transaksi': calculateTotal(t),
     }));
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
@@ -77,7 +86,7 @@ export function TransactionDetailsDialog({ transactions, title, children }: Tran
                   <TableRow key={t.id}>
                     <TableCell className="font-medium">{t.medicalRecordNumber}</TableCell>
                     <TableCell>{t.date}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(t.totalPrice)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(calculateTotal(t))}</TableCell>
                   </TableRow>
                 ))
               ) : (
