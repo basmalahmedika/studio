@@ -259,10 +259,16 @@ export function TransactionsDataTable() {
   const globallyFilteredTransactions = React.useMemo(() => {
     const parseDateUTC = (date: Date) => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
     const parseStringUTC = (dateString: string) => {
-        const parts = dateString.split('-').map(Number);
-        if (parts.length !== 3 || parts.some(isNaN)) return 0;
-        const [year, month, day] = parts;
-        return Date.UTC(year, month - 1, day);
+        try {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) throw new Error();
+            return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+        } catch (e) {
+            const parts = dateString.split('-').map(Number);
+            if (parts.length !== 3 || parts.some(isNaN)) return 0;
+            const [year, month, day] = parts;
+            return Date.UTC(year, month - 1, day);
+        }
     };
 
     const fromDateUTC = filters.date?.from ? parseDateUTC(filters.date.from) : null;
@@ -282,48 +288,39 @@ export function TransactionsDataTable() {
         return isDateInRange && patientTypeMatch && paymentMethodMatch;
     });
   }, [transactions, filters]);
-
+  
   const handleExportData = () => {
-    if (globallyFilteredTransactions.length === 0) {
-      toast({ variant: 'destructive', title: 'Ekspor Gagal', description: 'Tidak ada data untuk diekspor berdasarkan filter yang dipilih.'});
-      return;
-    }
-    
     const dataForExport: any[] = [];
 
     globallyFilteredTransactions.forEach(t => {
       const transactionItems = t.items || [];
-      const enrichedItems = transactionItems.map(item => {
+      
+      const recalculatedTotal = transactionItems.reduce((sum, item) => {
         const inventoryItem = inventory.find(inv => inv.id === item.itemId);
         const purchasePrice = inventoryItem?.purchasePrice || 0;
-        const sellingPrice = (t.paymentMethod === 'BPJS' || t.paymentMethod === 'Lain-lain') ? purchasePrice : item.price;
-        const margin = sellingPrice - purchasePrice;
-        const subtotal = sellingPrice * item.quantity;
-        return {
-          ...item,
-          price: sellingPrice,
-          itemName: inventoryItem?.itemName || 'Item Tidak Dikenal',
-          purchasePrice,
-          margin,
-          subtotal,
-        };
-      });
-      
-      const recalculatedTotal = enrichedItems.reduce((sum, item) => sum + item.subtotal, 0);
+        const priceToUse = (t.paymentMethod === 'BPJS' || t.paymentMethod === 'Lain-lain') ? purchasePrice : item.price;
+        return sum + (priceToUse * item.quantity);
+      }, 0);
 
-      if (enrichedItems.length > 0) {
-        enrichedItems.forEach(item => {
+      if (transactionItems.length > 0) {
+        transactionItems.forEach(item => {
+          const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+          const purchasePrice = inventoryItem?.purchasePrice || 0;
+          const sellingPrice = (t.paymentMethod === 'BPJS' || t.paymentMethod === 'Lain-lain') ? purchasePrice : item.price;
+          const margin = sellingPrice - purchasePrice;
+          const subtotal = sellingPrice * item.quantity;
+          
           dataForExport.push({
             'Tanggal': t.date,
             'No. Rekam Medis': t.medicalRecordNumber,
             'Tipe Pasien': t.patientType,
             'Metode Pembayaran': t.paymentMethod,
-            'Nama Item': item.itemName,
+            'Nama Item': inventoryItem?.itemName || 'Item Tidak Dikenal',
             'Kuantitas': item.quantity,
-            'Harga Beli': item.purchasePrice,
-            'Harga Jual': item.price,
-            'Margin': item.margin,
-            'Subtotal Item': item.subtotal,
+            'Harga Beli': purchasePrice,
+            'Harga Jual': sellingPrice,
+            'Margin': margin,
+            'Subtotal Item': subtotal,
             'Total Transaksi': recalculatedTotal,
           });
         });
@@ -339,10 +336,15 @@ export function TransactionsDataTable() {
             'Harga Jual': 0,
             'Margin': 0,
             'Subtotal Item': 0,
-            'Total Transaksi': t.totalPrice,
+            'Total Transaksi': 0,
         });
       }
     });
+
+    if (dataForExport.length === 0) {
+      toast({ variant: 'destructive', title: 'Ekspor Gagal', description: 'Tidak ada data untuk diekspor berdasarkan filter yang dipilih.'});
+      return;
+    }
 
     const ws = XLSX.utils.json_to_sheet(dataForExport);
     const wb = XLSX.utils.book_new();
@@ -581,7 +583,16 @@ export function TransactionsDataTable() {
                            
                         </div>
                       </CardContent>
-                      
+                      <CardFooter className="flex justify-end pt-4">
+                        <div className="text-right">
+                            <p className="text-sm text-muted-foreground">Total Transaksi</p>
+                            <p className="text-2xl font-bold">
+                                {formatCurrency(
+                                watchedItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+                                )}
+                            </p>
+                        </div>
+                      </CardFooter>
                     </Card>
 
                     <DialogFooter>
