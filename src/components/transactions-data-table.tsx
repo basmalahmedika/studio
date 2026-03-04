@@ -103,6 +103,11 @@ export function TransactionsDataTable() {
   
   const [currentPage, setCurrentPage] = React.useState(1);
   const [itemsPerPage, setItemsPerPage] = React.useState(10);
+  
+  const [isConfirming, setIsConfirming] = React.useState(false);
+  const [isDuplicateWarning, setIsDuplicateWarning] = React.useState(false);
+  const [transactionToSave, setTransactionToSave] = React.useState<TransactionFormValues | null>(null);
+
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
@@ -142,8 +147,7 @@ export function TransactionsDataTable() {
     });
   }, [patientType, paymentMethod, fields, inventory, update, watchedItems]);
 
-
-  const onSubmit = async (values: TransactionFormValues) => {
+  const handleSaveTransaction = async (values: TransactionFormValues) => {
     const finalItems = values.items.map(item => {
         const inventoryItem = inventory.find(i => i.id === item.itemId);
         if (!inventoryItem) throw new Error(`Item ${item.itemName} tidak ditemukan di inventaris.`);
@@ -185,9 +189,31 @@ export function TransactionsDataTable() {
             title: "Transaksi Gagal",
             description: error.message || "Terjadi kesalahan yang tidak terduga.",
         });
+    } finally {
+        setTransactionToSave(null);
     }
   };
-  
+
+  const onSubmit = (values: TransactionFormValues) => {
+    if (!values.id) {
+        const todayString = format(values.date, 'yyyy-MM-dd');
+        const isDuplicate = transactions.some(t =>
+            t.date === todayString &&
+            t.medicalRecordNumber === values.medicalRecordNumber &&
+            t.patientType === values.patientType &&
+            t.paymentMethod === values.paymentMethod
+        );
+
+        if (isDuplicate) {
+            setTransactionToSave(values);
+            setIsDuplicateWarning(true);
+            return;
+        }
+    }
+    setTransactionToSave(values);
+    setIsConfirming(true);
+  };
+
   const handleEdit = (transactionId: string) => {
      const transaction = transactions.find(t => t.id === transactionId);
      if (!transaction) return;
@@ -396,378 +422,420 @@ export function TransactionsDataTable() {
   );
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <CardTitle>Riwayat Transaksi</CardTitle>
-            <CardDescription className="mt-1">
-              Menampilkan {globallyFilteredTransactions.length} transaksi yang cocok dengan filter global.
-            </CardDescription>
-          </div>
-          <div className="flex flex-wrap gap-2">
-             <Button variant="outline" onClick={handleExportData}>
-              <FileDown className="mr-2 h-4 w-4" />
-              Ekspor Excel
-            </Button>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={handleOpenAddNew}>
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Tambah Transaksi Baru
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>{form.getValues('id') ? 'Ubah Transaksi' : 'Tambah Transaksi Baru'}</DialogTitle>
-                  <DialogDescription>
-                    Isi formulir di bawah ini untuk membuat transaksi baru.
-                  </DialogDescription>
-                </DialogHeader>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                       <FormField
-                        control={form.control}
-                        name="date"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-col">
-                            <FormLabel>Tanggal Transaksi</FormLabel>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <FormControl>
-                                  <Button
-                                    variant={"outline"}
-                                    className={cn("w-full pl-3 text-left font-normal",!field.value && "text-muted-foreground")}>
-                                    {field.value ? (format(field.value, "PPP")) : (<span>Pilih tanggal</span>)}
-                                    <CalendarIconLucide className="ml-auto h-4 w-4 opacity-50" />
-                                  </Button>
-                                </FormControl>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar 
-                                  mode="single" 
-                                  selected={field.value} 
-                                  onSelect={field.onChange} 
-                                  captionLayout="dropdown-buttons"
-                                  fromYear={1900}
-                                  toYear={new Date().getFullYear() + 5}
-                                  initialFocus 
-                                />
-                              </PopoverContent>
-                            </Popover>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                       <FormField
+    <>
+      <AlertDialog open={isDuplicateWarning} onOpenChange={setIsDuplicateWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Peringatan Potensi Duplikasi</AlertDialogTitle>
+            <AlertDialogDescription>
+              Transaksi dengan No. RM, Tipe Pasien, dan Jenis Pembayaran yang sama sudah ada untuk hari ini. Apakah Anda yakin ingin melanjutkan?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setTransactionToSave(null)}>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              setIsDuplicateWarning(false);
+              setIsConfirming(true);
+            }}>
+              Ya, Tetap Simpan
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isConfirming} onOpenChange={setIsConfirming}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Konfirmasi Penyimpanan</AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda sudah yakin data transaksi yang Anda input sudah benar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setTransactionToSave(null)}>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              if (transactionToSave) {
+                handleSaveTransaction(transactionToSave);
+              }
+              setIsConfirming(false);
+            }}>
+              Simpan Transaksi
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <CardTitle>Riwayat Transaksi</CardTitle>
+              <CardDescription className="mt-1">
+                Menampilkan {globallyFilteredTransactions.length} transaksi yang cocok dengan filter global.
+              </CardDescription>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={handleExportData}>
+                <FileDown className="mr-2 h-4 w-4" />
+                Ekspor Excel
+              </Button>
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button onClick={handleOpenAddNew}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Tambah Transaksi Baru
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>{form.getValues('id') ? 'Ubah Transaksi' : 'Tambah Transaksi Baru'}</DialogTitle>
+                    <DialogDescription>
+                      Isi formulir di bawah ini untuk membuat transaksi baru.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <FormField
                           control={form.control}
-                          name="medicalRecordNumber"
+                          name="date"
                           render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>No. Rekam Medis</FormLabel>
-                              <FormControl>
-                                <Input placeholder="cth., RM123456" {...field} />
-                              </FormControl>
+                            <FormItem className="flex flex-col">
+                              <FormLabel>Tanggal Transaksi</FormLabel>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <FormControl>
+                                    <Button
+                                      variant={"outline"}
+                                      className={cn("w-full pl-3 text-left font-normal",!field.value && "text-muted-foreground")}>
+                                      {field.value ? (format(field.value, "PPP")) : (<span>Pilih tanggal</span>)}
+                                      <CalendarIconLucide className="ml-auto h-4 w-4 opacity-50" />
+                                    </Button>
+                                  </FormControl>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <Calendar 
+                                    mode="single" 
+                                    selected={field.value} 
+                                    onSelect={field.onChange} 
+                                    captionLayout="dropdown-buttons"
+                                    fromYear={1900}
+                                    toYear={new Date().getFullYear() + 5}
+                                    initialFocus 
+                                  />
+                                </PopoverContent>
+                              </Popover>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
-                       <FormField
-                          control={form.control}
-                          name="patientType"
-                          render={({ field }) => (
-                             <FormItem>
-                                <FormLabel>Tipe Pasien</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl>
-                                    <SelectTrigger>
-                                    <SelectValue placeholder="Pilih tipe pasien" />
-                                    </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                    <SelectItem value="Rawat Jalan">Rawat Jalan</SelectItem>
-                                    <SelectItem value="Rawat Inap">Rawat Inap</SelectItem>
-                                    <SelectItem value="Lain-lain">Lain-lain</SelectItem>
-                                </SelectContent>
-                                </Select>
-                                <FormMessage />
-                            </FormItem>
-                          )}
-                        />
                         <FormField
-                          control={form.control}
-                          name="paymentMethod"
-                          render={({ field }) => (
-                             <FormItem>
-                                <FormLabel>Metode Pembayaran</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            control={form.control}
+                            name="medicalRecordNumber"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>No. Rekam Medis</FormLabel>
                                 <FormControl>
-                                    <SelectTrigger>
-                                    <SelectValue placeholder="Pilih metode pembayaran" />
-                                    </SelectTrigger>
+                                  <Input placeholder="cth., RM123456" {...field} />
                                 </FormControl>
-                                <SelectContent>
-                                    <SelectItem value="UMUM">UMUM</SelectItem>
-                                    <SelectItem value="BPJS">BPJS</SelectItem>
-                                    <SelectItem value="Lain-lain">Lain-lain</SelectItem>
-                                </SelectContent>
-                                </Select>
                                 <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                    </div>
-                    
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Kasir</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-4">
-                           <div className="relative">
-                              <FormLabel>Tambah Item</FormLabel>
-                              <Input
-                                placeholder="Cari dan pilih item..."
-                                value={itemSearch}
-                                onChange={(e) => setItemSearch(e.target.value)}
-                              />
-                               {filteredInventory.length > 0 && (
-                                <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-auto">
-                                  {filteredInventory.map(item => (
-                                    <div 
-                                      key={item.id} 
-                                      onClick={() => handleAddItem(item)}
-                                      className="px-3 py-2 text-sm cursor-pointer hover:bg-accent"
-                                    >
-                                      {item.itemName} (Stok: {item.quantity})
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                           </div>
-                           <div className="space-y-2">
-                            {fields.map((field, index) => {
-                              const currentItem = watchedItems[index];
-                              const subtotal = currentItem.price * currentItem.quantity;
-                              return (
-                                <div key={field.id} className="grid grid-cols-12 items-center gap-2 p-2 rounded-md bg-muted text-sm">
-                                    <div className="col-span-4 font-medium">{currentItem.itemName}</div>
-                                    <div className="col-span-2">
-                                        <FormField
-                                          control={form.control}
-                                          name={`items.${index}.quantity`}
-                                          render={({ field }) => (
-                                            <FormItem>
-                                              <FormControl>
-                                                <Input type="number" {...field} className="h-8 w-full" />
-                                              </FormControl>
-                                            </FormItem>
-                                          )}
-                                        />
-                                    </div>
-                                    <div className="col-span-1 text-center">x</div>
-                                    <div className="col-span-2 text-right">{formatCurrency(currentItem.price)}</div>
-                                    <div className="col-span-1 text-center">=</div>
-                                    <div className="col-span-1 text-right font-semibold">{formatCurrency(subtotal)}</div>
-                                    <div className="col-span-1 text-right">
-                                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => remove(index)}>
-                                          <X className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                </div>
-                              )
-                            })}
-                           </div>
-                           {form.formState.errors.items && <p className="text-sm font-medium text-destructive">{form.formState.errors.items?.message || (form.formState.errors.items as any)?.root?.message}</p>}
-                           
-                        </div>
-                      </CardContent>
-                      <CardFooter className="flex justify-end pt-4">
-                        <div className="text-right">
-                            <p className="text-sm text-muted-foreground">Total Transaksi</p>
-                            <p className="text-2xl font-bold">
-                                {formatCurrency(
-                                watchedItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+                              </FormItem>
+                            )}
+                          />
+                        <FormField
+                            control={form.control}
+                            name="patientType"
+                            render={({ field }) => (
+                              <FormItem>
+                                  <FormLabel>Tipe Pasien</FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                  <FormControl>
+                                      <SelectTrigger>
+                                      <SelectValue placeholder="Pilih tipe pasien" />
+                                      </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                      <SelectItem value="Rawat Jalan">Rawat Jalan</SelectItem>
+                                      <SelectItem value="Rawat Inap">Rawat Inap</SelectItem>
+                                      <SelectItem value="Lain-lain">Lain-lain</SelectItem>
+                                  </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="paymentMethod"
+                            render={({ field }) => (
+                              <FormItem>
+                                  <FormLabel>Metode Pembayaran</FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                  <FormControl>
+                                      <SelectTrigger>
+                                      <SelectValue placeholder="Pilih metode pembayaran" />
+                                      </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                      <SelectItem value="UMUM">UMUM</SelectItem>
+                                      <SelectItem value="BPJS">BPJS</SelectItem>
+                                      <SelectItem value="Lain-lain">Lain-lain</SelectItem>
+                                  </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                      </div>
+                      
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Kasir</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-4">
+                            <div className="relative">
+                                <FormLabel>Tambah Item</FormLabel>
+                                <Input
+                                  placeholder="Cari dan pilih item..."
+                                  value={itemSearch}
+                                  onChange={(e) => setItemSearch(e.target.value)}
+                                />
+                                {filteredInventory.length > 0 && (
+                                  <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-auto">
+                                    {filteredInventory.map(item => (
+                                      <div 
+                                        key={item.id} 
+                                        onClick={() => handleAddItem(item)}
+                                        className="px-3 py-2 text-sm cursor-pointer hover:bg-accent"
+                                      >
+                                        {item.itemName} (Stok: {item.quantity})
+                                      </div>
+                                    ))}
+                                  </div>
                                 )}
-                            </p>
-                        </div>
-                      </CardFooter>
-                    </Card>
+                            </div>
+                            <div className="space-y-2">
+                              {fields.map((field, index) => {
+                                const currentItem = watchedItems[index];
+                                const subtotal = currentItem.price * currentItem.quantity;
+                                return (
+                                  <div key={field.id} className="grid grid-cols-12 items-center gap-2 p-2 rounded-md bg-muted text-sm">
+                                      <div className="col-span-4 font-medium">{currentItem.itemName}</div>
+                                      <div className="col-span-2">
+                                          <FormField
+                                            control={form.control}
+                                            name={`items.${index}.quantity`}
+                                            render={({ field }) => (
+                                              <FormItem>
+                                                <FormControl>
+                                                  <Input type="number" {...field} className="h-8 w-full" />
+                                                </FormControl>
+                                              </FormItem>
+                                            )}
+                                          />
+                                      </div>
+                                      <div className="col-span-1 text-center">x</div>
+                                      <div className="col-span-2 text-right">{formatCurrency(currentItem.price)}</div>
+                                      <div className="col-span-1 text-center">=</div>
+                                      <div className="col-span-1 text-right font-semibold">{formatCurrency(subtotal)}</div>
+                                      <div className="col-span-1 text-right">
+                                        <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => remove(index)}>
+                                            <X className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                            {form.formState.errors.items && <p className="text-sm font-medium text-destructive">{form.formState.errors.items?.message || (form.formState.errors.items as any)?.root?.message}</p>}
+                            
+                          </div>
+                        </CardContent>
+                        <CardFooter className="flex justify-end pt-4">
+                          <div className="text-right">
+                              <p className="text-sm text-muted-foreground">Total Transaksi</p>
+                              <p className="text-2xl font-bold">
+                                  {formatCurrency(
+                                  watchedItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+                                  )}
+                              </p>
+                          </div>
+                        </CardFooter>
+                      </Card>
 
-                    <DialogFooter>
-                      <DialogClose asChild>
-                          <Button type="button" variant="secondary">Batal</Button>
-                      </DialogClose>
-                      <Button type="submit">Simpan Transaksi</Button>
-                    </DialogFooter>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
+                      <DialogFooter>
+                        <DialogClose asChild>
+                            <Button type="button" variant="secondary">Batal</Button>
+                        </DialogClose>
+                        <Button type="submit">Simpan Transaksi</Button>
+                      </DialogFooter>
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
-        </div>
-         <div className="relative mt-4">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Cari berdasarkan No. Rekam Medis..."
-              className="w-full rounded-lg bg-background pl-8 md:w-[300px]"
-              value={mrnFilter}
-              onChange={(e) => setMrnFilter(e.target.value)}
-            />
-          </div>
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[120px]">Tanggal</TableHead>
-                <TableHead>No. RM / Pasien</TableHead>
-                <TableHead colSpan={5}>Detail Item</TableHead>
-                <TableHead className="text-right">Aksi</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paginatedData.length > 0 ? (
-                paginatedData.map((t) => {
-                  const recalculatedTotal = t.enrichedItems.reduce((sum, item) => sum + item.subtotal, 0);
-                  return (
-                  <React.Fragment key={t.id}>
-                    <TableRow className="bg-background hover:bg-background">
-                      <TableCell className="font-medium">{t.date}</TableCell>
-                      <TableCell>
-                        <div>{t.medicalRecordNumber}</div>
-                        <div className="text-xs text-muted-foreground">{t.patientType}</div>
-                      </TableCell>
-                      <TableCell colSpan={5}>
-                        <Badge variant={(t.paymentMethod === 'BPJS' || t.paymentMethod === 'Lain-lain') ? 'secondary' : 'outline'}>
-                            {t.paymentMethod}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                           <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="h-8 w-8 p-0">
-                                  <span className="sr-only">Buka menu</span>
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleEdit(t.id)}>
-                                  <Pen className="mr-2 h-4 w-4" />
-                                  Ubah
-                                </DropdownMenuItem>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button variant="ghost" className="w-full justify-start text-sm text-red-500 hover:text-red-500 hover:bg-red-50 p-2 font-normal">
-                                      <Trash2 className="mr-2 h-4 w-4" />
-                                      Hapus
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Apakah Anda benar-benar yakin?</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Tindakan ini tidak bisa dibatalkan. Ini akan menghapus transaksi secara permanen.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Batal</AlertDialogCancel>
-                                      <AlertDialogAction onClick={() => handleDelete(t.id)} className="bg-destructive hover:bg-destructive/90">
-                                        Hapus
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                    {t.enrichedItems.map((item, itemIndex) => (
-                        <TableRow key={item.itemId} className="bg-muted/50 hover:bg-muted/80">
-                            <TableCell colSpan={2}></TableCell>
-                            <TableCell className="font-medium">{item.itemName}</TableCell>
-                            <TableCell className="text-right">{item.quantity}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(item.price)}</TableCell>
-                            <TableCell className="text-right font-semibold">{formatCurrency(item.subtotal)}</TableCell>
-                            <TableCell colSpan={2}></TableCell>
-                        </TableRow>
-                    ))}
-                     <TableRow>
-                        <TableCell colSpan={5} className="text-right font-bold">Total Transaksi</TableCell>
-                        <TableCell className="text-right font-bold">{formatCurrency(recalculatedTotal)}</TableCell>
-                        <TableCell colSpan={2}></TableCell>
-                    </TableRow>
-                  </React.Fragment>
-                )})
-              ) : (
+          <div className="relative mt-4">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Cari berdasarkan No. Rekam Medis..."
+                className="w-full rounded-lg bg-background pl-8 md:w-[300px]"
+                value={mrnFilter}
+                onChange={(e) => setMrnFilter(e.target.value)}
+              />
+            </div>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center">
-                    Tidak ada hasil yang ditemukan.
-                  </TableCell>
+                  <TableHead className="w-[120px]">Tanggal</TableHead>
+                  <TableHead>No. RM / Pasien</TableHead>
+                  <TableHead colSpan={5}>Detail Item</TableHead>
+                  <TableHead className="text-right">Aksi</TableHead>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-       <CardFooter>
-        <div className="flex items-center justify-between w-full text-sm text-muted-foreground">
-          <div className="flex-1">
-            Menampilkan {paginatedData.length > 0 ? Math.min((currentPage - 1) * itemsPerPage + 1, totalItems) : 0} sampai {Math.min(currentPage * itemsPerPage, totalItems)} dari {totalItems} transaksi (hasil pencarian lokal).
-          </div>
-          <div className="flex items-center gap-4">
-             <div className="flex items-center gap-2">
-                <span>Baris per halaman</span>
-                 <Select
-                    value={`${itemsPerPage}`}
-                    onValueChange={(value) => {
-                      setItemsPerPage(Number(value));
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <SelectTrigger className="h-8 w-[70px]">
-                      <SelectValue placeholder={itemsPerPage} />
-                    </SelectTrigger>
-                    <SelectContent side="top">
-                      {[10, 25, 50, 100].map((pageSize) => (
-                        <SelectItem key={pageSize} value={`${pageSize}`}>
-                          {pageSize}
-                        </SelectItem>
+              </TableHeader>
+              <TableBody>
+                {paginatedData.length > 0 ? (
+                  paginatedData.map((t) => {
+                    const recalculatedTotal = t.enrichedItems.reduce((sum, item) => sum + item.subtotal, 0);
+                    return (
+                    <React.Fragment key={t.id}>
+                      <TableRow className="bg-background hover:bg-background">
+                        <TableCell className="font-medium">{t.date}</TableCell>
+                        <TableCell>
+                          <div>{t.medicalRecordNumber}</div>
+                          <div className="text-xs text-muted-foreground">{t.patientType}</div>
+                        </TableCell>
+                        <TableCell colSpan={5}>
+                          <Badge variant={(t.paymentMethod === 'BPJS' || t.paymentMethod === 'Lain-lain') ? 'secondary' : 'outline'}>
+                              {t.paymentMethod}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" className="h-8 w-8 p-0">
+                                    <span className="sr-only">Buka menu</span>
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleEdit(t.id)}>
+                                    <Pen className="mr-2 h-4 w-4" />
+                                    Ubah
+                                  </DropdownMenuItem>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button variant="ghost" className="w-full justify-start text-sm text-red-500 hover:text-red-500 hover:bg-red-50 p-2 font-normal">
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Hapus
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Apakah Anda benar-benar yakin?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Tindakan ini tidak bisa dibatalkan. Ini akan menghapus transaksi secara permanen.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Batal</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleDelete(t.id)} className="bg-destructive hover:bg-destructive/90">
+                                          Hapus
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                      {t.enrichedItems.map((item, itemIndex) => (
+                          <TableRow key={item.itemId} className="bg-muted/50 hover:bg-muted/80">
+                              <TableCell colSpan={2}></TableCell>
+                              <TableCell className="font-medium">{item.itemName}</TableCell>
+                              <TableCell className="text-right">{item.quantity}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(item.price)}</TableCell>
+                              <TableCell className="text-right font-semibold">{formatCurrency(item.subtotal)}</TableCell>
+                              <TableCell colSpan={2}></TableCell>
+                          </TableRow>
                       ))}
-                    </SelectContent>
-                  </Select>
-             </div>
-             <div className="w-20 text-center">
-                Halaman {currentPage} dari {totalPages}
+                      <TableRow>
+                          <TableCell colSpan={5} className="text-right font-bold">Total Transaksi</TableCell>
+                          <TableCell className="text-right font-bold">{formatCurrency(recalculatedTotal)}</TableCell>
+                          <TableCell colSpan={2}></TableCell>
+                      </TableRow>
+                    </React.Fragment>
+                  )})
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={8} className="h-24 text-center">
+                      Tidak ada hasil yang ditemukan.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+        <CardFooter>
+          <div className="flex items-center justify-between w-full text-sm text-muted-foreground">
+            <div className="flex-1">
+              Menampilkan {paginatedData.length > 0 ? Math.min((currentPage - 1) * itemsPerPage + 1, totalItems) : 0} sampai {Math.min(currentPage * itemsPerPage, totalItems)} dari {totalItems} transaksi (hasil pencarian lokal).
             </div>
-            <div className="flex gap-2">
-                 <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  <span className="sr-only">Halaman Sebelumnya</span>
-                </Button>
-                 <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages}
-                >
-                  <span className="sr-only">Halaman Berikutnya</span>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                  <span>Baris per halaman</span>
+                  <Select
+                      value={`${itemsPerPage}`}
+                      onValueChange={(value) => {
+                        setItemsPerPage(Number(value));
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <SelectTrigger className="h-8 w-[70px]">
+                        <SelectValue placeholder={itemsPerPage} />
+                      </SelectTrigger>
+                      <SelectContent side="top">
+                        {[10, 25, 50, 100].map((pageSize) => (
+                          <SelectItem key={pageSize} value={`${pageSize}`}>
+                            {pageSize}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+              </div>
+              <div className="w-20 text-center">
+                  Halaman {currentPage} dari {totalPages}
+              </div>
+              <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    <span className="sr-only">Halaman Sebelumnya</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                  >
+                    <span className="sr-only">Halaman Berikutnya</span>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+              </div>
             </div>
           </div>
-        </div>
-      </CardFooter>
-    </Card>
+        </CardFooter>
+      </Card>
+    </>
   );
 }
-
-    
